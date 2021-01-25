@@ -7,11 +7,9 @@ module Utilities =
         open System.Xml
         open System.Xml.Schema
 
-        type XmlSchemaGenerator(schemaSet: XmlSchemaSet, schemaInference: XmlSchemaInference) =
-            let mutable schemaSet = schemaSet
-            let schemaInference = schemaInference
-
-            new() = XmlSchemaGenerator(XmlSchemaSet(), XmlSchemaInference())
+        type XmlSchemaGenerator() =
+            let mutable schemaSet = XmlSchemaSet()
+            let schemaInference = XmlSchemaInference()
 
             member _.AddXml (path: string) =
                 let xmlReader = XmlReader.Create(path)
@@ -28,3 +26,6 @@ module Utilities =
                 let stringWriter = new StringWriter()
                 this.Schema.Write(stringWriter)
                 stringWriter.ToString()
+
+            member this.SaveSchemaToDisk path =
+                File.WriteAllText(path, this.SchemaString)
