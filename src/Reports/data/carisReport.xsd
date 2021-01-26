@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="utf-16"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="root">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="testDetails">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="labName" type="xs:string" />
+              <xs:element name="testName" type="xs:string" />
+              <xs:element name="testCode" type="xs:string" />
+              <xs:element name="labReportVersion" type="xs:string" />
+              <xs:element name="labReportID" type="xs:string" />
+              <xs:element name="reportType" type="xs:string" />
+              <xs:element name="orderedDate" type="xs:string" />
+              <xs:element name="receivedDate" type="xs:string" />
+              <xs:element name="approvalInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="approvedBy" type="xs:string" />
+                    <xs:element name="approveDate" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="amendmentInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="amendmentType" type="xs:string" />
+                    <xs:element name="amendmentComments" type="xs:string" />
+                    <xs:element name="amendedLabReportID" type="xs:string" />
+                    <xs:element name="amendedBy" type="xs:string" />
+                    <xs:element name="amendedDate" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="patientInformation">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="fullName" type="xs:string" />
+              <xs:element name="lastName" type="xs:string" />
+              <xs:element name="firstName" type="xs:string" />
+              <xs:element name="middleName" type="xs:string" />
+              <xs:element name="dob" type="xs:date" />
+              <xs:element name="gender" type="xs:string" />
+              <xs:element name="mrn" type="xs:string" />
+              <xs:element name="icd_code" type="xs:string" />
+              <xs:element name="diagnosis" type="xs:string" />
+              <xs:element name="pathologicDiagnosis" type="xs:string" />
+              <xs:element name="primarySite" type="xs:string" />
+              <xs:element name="lineage" type="xs:string" />
+              <xs:element name="subLineage" type="xs:string" />
+              <xs:element name="contactInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="phone" type="xs:string" />
+                    <xs:element name="fax" />
+                    <xs:element name="email" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="addressInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="addressLine1" type="xs:string" />
+                    <xs:element name="addressLine2" type="xs:string" />
+                    <xs:element name="city" type="xs:string" />
+                    <xs:element name="state" type="xs:string" />
+                    <xs:element name="zipcode" type="xs:string" />
+                    <xs:element name="country" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="physicianInformation">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="npi" type="xs:unsignedInt" />
+              <xs:element name="fullName" type="xs:string" />
+              <xs:element name="lastName" type="xs:string" />
+              <xs:element name="firstName" type="xs:string" />
+              <xs:element name="middleName" />
+              <xs:element name="organization" type="xs:string" />
+              <xs:element name="sourceID" type="xs:unsignedInt" />
+              <xs:element name="contactInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="phone" type="xs:string" />
+                    <xs:element name="fax" type="xs:string" />
+                    <xs:element name="email" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="addressInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="addressLine1" type="xs:string" />
+                    <xs:element name="addressLine2" />
+                    <xs:element name="city" type="xs:string" />
+                    <xs:element name="district" />
+                    <xs:element name="state" type="xs:string" />
+                    <xs:element name="zipcode" type="xs:unsignedShort" />
+                    <xs:element name="country" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="pathologistInformation">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="npi" />
+              <xs:element name="fullName" />
+              <xs:element name="lastName" />
+              <xs:element name="firstName" />
+              <xs:element name="middleName" />
+              <xs:element name="organization" type="xs:string" />
+              <xs:element name="sourceID" />
+              <xs:element name="contactInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="phone" type="xs:string" />
+                    <xs:element name="fax" type="xs:string" />
+                    <xs:element name="email" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="addressInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="addressLine1" type="xs:string" />
+                    <xs:element name="addressLine2" />
+                    <xs:element name="city" type="xs:string" />
+                    <xs:element name="state" type="xs:string" />
+                    <xs:element name="zipcode" type="xs:string" />
+                    <xs:element name="country" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="labSpecific" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="healthcareOrganization">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="name" type="xs:string" />
+              <xs:element name="sourceID" type="xs:unsignedInt" />
+              <xs:element name="contactInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="phone" type="xs:string" />
+                    <xs:element name="fax" type="xs:string" />
+                    <xs:element name="email" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="addressInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="addressLine1" type="xs:string" />
+                    <xs:element name="addressLine2" />
+                    <xs:element name="city" type="xs:string" />
+                    <xs:element name="state" type="xs:string" />
+                    <xs:element name="zipcode" type="xs:unsignedShort" />
+                    <xs:element name="country" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="labSpecific" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="specimenInformation">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="tumorSpecimenInformation">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="specimenID" type="xs:string" />
+                    <xs:element name="specimenType" type="xs:string" />
+                    <xs:element name="specimenAccessionID" type="xs:string" />
+                    <xs:element name="specimenSite" type="xs:string" />
+                    <xs:element name="specimenCollectionDate" type="xs:date" />
+                    <xs:element name="specimenReceivedDate" type="xs:date" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="clinicalTrials">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:choice maxOccurs="unbounded">
+                <xs:element name="nctID" type="xs:string" />
+                <xs:element name="titleBrief" type="xs:string" />
+              </xs:choice>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="therapies">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="therapyName" type="xs:string" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element maxOccurs="unbounded" name="tests">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="testName" type="xs:string" />
+              <xs:element name="testCode" type="xs:string" />
+              <xs:element name="platformTechnology" type="xs:string" />
+              <xs:element name="testMethodology" type="xs:string" />
+              <xs:element minOccurs="0" name="test_cancellation_reason" type="xs:string" />
+              <xs:element minOccurs="0" maxOccurs="unbounded" name="testResults">
+                <xs:complexType>
+                  <xs:sequence minOccurs="0">
+                    <xs:element minOccurs="0" name="translocation">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:choice maxOccurs="unbounded">
+                            <xs:element name="resultCount" type="xs:unsignedByte" />
+                            <xs:element name="gene" type="xs:string" />
+                            <xs:element name="biomarkerName" type="xs:string" />
+                            <xs:element name="result" type="xs:string" />
+                            <xs:element name="result_group" type="xs:string" />
+                            <xs:element name="therapyRecommendation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="therapyName" type="xs:string" />
+                                  <xs:element name="therapySensitivity" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="genomicSource" type="xs:string" />
+                            <xs:element name="genomeBuild" type="xs:string" />
+                            <xs:element name="fusionISOForm" type="xs:string" />
+                            <xs:element name="gene1" type="xs:string" />
+                            <xs:element name="exon1" type="xs:unsignedByte" />
+                            <xs:element name="transcriptID1" type="xs:string" />
+                            <xs:element name="gene2" type="xs:string" />
+                            <xs:element name="exon2" type="xs:unsignedByte" />
+                            <xs:element name="transcriptID2" type="xs:string" />
+                            <xs:element name="genomicBreakpoint" type="xs:string" />
+                            <xs:element name="interpretation" type="xs:string" />
+                            <xs:element name="labSpecific">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="analysisConfigurationName" type="xs:string" />
+                                  <xs:element name="analysisConfigurationVersion" type="xs:string" />
+                                  <xs:element name="analysisPipelineName" type="xs:string" />
+                                  <xs:element name="analysisPipelineVersion" type="xs:string" />
+                                  <xs:element name="NGSPanelName" type="xs:string" />
+                                  <xs:element name="NGSPanelVersion" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="clinicalTrialRecommendation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="nctID" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                          </xs:choice>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element minOccurs="0" name="genomicLevelHeterozygosity">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="resultCount" type="xs:unsignedByte" />
+                          <xs:element name="biomarkerName" type="xs:string" />
+                          <xs:element name="result" type="xs:string" />
+                          <xs:element name="LOHpercentage" type="xs:unsignedByte" />
+                          <xs:element name="result_group" type="xs:string" />
+                          <xs:element name="genomicSource" type="xs:string" />
+                          <xs:element name="interpretation" type="xs:string" />
+                          <xs:element name="labSpecific">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="analysisConfigurationName" type="xs:string" />
+                                <xs:element name="analysisConfigurationVersion" type="xs:string" />
+                                <xs:element name="analysisPipelineName" type="xs:string" />
+                                <xs:element name="analysisPipelineVersion" type="xs:string" />
+                                <xs:element name="NGSPanelName" type="xs:string" />
+                                <xs:element name="NGSPanelVersion" type="xs:string" />
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element minOccurs="0" name="microsatelliteInstability">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="resultCount" type="xs:unsignedByte" />
+                          <xs:element name="biomarkerName" type="xs:string" />
+                          <xs:element name="msiCall" type="xs:string" />
+                          <xs:element name="result_group" type="xs:string" />
+                          <xs:element name="genomicSource" type="xs:string" />
+                          <xs:element name="interpretation" type="xs:string" />
+                          <xs:element name="labSpecific">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="analysisConfigurationName" type="xs:string" />
+                                <xs:element name="analysisConfigurationVersion" type="xs:string" />
+                                <xs:element name="analysisPipelineName" type="xs:string" />
+                                <xs:element name="analysisPipelineVersion" type="xs:string" />
+                                <xs:element name="NGSPanelName" type="xs:string" />
+                                <xs:element name="NGSPanelVersion" type="xs:string" />
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element minOccurs="0" name="tumorMutationBurden">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="resultCount" type="xs:unsignedByte" />
+                          <xs:element name="biomarkerName" type="xs:string" />
+                          <xs:element name="result_group" type="xs:string" />
+                          <xs:element name="mutationBurdenCall" type="xs:string" />
+                          <xs:element name="mutationBurdenScore" type="xs:string" />
+                          <xs:element name="mutationBurdenUnit" type="xs:string" />
+                          <xs:element name="genomicSource" type="xs:string" />
+                          <xs:element name="interpretation" type="xs:string" />
+                          <xs:element name="labSpecific">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="analysisConfigurationName" type="xs:string" />
+                                <xs:element name="analysisConfigurationVersion" type="xs:string" />
+                                <xs:element name="analysisPipelineName" type="xs:string" />
+                                <xs:element name="analysisPipelineVersion" type="xs:string" />
+                                <xs:element name="NGSPanelName" type="xs:string" />
+                                <xs:element name="NGSPanelVersion" type="xs:string" />
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element minOccurs="0" name="genomicAlteration">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:choice maxOccurs="unbounded">
+                            <xs:element name="resultCount" type="xs:unsignedByte" />
+                            <xs:element name="biomarkerName" type="xs:string" />
+                            <xs:element name="result" type="xs:string" />
+                            <xs:element name="result_group" type="xs:string" />
+                            <xs:element name="gene" type="xs:string" />
+                            <xs:element name="hgvsCodingChange" type="xs:string" />
+                            <xs:element name="hgvsProteinChange" type="xs:string" />
+                            <xs:element name="chromosome" type="xs:string" />
+                            <xs:element name="genomeBuild" type="xs:string" />
+                            <xs:element name="exon" type="xs:string" />
+                            <xs:element name="genomicSource" type="xs:string" />
+                            <xs:element name="dbVarID" type="xs:string" />
+                            <xs:element name="alterationDetails">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="transcriptAlterationDetails">
+                                    <xs:complexType>
+                                      <xs:sequence>
+                                        <xs:element name="referenceNucleotide" type="xs:string" />
+                                        <xs:element name="observedNucleotide" type="xs:string" />
+                                        <xs:element name="transcriptStartPosition" type="xs:unsignedInt" />
+                                        <xs:element name="transcriptStopPosition" type="xs:unsignedInt" />
+                                        <xs:element name="transcriptID" type="xs:string" />
+                                        <xs:element name="transcriptIDSource" type="xs:string" />
+                                      </xs:sequence>
+                                    </xs:complexType>
+                                  </xs:element>
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="molecularConsequence" type="xs:string" />
+                            <xs:element name="alleleFrequencyInformation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="alleleFrequency" type="xs:unsignedByte" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="readInformation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element minOccurs="0" name="readPercentage" />
+                                  <xs:element minOccurs="0" name="readDepth" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="unknownSignificance" type="xs:boolean" />
+                            <xs:element name="wildtypeBiomarker" type="xs:boolean" />
+                            <xs:element name="interpretation" type="xs:string" />
+                            <xs:element name="clinicalTrialRecommendation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="nctID" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="therapyRecommendation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="therapyName" type="xs:string" />
+                                  <xs:element name="therapySensitivity" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="labSpecific">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="analysisConfigurationName" type="xs:string" />
+                                  <xs:element name="analysisConfigurationVersion" type="xs:string" />
+                                  <xs:element name="analysisPipelineName" type="xs:string" />
+                                  <xs:element name="analysisPipelineVersion" type="xs:string" />
+                                  <xs:element name="NGSPanelName" type="xs:string" />
+                                  <xs:element name="NGSPanelVersion" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                          </xs:choice>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element minOccurs="0" name="copyNumberAlteration">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:choice maxOccurs="unbounded">
+                            <xs:element name="resultCount" type="xs:unsignedByte" />
+                            <xs:element name="biomarkerName" type="xs:string" />
+                            <xs:element name="gene" type="xs:string" />
+                            <xs:element name="result" type="xs:string" />
+                            <xs:element name="result_group" type="xs:string" />
+                            <xs:element name="chromosome" type="xs:string" />
+                            <xs:element name="genomicCoordinates" type="xs:string" />
+                            <xs:element name="genomeBuild" type="xs:string" />
+                            <xs:element name="genomicSource" type="xs:string" />
+                            <xs:element name="labSpecific">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="analysisConfigurationName" type="xs:string" />
+                                  <xs:element name="analysisConfigurationVersion" type="xs:string" />
+                                  <xs:element name="analysisPipelineName" type="xs:string" />
+                                  <xs:element name="analysisPipelineVersion" type="xs:string" />
+                                  <xs:element name="NGSPanelName" type="xs:string" />
+                                  <xs:element name="NGSPanelVersion" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="copyNumberType" type="xs:string" />
+                            <xs:element name="copyNumber" type="xs:string" />
+                            <xs:element name="dbVarID" />
+                            <xs:element name="interpretation" />
+                            <xs:element name="copyNumberControl" type="xs:decimal" />
+                            <xs:element name="copyNumberCounted" type="xs:string" />
+                            <xs:element name="copyNumberRatio" type="xs:decimal" />
+                            <xs:element name="probeSetName" type="xs:string" />
+                            <xs:element name="threshold" type="xs:string" />
+                            <xs:element name="therapyRecommendation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="therapyName" type="xs:string" />
+                                  <xs:element name="therapySensitivity" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                            <xs:element name="clinicalTrialRecommendation">
+                              <xs:complexType>
+                                <xs:sequence>
+                                  <xs:element name="nctID" type="xs:string" />
+                                </xs:sequence>
+                              </xs:complexType>
+                            </xs:element>
+                          </xs:choice>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element minOccurs="0" name="expressionAlteration">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="resultCount" type="xs:unsignedByte" />
+                          <xs:element name="expressionType" type="xs:string" />
+                          <xs:element name="biomarkerName" type="xs:string" />
+                          <xs:element name="result" type="xs:string" />
+                          <xs:element name="result_group" type="xs:string" />
+                          <xs:element maxOccurs="unbounded" name="gene" type="xs:string" />
+                          <xs:element minOccurs="0" name="tcResult" type="xs:string" />
+                          <xs:element minOccurs="0" name="tcIntensity" type="xs:string" />
+                          <xs:element minOccurs="0" name="tcStainPercent" type="xs:unsignedByte" />
+                          <xs:element minOccurs="0" name="tcThreshold" type="xs:string" />
+                          <xs:element minOccurs="0" name="icResult" type="xs:string" />
+                          <xs:element minOccurs="0" name="icStainPercent" type="xs:unsignedByte" />
+                          <xs:element minOccurs="0" name="icThreshold" type="xs:string" />
+                          <xs:element minOccurs="0" name="intensity" type="xs:string" />
+                          <xs:element minOccurs="0" name="stainPercent" type="xs:string" />
+                          <xs:element minOccurs="0" name="threshold" type="xs:string" />
+                          <xs:element name="isExpressed" type="xs:boolean" />
+                          <xs:element name="genomicSource" type="xs:string" />
+                          <xs:element name="equivocal" type="xs:boolean" />
+                          <xs:element name="interpretation" />
+                          <xs:element minOccurs="0" name="therapyRecommendation">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="therapyName" type="xs:string" />
+                                <xs:element name="therapySensitivity" type="xs:string" />
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                          <xs:element minOccurs="0" name="clinicalTrialRecommendation">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="nctID" type="xs:string" />
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
