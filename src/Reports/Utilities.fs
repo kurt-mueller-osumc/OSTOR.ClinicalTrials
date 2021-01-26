@@ -1,6 +1,13 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Utilities =
+    module Regex =
+        open System.Text.RegularExpressions
+
+        /// Remove a regex expression from a string
+        let remove regex string =
+            Regex.Replace(string, regex, "")
+
     module Xml =
         open System.IO
         open System.Linq
@@ -16,11 +23,9 @@ module Utilities =
 
                 schemaSet <- schemaInference.InferSchema(xmlReader, schemaSet)
 
-            member _.Schemas =
-                Enumerable.Cast<XmlSchema>(schemaSet.Schemas())
+            member _.Schemas = Enumerable.Cast<XmlSchema>(schemaSet.Schemas())
 
-            member this.Schema =
-                this.Schemas.First()
+            member this.Schema = this.Schemas.First()
 
             member this.SchemaString =
                 let stringWriter = new StringWriter()
