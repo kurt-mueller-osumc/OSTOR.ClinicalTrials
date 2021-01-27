@@ -1,6 +1,12 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Utilities =
+    module DateTime =
+        let tryParse(input: string) =
+            match System.DateTime.TryParse(input) with
+            | (true, dateTime) -> Some dateTime
+            | _ -> None
+
     module Regex =
         open System.Text.RegularExpressions
 
@@ -15,7 +21,6 @@ module Utilities =
 
         let writeToDisk path string =
             File.WriteAllText(path, string)
-
 
     module Xml =
         open System.IO
@@ -55,3 +60,6 @@ module Utilities =
         module SchemaGenerator =
             let addXml xmlPath (schemaGenerator: XmlSchemaGenerator) =
                 schemaGenerator.AddXml xmlPath
+
+            let schemaString (schemaGenerator: XmlSchemaGenerator) =
+                schemaGenerator.SchemaString
