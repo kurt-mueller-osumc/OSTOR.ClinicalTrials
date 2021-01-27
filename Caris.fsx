@@ -1,43 +1,29 @@
+#r "nuget: FSharp.Data"
+#r "./src/Reports/bin/Debug/net5.0/Reports.dll"
+
 open System.IO
-open System.Xml
-open System.Xml.Schema
-open System.Linq
+open System.Xml.Linq
 
-type XmlSchemaGenerator(schemaSet: XmlSchemaSet, schemaInference: XmlSchemaInference) =
-    let mutable schemaSet = schemaSet
-    let schemaInference = schemaInference
+open FSharp.Data
 
-    new() = XmlSchemaGenerator(XmlSchemaSet(), XmlSchemaInference())
+[<Literal>]
+let fmiClinicalReportXsdPath = __SOURCE_DIRECTORY__ + "/src/Reports/data/fmiReport1.xsd"
 
-    member _.AddXml (path: string) =
-        let xmlReader = XmlReader.Create(path)
-
-        schemaSet <- schemaInference.InferSchema(xmlReader, schemaSet)
-
-    member _.Schemas =
-        Enumerable.Cast<XmlSchema>(schemaSet.Schemas())
-
-    member this.Schema =
-        this.Schemas.First()
-
-    member this.SchemaString =
-        let stringWriter = new StringWriter()
-        this.Schema.Write(stringWriter)
-        stringWriter.ToString()
+type FmiClinicalReportXsd = XmlProvider<Schema = fmiClinicalReportXsdPath>
 
 
-let schemaGenerator = XmlSchemaGenerator()
+[<Literal>]
+let fmiXmlsPath = "./data/FMI/ORD-0758611-01.xml"
+let xmlText = File.ReadAllText(fmiXmlsPath)
 
-schemaGenerator.AddXml("./data/Caris/TN20-111602_2020-11-12_00.27.xml")
-schemaGenerator.AddXml("./data/Caris/TN15-115563_2020-11-13_21.26.xml")
-schemaGenerator.AddXml("./data/Caris/TN20-111602_2020-11-12_00.27.xml")
-schemaGenerator.AddXml("./data/Caris/TN20-116512_2020-11-11_15.17.xml")
-schemaGenerator.AddXml("./data/Caris/TN20-139284_2020-11-11_15.42.xml")
-schemaGenerator.AddXml("./data/Caris/TN20-153400_2020-11-12_00.10.xml")
+let rrNs = XNamespace.Get "http://integration.foundationmedicine.com/reporting"
+let xml = XDocument.Parse(xmlText)
 
-// let schema = schemaGenerator.Schemas.First()
-// let stringWriter = new StringWriter()
-// schema.Write(stringWriter)
+let finalReportElement = xml.Element(rrNs + "ResultsReport")
+                            .Element(rrNs + "ResultsPayload")
+                            .Element(XName.Get "FinalReport")
+                            .ToString()
 
+let fmiClinicalReport = FmiClinicalReportXsd.Parse(finalReportElement)
 
-
+fmiClinicalReport.Sample.ReceivedDate
