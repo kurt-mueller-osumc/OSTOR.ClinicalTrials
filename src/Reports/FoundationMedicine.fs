@@ -59,3 +59,12 @@ module FoundationMedicine =
           VariantName: VariantName }
     and GeneName = GeneName of string
     and VariantName = VariantName of string
+
+    type Gene =
+        { GeneName: GeneName
+          GeneAlterations: GeneAlteration list }
+    and GeneAlteration =
+        { AlterationName: GeneAlterationName
+          Interpretation: GeneAlterationInterpretation }
+    and GeneAlterationName = GeneAlterationName of name: string
+    and GeneAlterationInterpretation = GeneAlterationInterpretation of interpretation: string
