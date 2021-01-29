@@ -33,9 +33,10 @@ module Utilities =
             let schemaInference = XmlSchemaInference()
 
             member this.AddXml (path: string) =
-                let xmlReader = XmlReader.Create(path)
+                use xmlReader = XmlReader.Create(path)
 
                 schemaSet <- schemaInference.InferSchema(xmlReader, schemaSet)
+                schemaSet.Compile()
                 this
 
             member _.Schemas = Enumerable.Cast<XmlSchema>(schemaSet.Schemas())
