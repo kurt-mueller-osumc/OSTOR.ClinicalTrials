@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-16"?>
+<xs:schema xmlns:tns="http://foundationmedicine.com/compbio/variant-report-external" attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="http://foundationmedicine.com/compbio/variant-report-external" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="variant-report">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="samples">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="sample">
+                <xs:complexType>
+                  <xs:attribute name="bait-set" type="xs:string" use="required" />
+                  <xs:attribute name="mean-exon-depth" type="xs:decimal" use="optional" />
+                  <xs:attribute name="name" type="xs:string" use="required" />
+                  <xs:attribute name="nucleic-acid-type" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="quality-control">
+          <xs:complexType>
+            <xs:attribute name="status" type="xs:string" use="required" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="short-variants">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="short-variant">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="dna-evidence">
+                      <xs:complexType>
+                        <xs:attribute name="sample" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="allele-fraction" type="xs:decimal" use="required" />
+                  <xs:attribute name="cds-effect" type="xs:string" use="required" />
+                  <xs:attribute name="depth" type="xs:unsignedShort" use="required" />
+                  <xs:attribute name="equivocal" type="xs:boolean" use="required" />
+                  <xs:attribute name="functional-effect" type="xs:string" use="required" />
+                  <xs:attribute name="gene" type="xs:string" use="required" />
+                  <xs:attribute name="percent-reads" type="xs:decimal" use="required" />
+                  <xs:attribute name="position" type="xs:string" use="required" />
+                  <xs:attribute name="protein-effect" type="xs:string" use="required" />
+                  <xs:attribute name="status" type="xs:string" use="required" />
+                  <xs:attribute name="strand" type="xs:string" use="required" />
+                  <xs:attribute name="transcript" type="xs:string" use="required" />
+                  <xs:attribute name="subclonal" type="xs:boolean" use="optional" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="copy-number-alterations">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="copy-number-alteration">
+                <xs:complexType>
+                  <xs:sequence minOccurs="0">
+                    <xs:element name="dna-evidence">
+                      <xs:complexType>
+                        <xs:attribute name="sample" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="copy-number" type="xs:unsignedByte" use="required" />
+                  <xs:attribute name="equivocal" type="xs:boolean" use="required" />
+                  <xs:attribute name="gene" type="xs:string" use="required" />
+                  <xs:attribute name="number-of-exons" type="xs:string" use="required" />
+                  <xs:attribute name="position" type="xs:string" use="required" />
+                  <xs:attribute name="ratio" type="xs:decimal" use="required" />
+                  <xs:attribute name="status" type="xs:string" use="required" />
+                  <xs:attribute name="type" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="rearrangements">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="rearrangement">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="dna-evidence">
+                      <xs:complexType>
+                        <xs:attribute name="sample" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="description" type="xs:string" use="required" />
+                  <xs:attribute name="equivocal" type="xs:boolean" use="required" />
+                  <xs:attribute name="in-frame" type="xs:string" use="required" />
+                  <xs:attribute name="other-gene" type="xs:string" use="required" />
+                  <xs:attribute name="pos1" type="xs:string" use="required" />
+                  <xs:attribute name="pos2" type="xs:string" use="required" />
+                  <xs:attribute name="status" type="xs:string" use="required" />
+                  <xs:attribute name="supporting-read-pairs" type="xs:unsignedShort" use="required" />
+                  <xs:attribute name="targeted-gene" type="xs:string" use="required" />
+                  <xs:attribute name="type" type="xs:string" use="required" />
+                  <xs:attribute name="allele-fraction" type="xs:decimal" use="optional" />
+                  <xs:attribute name="percent-reads" type="xs:decimal" use="optional" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="biomarkers">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element name="microsatellite-instability">
+                <xs:complexType>
+                  <xs:attribute name="status" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+              <xs:element minOccurs="0" name="tumor-mutation-burden">
+                <xs:complexType>
+                  <xs:attribute name="score" type="xs:decimal" use="required" />
+                  <xs:attribute name="status" type="xs:string" use="required" />
+                  <xs:attribute name="unit" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="non-human-content">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="non-human">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="dna-evidence">
+                      <xs:complexType>
+                        <xs:attribute name="sample" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="organism" type="xs:string" use="required" />
+                  <xs:attribute name="reads-per-million" type="xs:unsignedShort" use="required" />
+                  <xs:attribute name="status" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="disease" type="xs:string" use="optional" />
+      <xs:attribute name="disease-ontology" type="xs:string" use="required" />
+      <xs:attribute name="flowcell-analysis" type="xs:unsignedInt" use="required" />
+      <xs:attribute name="gender" type="xs:string" use="required" />
+      <xs:attribute name="pathology-diagnosis" type="xs:string" use="required" />
+      <xs:attribute name="percent-tumor-nuclei" type="xs:unsignedByte" use="optional" />
+      <xs:attribute name="pipeline-version" type="xs:string" use="required" />
+      <xs:attribute name="purity-assessment" type="xs:decimal" use="optional" />
+      <xs:attribute name="specimen" type="xs:string" use="required" />
+      <xs:attribute name="study" type="xs:string" use="required" />
+      <xs:attribute name="test-request" type="xs:string" use="required" />
+      <xs:attribute name="test-type" type="xs:string" use="required" />
+      <xs:attribute name="tissue-of-origin" type="xs:string" use="required" />
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

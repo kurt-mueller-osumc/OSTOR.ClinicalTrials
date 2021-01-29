@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-16"?>
+<xsd:schema xmlns:rr="http://integration.foundationmedicine.com/reporting" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsd="http://www.w3.org/2001/XMLSchema" attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="http://integration.foundationmedicine.com/reporting">
+  <xs:import />
+  <xs:import namespace="http://foundationmedicine.com/compbio/variant-report-external" />
+  <xs:element name="ResultsReport">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="CustomerInformation">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="ReferenceID" />
+              <xs:element name="CSN" />
+              <xs:element name="TRF" type="xs:string" />
+              <xs:element name="MRN" type="xs:string" />
+              <xs:element name="PhysicianId" type="xs:unsignedInt" />
+              <xs:element name="NPI" type="xs:unsignedInt" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="ResultsPayload">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element ref="FinalReport" />
+              <xs:element xmlns:q1="http://foundationmedicine.com/compbio/variant-report-external" ref="q1:variant-report" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xsd:schema>

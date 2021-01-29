@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-16"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="FinalReport">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Application">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="ApplicationSettings">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="ApplicationSetting">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="Name" type="xs:string" />
+                          <xs:element name="Value" />
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="DemographicCorrectionDate" />
+        <xs:element name="ReportId" type="xs:string" />
+        <xs:element name="SampleName" type="xs:string" />
+        <xs:element name="Version" type="xs:unsignedByte" />
+        <xs:element name="Sample">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="FM_Id" type="xs:string" />
+              <xs:element name="SampleId" type="xs:string" />
+              <xs:element name="BlockId" type="xs:string" />
+              <xs:element name="TRFNumber" type="xs:string" />
+              <xs:element name="TestType" type="xs:string" />
+              <xs:element name="SpecFormat" type="xs:string" />
+              <xs:element name="ReceivedDate" type="xs:date" />
+              <xs:element name="processSites">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element maxOccurs="unbounded" name="processSite">
+                      <xs:complexType>
+                        <xs:attribute name="address" type="xs:string" use="required" />
+                        <xs:attribute name="cliaNumber" type="xs:string" use="required" />
+                        <xs:attribute name="locationID" type="xs:unsignedByte" use="required" />
+                        <xs:attribute name="locationName" type="xs:string" use="required" />
+                        <xs:attribute name="processID" type="xs:unsignedByte" use="required" />
+                        <xs:attribute name="processName" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="PMI">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="ReportId" type="xs:string" />
+              <xs:element name="MRN" type="xs:string" />
+              <xs:element name="FullName" type="xs:string" />
+              <xs:element name="FirstName" type="xs:string" />
+              <xs:element name="LastName" type="xs:string" />
+              <xs:element name="SubmittedDiagnosis" type="xs:string" />
+              <xs:element name="Gender" type="xs:string" />
+              <xs:element name="DOB" type="xs:date" />
+              <xs:element name="OrderingMD" type="xs:string" />
+              <xs:element name="OrderingMDId" type="xs:unsignedInt" />
+              <xs:element name="Pathologist" type="xs:string" />
+              <xs:element name="CopiedPhysician1" type="xs:string" />
+              <xs:element name="MedFacilName" type="xs:string" />
+              <xs:element name="MedFacilID" type="xs:unsignedInt" />
+              <xs:element name="SpecSite" type="xs:string" />
+              <xs:element name="CollDate" type="xs:date" />
+              <xs:element name="ReceivedDate" type="xs:date" />
+              <xs:element name="CountryOfOrigin" type="xs:string" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="PertinentNegatives">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="PertinentNegative">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Gene" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Summaries">
+          <xs:complexType>
+            <xs:attribute name="alterationCount" type="xs:unsignedShort" use="required" />
+            <xs:attribute name="clinicalTrialCount" type="xs:unsignedByte" use="required" />
+            <xs:attribute name="resistiveCount" type="xs:unsignedByte" use="required" />
+            <xs:attribute name="sensitizingCount" type="xs:unsignedByte" use="required" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="VariantProperties">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="VariantProperty">
+                <xs:complexType>
+                  <xs:attribute name="geneName" type="xs:string" use="required" />
+                  <xs:attribute name="isVUS" type="xs:boolean" use="required" />
+                  <xs:attribute name="variantName" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="priorTests" />
+        <xs:element name="Genes">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="Gene">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Name" type="xs:string" />
+                    <xs:element name="Include" type="xs:boolean" />
+                    <xs:element name="Alterations">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element maxOccurs="unbounded" name="Alteration">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="Name" type="xs:string" />
+                                <xs:element name="AlterationProperties">
+                                  <xs:complexType>
+                                    <xs:sequence>
+                                      <xs:element maxOccurs="unbounded" name="AlterationProperty">
+                                        <xs:complexType>
+                                          <xs:attribute name="isEquivocal" type="xs:boolean" use="required" />
+                                          <xs:attribute name="name" type="xs:string" use="required" />
+                                        </xs:complexType>
+                                      </xs:element>
+                                    </xs:sequence>
+                                  </xs:complexType>
+                                </xs:element>
+                                <xs:element name="Interpretation" type="xs:string" />
+                                <xs:element name="Include" type="xs:boolean" />
+                                <xs:element name="ClinicalTrialNote" type="xs:string" />
+                                <xs:element name="Therapies">
+                                  <xs:complexType>
+                                    <xs:sequence minOccurs="0">
+                                      <xs:element maxOccurs="unbounded" name="Therapy">
+                                        <xs:complexType>
+                                          <xs:sequence>
+                                            <xs:element name="Name" />
+                                            <xs:element name="GenericName" type="xs:string" />
+                                            <xs:element name="FDAApproved" type="xs:boolean" />
+                                            <xs:element name="Rationale" type="xs:string" />
+                                            <xs:element name="ApprovedUses" />
+                                            <xs:element name="Effect" type="xs:string" />
+                                            <xs:element name="Include" type="xs:boolean" />
+                                            <xs:element name="IncludeInSummary" type="xs:boolean" />
+                                            <xs:element name="ReferenceLinks" />
+                                          </xs:sequence>
+                                        </xs:complexType>
+                                      </xs:element>
+                                    </xs:sequence>
+                                  </xs:complexType>
+                                </xs:element>
+                                <xs:element name="ReferenceLinks" />
+                                <xs:element name="ClinicalTrialLinks">
+                                  <xs:complexType>
+                                    <xs:sequence minOccurs="0">
+                                      <xs:element maxOccurs="unbounded" name="ClinicalTrialLink">
+                                        <xs:complexType>
+                                          <xs:sequence>
+                                            <xs:element name="Include" type="xs:boolean" />
+                                          </xs:sequence>
+                                          <xs:attribute name="nctId" type="xs:string" use="required" />
+                                        </xs:complexType>
+                                      </xs:element>
+                                    </xs:sequence>
+                                  </xs:complexType>
+                                </xs:element>
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="ReferenceLinks" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Trials">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="Trial">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Gene" type="xs:string" />
+                    <xs:element name="Alteration" type="xs:string" />
+                    <xs:element name="Title" type="xs:string" />
+                    <xs:element name="StudyPhase" type="xs:string" />
+                    <xs:element name="Target" type="xs:string" />
+                    <xs:element name="Locations" type="xs:string" />
+                    <xs:element name="NCTID" type="xs:string" />
+                    <xs:element name="Note" type="xs:string" />
+                    <xs:element name="Include" type="xs:boolean" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="References">
+          <xs:complexType>
+            <xs:sequence minOccurs="0">
+              <xs:element maxOccurs="unbounded" name="Reference">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="ReferenceId" type="xs:unsignedInt" />
+                    <xs:element name="FullCitation" type="xs:string" />
+                    <xs:element name="Include" type="xs:boolean" />
+                  </xs:sequence>
+                  <xs:attribute name="number" type="xs:unsignedShort" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Signatures">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="Signature">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="ServerTime" type="xs:string" />
+                    <xs:element name="OpName" type="xs:string" />
+                    <xs:element name="Text" type="xs:string" />
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="reportProperties">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="reportProperty">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="value" type="xs:string" />
+                  </xs:sequence>
+                  <xs:attribute name="identifier" type="xs:string" use="required" />
+                  <xs:attribute name="key" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="comments" />
+        <xs:element name="AAC">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="Amendmends">
+                <xs:complexType>
+                  <xs:sequence minOccurs="0">
+                    <xs:element name="Amendmend">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="ModifiedDts" type="xs:string" />
+                          <xs:element name="IsSigned" type="xs:boolean" />
+                          <xs:element name="Comment" type="xs:string" />
+                          <xs:element name="Type" type="xs:string" />
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="StagingId" type="xs:unsignedInt" use="required" />
+      <xs:attribute name="clinicalId" type="xs:unsignedInt" use="required" />
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

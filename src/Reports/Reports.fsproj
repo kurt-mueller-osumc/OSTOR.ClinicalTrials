@@ -8,4 +8,10 @@
     <Compile Include="FoundationMedicine.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="data/FMI/clinicalReport.xsd" />
+    <EmbeddedResource Include="data/FMI/resultsReport.xsd" />
+    <EmbeddedResource Include="data/FMI/variantReport.xsd" />
+  </ItemGroup>
 </Project>
