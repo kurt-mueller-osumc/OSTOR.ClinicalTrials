@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Utilities.fs" />
+    <Compile Include="Common.fs" />
     <Compile Include="FoundationMedicine.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
