@@ -128,8 +128,13 @@ module FoundationMedicine =
         open System.IO
         open System.Xml.Linq
 
-        type ClinicalReportProvider = XmlProvider<Schema="./data/FMI/clinicalReport.xsd", EmbeddedResource="Report, clinicalReport.xsd">
-        type VariantReportProvider = XmlProvider<Schema="./data/FMI/variantReport.xsd", EmbeddedResource="Report, variantReport.xsd">
+        [<Literal>]
+        let ClinicalReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/clinicalReport.xsd"
+        [<Literal>]
+        let VariantReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/variantReport.xsd"
+
+        type ClinicalReportProvider = XmlProvider<Schema= ClinicalReportXsdPath, EmbeddedResource="Reports, clinicalReport.xsd">
+        type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource="Reports, variantReport.xsd">
 
         type Xml(filePath: string) =
             let filePath = filePath
