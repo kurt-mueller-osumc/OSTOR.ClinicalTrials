@@ -7,12 +7,46 @@ module FoundationMedicine =
         { ReportId: ReportId // FM_Id
           SampleId: SampleId
           ReceivedDate: ReceivedDate
-          BlockId: BlockId }
+          BlockId: BlockId
+          SpecimenFormat: SpecimenFormat }
     and SampleId = SampleId of string
     and ReceivedDate = ReceivedDate of System.DateTime
     and BlockId = BlockId of string
+    and SpecimenFormat = SpecimenFormat of string
 
     type SampleInput =
         { ReportId: ReportId
-          ReceivedDateInput: ReceivedDateInput }
+          SampleId: SampleId
+          ReceivedDateInput: ReceivedDateInput
+          BlockId: BlockId
+          SpecimenFormat: SpecimenFormat }
     and ReceivedDateInput = ReceivedDateInput of string
+
+    type PMI =
+        { ReportId: ReportId
+          MRN: MRN
+          LastName: LastName
+          FirstName: FirstName
+          SubmittedDiagnosis: SubmittedDiagnosis
+          Gender: Gender
+          DateOfBirth: DateOfBirth
+          OrderingMdName: OrderingMdName
+          SpecimenSite: SpecimenSite
+          CollectionDate: CollectionDate }
+    and MRN = MRN of uint64
+    and LastName = LastName of string
+    and FirstName = FirstName of string
+    and SubmittedDiagnosis = SubmittedDiagnosis of string
+    and Gender = Male | Female
+    and DateOfBirth = DateOfBirth of System.DateTime
+    and OrderingMdName = OrderingMdName of string
+    and SpecimenSite = SpecimenSite of string
+    and CollectionDate = CollectionDate of System.DateTime
+
+    type PmiInput =
+      { ReportId: ReportId
+        MrnInput: MrnInput
+        LastName: LastName
+        FirstName: FirstName
+        SubmittedDiagnosis: SubmittedDiagnosis }
+    and MrnInput = MrnInput of string
