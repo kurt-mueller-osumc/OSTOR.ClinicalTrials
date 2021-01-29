@@ -1,23 +1,20 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module FoundationMedicine =
-    type ReportId = ReportId of string
-
+    type ReportId = internal ReportId of string
     type Unvalidated = Unvalidated
     type Invalid = internal | Invalid
     type Valid = internal | Valid
 
     type Sample<'Status> =
         { SampleId: SampleId<'Status>
-          SampleName: SampleName<'Status>
           ReceivedDate: ReceivedDate<'Status>
           BlockId: BlockId<'Status>
           SpecimenFormat: SpecimenFormat<'Status> }
-    and SampleId<'Status> = SampleId of string
-    and SampleName<'Status> = SampleName of string
-    and ReceivedDate<'Status> = ReceivedDate of System.DateTime
-    and BlockId<'Status> = BlockId of string
-    and SpecimenFormat<'Status> = SpecimenFormat of string
+    and SampleId<'Status> = internal | SampleId of string
+    and ReceivedDate<'Status> = internal | ReceivedDate of System.DateTime
+    and BlockId<'Status> = internal | BlockId of string
+    and SpecimenFormat<'Status> = internal | SpecimenFormat of string
 
     type PMI =
         { MRN: MRN
@@ -42,7 +39,6 @@ module FoundationMedicine =
           MdId: OrderingMdId }
     and OrderingMdName = OrderingMdName of string
     and OrderingMdId = OrderingMdId of string
-
 
     type PmiInput =
       { ReportId: ReportId
@@ -71,6 +67,8 @@ module FoundationMedicine =
     and GeneAlterationInterpretation = GeneAlterationInterpretation of interpretation: string
 
     module Validation =
+        open FsToolkit.ErrorHandling
+
         module Sample =
             module SampleId =
                 open System.Text.RegularExpressions
@@ -85,6 +83,10 @@ module FoundationMedicine =
                     else
                         Error <| $"Sample id not valid: {sampleId}"
 
+            module ReceivedDate =
+                let validate ((ReceivedDate receivedDate): ReceivedDate<Unvalidated>) : Result<ReceivedDate<Valid>, string> =
+                    Ok (ReceivedDate receivedDate)
+
             module BlockId =
                 open System.Text.RegularExpressions
 
@@ -98,7 +100,7 @@ module FoundationMedicine =
                     else
                         Error $"Block id not valid: {blockId}"
 
-            module SpecFormat =
+            module SpecimenFormat =
 
                 /// Validate that a sample's specimen format is not blank.
                 let validate ((SpecimenFormat specFormat): SpecimenFormat<Unvalidated>) : Result<SpecimenFormat<Valid>,string> =
@@ -107,9 +109,19 @@ module FoundationMedicine =
                     else
                         Error $"Specimen format cannot be blank"
 
+            /// Validate a sample from a FMI report
+            let validate (sample: Sample<Unvalidated>) =
+                validation {
+                    let! sampleId = SampleId.validate sample.SampleId
+                    and! receivedDate = ReceivedDate.validate sample.ReceivedDate
+                    and! blockId = BlockId.validate sample.BlockId
+                    and! specimenFormat = SpecimenFormat.validate sample.SpecimenFormat
 
-
-
+                    return { SampleId = sampleId
+                             ReceivedDate = receivedDate
+                             BlockId = blockId
+                             SpecimenFormat = specimenFormat }
+                }
 
     module Report =
         open FSharp.Data
@@ -147,20 +159,6 @@ module FoundationMedicine =
 
             member this.Sample : Sample<Unvalidated> =
                 { SampleId = SampleId this.ClinicalReport.Sample.SampleId
-                  SampleName = SampleName this.ClinicalReport.SampleName
                   BlockId = BlockId this.ClinicalReport.Sample.BlockId
                   ReceivedDate = ReceivedDate this.ClinicalReport.Sample.ReceivedDate
                   SpecimenFormat = SpecimenFormat this.ClinicalReport.Sample.SpecFormat }
-
-//            member this.PMI =
-//                let reportPmi = this.ClinicalReport.Pmi
-//                {| MRN = MRN reportPmi.Mrn
-//                   LastName = LastName reportPmi.LastName
-//                   FirstName = FirstName reportPmi.FirstName
-//                   SubmittedDiagnosis = SubmittedDiagnosis reportPmi.SubmittedDiagnosis
-//                   Gender = reportPmi.Gender
-//                   DateOfBirth = DateOfBirth reportPmi.Dob
-//                   OrderingMd = { MdName = OrderingMdName reportPmi.OrderingMd; MdId = OrderingMdId reportPmi.OrderingMdId }
-//                   SpecimenSite = reportPmi.SpecSite
-//                   CollectionDate = reportPmi.CollDate
-//                   ReceivedDate = reportPmi.ReceivedDate |}
