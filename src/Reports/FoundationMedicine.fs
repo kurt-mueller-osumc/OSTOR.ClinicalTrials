@@ -50,3 +50,12 @@ module FoundationMedicine =
         FirstName: FirstName
         SubmittedDiagnosis: SubmittedDiagnosis }
     and MrnInput = MrnInput of string
+
+    type Variant =
+        | VariantOfUnknownSignificance of VariantProperty
+        | VariantOfKnownSignificance of VariantProperty
+    and VariantProperty =
+        { GeneName: GeneName
+          VariantName: VariantName }
+    and GeneName = GeneName of string
+    and VariantName = VariantName of string
