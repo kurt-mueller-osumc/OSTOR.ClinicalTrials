@@ -260,3 +260,8 @@ module FoundationMedicine =
                     { GeneName=  GeneName variantProperty.GeneName
                       IsVus = IsVUS variantProperty.IsVus
                       VariantName = VariantName variantProperty.VariantName })
+
+            member this.MicrosatelliteStatus =
+                let msStatusGene = this.ClinicalReport.Genes |> Seq.find (fun gene -> gene.Name = "Microsatellite status")
+                let alteration = msStatusGene.Alterations |> Seq.head
+                alteration.Name
