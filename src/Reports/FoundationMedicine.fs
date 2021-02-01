@@ -1,6 +1,11 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module FoundationMedicine =
+    [<AutoOpen>]
+    module Measures =
+        [<Measure>] type mutation
+        [<Measure>] type megabase
+
     type Unvalidated = Unvalidated
     type Invalid = internal | Invalid
     type Valid = internal | Valid
@@ -50,12 +55,6 @@ module FoundationMedicine =
     and GeneName = GeneName of string
     and VariantName = VariantName of string
 
-    type VariantInput =
-        { GeneName: GeneName
-          IsVus: IsVUS
-          VariantName: VariantName }
-    and IsVUS = IsVUS of bool
-
     type Gene =
         { GeneName: GeneName
           GeneAlterations: GeneAlteration list }
@@ -71,7 +70,10 @@ module FoundationMedicine =
         | Stable
         | ``High Instability``
 
-    type MicrosatelliteStatusInput = MicrosatelliteStatusInput of status: string
+    type TumorMutationalBurden =
+        internal
+        | TumorMutationalBurden of rate : float<mutation/megabase>
+        | ``Cannot Be Determined``
 
     type Report =
         { MicrosatelliteStatus: MicrosatelliteStatus option }
@@ -174,6 +176,12 @@ module FoundationMedicine =
             }
 
     module Variant =
+        type Input =
+            { GeneName: GeneName
+              IsVus: IsVUS
+              VariantName: VariantName }
+        and IsVUS = IsVUS of bool
+
         module Input =
             open Utilities
 
@@ -197,7 +205,7 @@ module FoundationMedicine =
                 | false -> NotVus
 
             /// Validate that a variant input has a gene name and at least one variant name.
-            let validate (variantInput: VariantInput) =
+            let validate (variantInput: Input) =
                 match (variantInput.GeneName, variantInput.IsVus, variantInput.VariantName) with
                 | ValidGeneName geneName, IsVus, ValidVariantNames variantNames -> Ok <| VariantOfUnknownSignificance { GeneName = geneName; VariantNames = variantNames }
                 | ValidGeneName geneName, NotVus, ValidVariantNames variantNames -> Ok <| VariantOfKnownSignificance { GeneName = geneName; VariantNames = variantNames }
@@ -206,8 +214,10 @@ module FoundationMedicine =
                 | _ -> Error $"Invalid variant: {variantInput}"
 
     module MicrosatelliteStatus =
+        type Input = Input of string
+
         module Input =
-            let (|MsiHigh|MsStable|CannotBeDetermined|InvalidMsStatus|) (MicrosatelliteStatusInput msInput) =
+            let (|MsiHigh|MsStable|CannotBeDetermined|InvalidMsStatus|) (Input msInput) =
                 match msInput with
                 | "Cannot Be Determined" -> CannotBeDetermined
                 | "MS-Stable" -> MsStable
@@ -215,10 +225,10 @@ module FoundationMedicine =
                 | _ -> InvalidMsStatus
 
             /// Validate that if a microsatellite input exists, it either cannot be determined, is stable, or has high instability. If not, result in an error.
-            let validate (msInput: MicrosatelliteStatusInput option) =
+            let validate (msInput: Input option) =
                 match msInput with
                 | None -> Ok None
-                | Some CannotBeDetermined -> Ok <| Some ``Cannot Be Determined``
+                | Some CannotBeDetermined -> Ok <| Some MicrosatelliteStatus.``Cannot Be Determined``
                 | Some MsStable -> Ok <| Some Stable
                 | Some MsiHigh -> Ok <| Some ``High Instability``
                 | Some _ -> Error $"Invalid MsStatusInput: {msInput}"
@@ -284,11 +294,11 @@ module FoundationMedicine =
                   OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId } }
 
             /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
-            member this.VariantProperties =
+            member this.VariantProperties : Variant.Input seq =
                 this.ClinicalReport.VariantProperties
                 |> Seq.map (fun variantProperty ->
-                    { GeneName=  GeneName variantProperty.GeneName
-                      IsVus = IsVUS variantProperty.IsVus
+                    { GeneName =  GeneName variantProperty.GeneName
+                      IsVus = Variant.IsVUS variantProperty.IsVus
                       VariantName = VariantName variantProperty.VariantName })
 
             /// Retrieve the report's microsatellite status, if it exists.
@@ -296,4 +306,9 @@ module FoundationMedicine =
                 this.ClinicalReport.Genes
                 |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
                 |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
-                |> Option.map MicrosatelliteStatusInput
+                |> Option.map MicrosatelliteStatus.Input
+
+            member this.TumorMutationalBurden =
+                this.ClinicalReport.Genes
+                |> Seq.tryFind (fun gene -> gene.Name = "Tumor Mutation Burden")
+                |> Option.map (fun tmb -> Seq.head(tmb.Alterations).Name)
