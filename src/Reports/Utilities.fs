@@ -17,6 +17,9 @@ module Utilities =
     module String =
         open System.IO
 
+        let split char (string: string) =
+            string.Split([| char |]) |> Array.toList
+
         let readFromDisk path = File.ReadAllText(path)
 
         let writeToDisk path string =

@@ -42,13 +42,20 @@ module FoundationMedicine =
     and OrderingMdId = OrderingMdId of string
 
     type Variant =
-        | VariantOfUnknownSignificance of VariantProperty
-        | VariantOfKnownSignificance of VariantProperty
-    and VariantProperty =
+        | VariantOfUnknownSignificance of VariantInfo
+        | VariantOfKnownSignificance of VariantInfo
+    and VariantInfo =
         { GeneName: GeneName
-          VariantName: VariantName }
+          VariantNames: VariantName list }
     and GeneName = GeneName of string
     and VariantName = VariantName of string
+
+    type VariantInput =
+        { GeneName: GeneName
+          IsVus: IsVUS
+          VariantName: VariantName }
+    and IsVUS = IsVUS of bool
+
 
     type Gene =
         { GeneName: GeneName
@@ -102,7 +109,6 @@ module FoundationMedicine =
                         Error $"Invalid block id: {blockId}"
 
             module SpecimenFormat =
-
                 /// Validate that a sample's specimen format is not blank.
                 let validate ((SpecimenFormat specFormat): SpecimenFormat<Unvalidated>) : Result<SpecimenFormat<Valid>,string> =
                     if specFormat <> "" then
@@ -157,6 +163,38 @@ module FoundationMedicine =
                          OrderingMd = pmi.OrderingMd }
             }
 
+    module Variant =
+        module Input =
+            open Utilities
+
+            let (|InvalidVariantNames|ValidVariantNames|) (VariantName variantName) =
+                if variantName <> "" then
+                    let variantNames =
+                        variantName
+                        |> String.split ','
+                        |> List.map VariantName
+
+                    ValidVariantNames variantNames
+                else InvalidVariantNames
+
+            let (|InvalidGeneName|ValidGeneName|) (GeneName geneName) =
+                if geneName <> "" then ValidGeneName (GeneName geneName)
+                else InvalidGeneName
+
+            let (|IsVus|NotVus|) (IsVUS isVus) =
+                match isVus with
+                | true -> IsVus
+                | false -> NotVus
+
+            /// Validate that a variant input has a gene name and at least one variant name.
+            let validate (variantInput: VariantInput) =
+                match (variantInput.GeneName, variantInput.IsVus, variantInput.VariantName) with
+                | ValidGeneName geneName, IsVus, ValidVariantNames variantNames -> Ok <| VariantOfUnknownSignificance { GeneName = geneName; VariantNames = variantNames }
+                | ValidGeneName geneName, NotVus, ValidVariantNames variantNames -> Ok <| VariantOfKnownSignificance { GeneName = geneName; VariantNames = variantNames }
+                | InvalidGeneName, _, ValidVariantNames _ -> Error $"Invalid gene name: {variantInput.GeneName}"
+                | ValidGeneName _, _, InvalidVariantNames -> Error $"Invalid variant names: {variantInput.VariantName}"
+                | _ -> Error $"Invalid variant: {variantInput}"
+
 
     module Report =
         open FSharp.Data
@@ -168,7 +206,7 @@ module FoundationMedicine =
         [<Literal>]
         let VariantReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/variantReport.xsd"
 
-        type ClinicalReportProvider = XmlProvider<Schema= ClinicalReportXsdPath, EmbeddedResource="Reports, clinicalReport.xsd">
+        type ClinicalReportProvider = XmlProvider<Schema=ClinicalReportXsdPath, EmbeddedResource="Reports, clinicalReport.xsd">
         type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource="Reports, variantReport.xsd">
 
         type Xml(filePath: string) =
@@ -216,3 +254,9 @@ module FoundationMedicine =
                   CollectionDate = CollectionDate pmi.CollDate
                   OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId } }
 
+            member this.VariantProperties =
+                this.ClinicalReport.VariantProperties
+                |> Seq.map (fun variantProperty ->
+                    { GeneName=  GeneName variantProperty.GeneName
+                      IsVus = IsVUS variantProperty.IsVus
+                      VariantName = VariantName variantProperty.VariantName })
