@@ -56,7 +56,6 @@ module FoundationMedicine =
           VariantName: VariantName }
     and IsVUS = IsVUS of bool
 
-
     type Gene =
         { GeneName: GeneName
           GeneAlterations: GeneAlteration list }
@@ -65,6 +64,17 @@ module FoundationMedicine =
           Interpretation: GeneAlterationInterpretation }
     and GeneAlterationName = GeneAlterationName of name: string
     and GeneAlterationInterpretation = GeneAlterationInterpretation of interpretation: string
+
+    type MicrosatelliteStatus =
+        internal
+        | ``Cannot Be Determined``
+        | Stable
+        | ``High Instability``
+
+    type MicrosatelliteStatusInput = MicrosatelliteStatusInput of status: string
+
+    type Report =
+        { MicrosatelliteStatus: MicrosatelliteStatus option }
 
     module Validation =
         open FsToolkit.ErrorHandling
@@ -195,6 +205,23 @@ module FoundationMedicine =
                 | ValidGeneName _, _, InvalidVariantNames -> Error $"Invalid variant names: {variantInput.VariantName}"
                 | _ -> Error $"Invalid variant: {variantInput}"
 
+    module MicrosatelliteStatus =
+        module Input =
+            let (|MsiHigh|MsStable|CannotBeDetermined|InvalidMsStatus|) (MicrosatelliteStatusInput msInput) =
+                match msInput with
+                | "Cannot Be Determined" -> CannotBeDetermined
+                | "MS-Stable" -> MsStable
+                | "MSI-High" -> MsiHigh
+                | _ -> InvalidMsStatus
+
+            /// Validate that if a microsatellite input exists, it either cannot be determined, is stable, or has high instability. If not, result in an error.
+            let validate (msInput: MicrosatelliteStatusInput option) =
+                match msInput with
+                | None -> Ok None
+                | Some CannotBeDetermined -> Ok <| Some ``Cannot Be Determined``
+                | Some MsStable -> Ok <| Some Stable
+                | Some MsiHigh -> Ok <| Some ``High Instability``
+                | Some _ -> Error $"Invalid MsStatusInput: {msInput}"
 
     module Report =
         open FSharp.Data
@@ -235,12 +262,14 @@ module FoundationMedicine =
 
             member this.ReportSample = this.ClinicalReport.Sample
 
+            /// Retrieve the report's sample
             member this.Sample : Sample<Unvalidated> =
                 { SampleId = SampleId this.ClinicalReport.Sample.SampleId
                   BlockId = BlockId this.ClinicalReport.Sample.BlockId
                   ReceivedDate = ReceivedDate this.ClinicalReport.Sample.ReceivedDate
                   SpecimenFormat = SpecimenFormat this.ClinicalReport.Sample.SpecFormat }
 
+            /// Retrieve the report's patient medical information
             member this.PMI : PMI<Unvalidated> =
                 let pmi = this.ClinicalReport.Pmi
 
@@ -254,6 +283,7 @@ module FoundationMedicine =
                   CollectionDate = CollectionDate pmi.CollDate
                   OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId } }
 
+            /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
             member this.VariantProperties =
                 this.ClinicalReport.VariantProperties
                 |> Seq.map (fun variantProperty ->
@@ -261,7 +291,9 @@ module FoundationMedicine =
                       IsVus = IsVUS variantProperty.IsVus
                       VariantName = VariantName variantProperty.VariantName })
 
+            /// Retrieve the report's microsatellite status, if it exists.
             member this.MicrosatelliteStatus =
-                let msStatusGene = this.ClinicalReport.Genes |> Seq.find (fun gene -> gene.Name = "Microsatellite status")
-                let alteration = msStatusGene.Alterations |> Seq.head
-                alteration.Name
+                this.ClinicalReport.Genes
+                |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
+                |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
+                |> Option.map MicrosatelliteStatusInput
