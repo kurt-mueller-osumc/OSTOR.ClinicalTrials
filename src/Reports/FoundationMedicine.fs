@@ -25,7 +25,8 @@ module FoundationMedicine =
           DateOfBirth: DateOfBirth
           SpecimenSite: SpecimenSite
           CollectionDate: CollectionDate
-          OrderingMd: OrderingMd }
+          OrderingMd: OrderingMd
+          Pathologist: Pathologist }
     and LastName = internal LastName of string
     and FirstName = internal FirstName of string
     and SubmittedDiagnosis = internal SubmittedDiagnosis of string
@@ -38,6 +39,7 @@ module FoundationMedicine =
           MdId: OrderingMdId }
     and OrderingMdName = internal OrderingMdName of string
     and OrderingMdId = internal OrderingMdId of string
+    and Pathologist = internal Pathologist of string
 
     type Variant =
         | VariantOfUnknownSignificance of VariantInfo
@@ -164,7 +166,8 @@ module FoundationMedicine =
               DateOfBirth: DateOfBirth
               SpecimenSite: SpecimenSite
               CollectionDate: CollectionDate
-              OrderingMd: OrderingMd }
+              OrderingMd: OrderingMd
+              Pathologist: Pathologist }
 
         let validate (pmiInput: Input) =
             validation {
@@ -179,7 +182,8 @@ module FoundationMedicine =
                          DateOfBirth = pmiInput.DateOfBirth
                          SpecimenSite = pmiInput.SpecimenSite
                          CollectionDate = pmiInput.CollectionDate
-                         OrderingMd = pmiInput.OrderingMd }
+                         OrderingMd = pmiInput.OrderingMd
+                         Pathologist = pmiInput.Pathologist }
             }
 
     module Variant =
@@ -298,7 +302,8 @@ module FoundationMedicine =
                   DateOfBirth = DateOfBirth pmi.Dob
                   SpecimenSite = SpecimenSite pmi.SpecSite
                   CollectionDate = CollectionDate pmi.CollDate
-                  OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId } }
+                  OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId }
+                  Pathologist = Pathologist pmi.Pathologist }
 
             /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
             member this.VariantInputs : Variant.Input seq =
