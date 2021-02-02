@@ -65,13 +65,15 @@ module FoundationMedicine =
         | Stable
         | ``High Instability``
 
-    type TumorMutationalBurden =
-        internal
-        | TumorMutationalBurden of rate : float<mutation/megabase>
-        | ``Cannot Be Determined``
+    type TumorMutationBurden =
+        { Score : TmbScore
+          Status: TmbStatus }
+    and TmbScore = internal TmbScore of score: float<mutation/megabase>
+    and TmbStatus = internal Low | Intermediate | High | UnknownStatus
 
     type Report =
-        { MicrosatelliteStatus: MicrosatelliteStatus option }
+        { MicrosatelliteStatus: MicrosatelliteStatus option
+          TumorMutationBurden: TumorMutationBurden option }
 
     module ReportId =
         open System.Text.RegularExpressions
@@ -244,6 +246,41 @@ module FoundationMedicine =
                 | Some MsiHigh -> Ok <| Some ``High Instability``
                 | Some _ -> Error $"Invalid MsStatusInput: {msInput}"
 
+    module TumorMutationBurden =
+        open FsToolkit.ErrorHandling
+
+        type ScoreInput = ScoreInput of float
+        type StatusInput = StatusInput of string
+
+        type Input =
+            { ScoreInput: ScoreInput
+              StatusInput: StatusInput}
+
+        module Score =
+            let validate (ScoreInput input) =
+                if input >= 0.0 then Ok <| TmbScore (input * 1.0<mutation/megabase>)
+                else Error $"Invalid score: {input}"
+
+        module Status =
+            let validate (StatusInput input) =
+                match input with
+                | "low" -> Ok Low
+                | "intermediate" -> Ok Intermediate
+                | "high" -> Ok High
+                | "unknown" -> Ok UnknownStatus
+                | _ -> Error $"Invalid tmb status: {input}"
+
+        let validate tmbInput =
+            validation {
+                let! score = Score.validate tmbInput.ScoreInput
+                and! status = Status.validate tmbInput.StatusInput
+
+                return { Score = score
+                         Status = status }
+            }
+
+        let validateOptional = Option.map validate
+
     module Report =
         open FSharp.Data
         open System.IO
@@ -324,3 +361,11 @@ module FoundationMedicine =
                 this.ClinicalReport.Genes
                 |> Seq.tryFind (fun gene -> gene.Name = "Tumor Mutation Burden")
                 |> Option.map (fun tmb -> Seq.head(tmb.Alterations).Name)
+
+            member this.Biomarkers =
+                this.VariantReport.Biomarkers
+
+            member this.TMB =
+                match this.Biomarkers.TumorMutationBurden with
+                | Some tmb -> Some (tmb.Score, tmb.Status)
+                | None -> None
