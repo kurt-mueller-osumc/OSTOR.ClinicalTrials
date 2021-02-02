@@ -1,50 +1,43 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module FoundationMedicine =
-    [<AutoOpen>]
-    module Measures =
-        [<Measure>] type mutation
-        [<Measure>] type megabase
+    [<Measure>] type mutation
+    [<Measure>] type megabase
 
-    type Unvalidated = Unvalidated
-    type Invalid = internal | Invalid
-    type Valid = internal | Valid
+    type ReportId = internal ReportId of string
 
-    type ReportId<'Status> = internal ReportId of string
+    type Sample =
+        { SampleId: SampleId
+          ReceivedDate: ReceivedDate
+          BlockId: BlockId
+          SpecimenFormat: SpecimenFormat }
+    and SampleId = internal | SampleId of string
+    and ReceivedDate = internal | ReceivedDate of System.DateTime
+    and BlockId = internal | BlockId of string
+    and SpecimenFormat = internal | SpecimenFormat of string
 
-    type Sample<'Validation> =
-        { SampleId: SampleId<'Validation>
-          ReceivedDate: ReceivedDate<'Validation>
-          BlockId: BlockId<'Validation>
-          SpecimenFormat: SpecimenFormat<'Validation> }
-    and SampleId<'Validation> = internal | SampleId of string
-    and ReceivedDate<'Validation> = internal | ReceivedDate of System.DateTime
-    and BlockId<'Validation> = internal | BlockId of string
-    and SpecimenFormat<'Validation> = internal | SpecimenFormat of string
-
-    type PMI<'Validation> =
-        { MRN: MRN<'Validation>
+    type PMI =
+        { MRN: MRN
           LastName: LastName
           FirstName: FirstName
           SubmittedDiagnosis: SubmittedDiagnosis
-          Gender: Gender<'Validation>
+          Gender: Gender
           DateOfBirth: DateOfBirth
           SpecimenSite: SpecimenSite
           CollectionDate: CollectionDate
           OrderingMd: OrderingMd }
-    and MRN<'Validation> = MRN of string
-    and LastName = LastName of string
-    and FirstName = FirstName of string
-    and SubmittedDiagnosis = SubmittedDiagnosis of string
-    and Gender<'Validation> = Gender of string
-    and DateOfBirth = DateOfBirth of System.DateTime
-    and SpecimenSite = SpecimenSite of string
-    and CollectionDate = CollectionDate of System.DateTime
+    and LastName = internal LastName of string
+    and FirstName = internal FirstName of string
+    and SubmittedDiagnosis = internal SubmittedDiagnosis of string
+    and Gender = internal Male | Female
+    and DateOfBirth = internal DateOfBirth of System.DateTime
+    and SpecimenSite = internal SpecimenSite of string
+    and CollectionDate = internal CollectionDate of System.DateTime
     and OrderingMd =
         { MdName: OrderingMdName
           MdId: OrderingMdId }
-    and OrderingMdName = OrderingMdName of string
-    and OrderingMdId = OrderingMdId of string
+    and OrderingMdName = internal OrderingMdName of string
+    and OrderingMdId = internal OrderingMdId of string
 
     type Variant =
         | VariantOfUnknownSignificance of VariantInfo
@@ -52,8 +45,8 @@ module FoundationMedicine =
     and VariantInfo =
         { GeneName: GeneName
           VariantNames: VariantName list }
-    and GeneName = GeneName of string
-    and VariantName = VariantName of string
+    and GeneName = internal GeneName of string
+    and VariantName = internal VariantName of string
 
     type Gene =
         { GeneName: GeneName
@@ -61,8 +54,8 @@ module FoundationMedicine =
     and GeneAlteration =
         { AlterationName: GeneAlterationName
           Interpretation: GeneAlterationInterpretation }
-    and GeneAlterationName = GeneAlterationName of name: string
-    and GeneAlterationInterpretation = GeneAlterationInterpretation of interpretation: string
+    and GeneAlterationName = internal GeneAlterationName of name: string
+    and GeneAlterationInterpretation = internal GeneAlterationInterpretation of interpretation: string
 
     type MicrosatelliteStatus =
         internal
@@ -78,101 +71,115 @@ module FoundationMedicine =
     type Report =
         { MicrosatelliteStatus: MicrosatelliteStatus option }
 
-    module Validation =
+    module ReportId =
+        open System.Text.RegularExpressions
+
+        type Input = Input of string
+
+        /// Validate that a sample id is the following format where 'd' is a digit: ORD-ddddddd-dd
+        ///
+        ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
+        ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
+        let validate (Input reportId) =
+            if Regex("ORD-\d{7,}-\d{2,}").Match(reportId).Success then
+                Ok <| ReportId reportId
+            else
+                Error <| $"Invalid report id: {reportId}"
+
+    module Sample =
         open FsToolkit.ErrorHandling
 
-        module ReportId =
+        module SampleId =
             open System.Text.RegularExpressions
 
-            /// Validate that a sample id is the following format where 'd' is a digit: ORD-ddddddd-dd
+            type Input = Input of string
+
+            /// Validate that a sample's id is in the following format where 'd' is a digit: USddddddd.dd
             ///
-            ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
-            ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
-            let validate ((ReportId reportId): ReportId<Unvalidated>) : Result<ReportId<Valid>,string> =
-                if Regex("ORD-\d{7,}-\d{2,}").Match(reportId).Success then
-                    Ok <| ReportId reportId
+            ///    validate (SampleId "US0123456.78") = Ok (SampleId "US0123456.78")
+            ///    validate (SampleId "invalidId") = Error "Invalid sample id: invalidId"
+            let validate (Input input) =
+                if Regex("US\d{7,}.\d{2,}").Match(input).Success then
+                    Ok <| SampleId input
                 else
-                    Error <| $"Invalid report id: {reportId}"
+                    Error <| $"Invalid sample id: {input}"
 
-        module Sample =
-            module SampleId =
-                open System.Text.RegularExpressions
+        module BlockId =
+            type Input = Input of string
 
-                /// Validate that a sample's id is in the following format where 'd' is a digit: USddddddd.dd
-                ///
-                ///    validate (SampleId "US0123456.78") = Ok (SampleId "US0123456.78")
-                ///    validate (SampleId "invalidId") = Error "Invalid sample id: invalidId"
-                let validate ((SampleId sampleId): SampleId<Unvalidated>) : Result<SampleId<Valid>,string> =
-                    if Regex("US\d{7,}.\d{2,}").Match(sampleId).Success then
-                        Ok <| SampleId sampleId
-                    else
-                        Error <| $"Invalid sample id: {sampleId}"
+            /// Validate that a block id is not blank.
+            let validate (Input input) =
+                if input <> "" then
+                    Ok <| BlockId input
+                else
+                    Error $"Invalid block id: {input}"
 
-            module ReceivedDate =
-                let validate ((ReceivedDate receivedDate): ReceivedDate<Unvalidated>) : Result<ReceivedDate<Valid>, string> =
-                    Ok (ReceivedDate receivedDate)
+        module SpecimenFormat =
+            type Input = Input of string
 
-            module BlockId =
-                /// Validate that a block id is not blank.
-                let validate ((BlockId blockId): BlockId<Unvalidated>) : Result<BlockId<Valid>,string> =
-                    if blockId <> "" then
-                        Ok <| BlockId blockId
-                    else
-                        Error $"Invalid block id: {blockId}"
+            /// Validate that a sample's specimen format is not blank.
+            let validate (Input input) =
+                if input <> "" then
+                    Ok <| SpecimenFormat input
+                else
+                    Error $"Specimen format cannot be blank"
 
-            module SpecimenFormat =
-                /// Validate that a sample's specimen format is not blank.
-                let validate ((SpecimenFormat specFormat): SpecimenFormat<Unvalidated>) : Result<SpecimenFormat<Valid>,string> =
-                    if specFormat <> "" then
-                        Ok <| SpecimenFormat specFormat
-                    else
-                        Error $"Specimen format cannot be blank"
+        type Input =
+            { SampleIdInput: SampleId.Input
+              ReceivedDate: ReceivedDate
+              BlockId: BlockId.Input
+              SpecimenFormat: SpecimenFormat.Input }
 
-            /// Validate a sample from a FMI report
-            let validate (sample: Sample<Unvalidated>) =
-                validation {
-                    let! sampleId = SampleId.validate sample.SampleId
-                    and! receivedDate = ReceivedDate.validate sample.ReceivedDate
-                    and! blockId = BlockId.validate sample.BlockId
-                    and! specimenFormat = SpecimenFormat.validate sample.SpecimenFormat
+        /// Validate a sample from a FMI report
+        let validate (sampleInput: Input) =
+            validation {
+                let! sampleId = SampleId.validate sampleInput.SampleIdInput
+                and! blockId = BlockId.validate sampleInput.BlockId
+                and! specimenFormat = SpecimenFormat.validate sampleInput.SpecimenFormat
 
-                    return { SampleId = sampleId
-                             ReceivedDate = receivedDate
-                             BlockId = blockId
-                             SpecimenFormat = specimenFormat }
-                }
+                return { SampleId = sampleId
+                         ReceivedDate = sampleInput.ReceivedDate
+                         BlockId = blockId
+                         SpecimenFormat = specimenFormat }
+            }
 
     module PMI =
         open FsToolkit.ErrorHandling
-        open System.Text.RegularExpressions
-
-        module MRN =
-            let validate ((MRN mrn): MRN<Unvalidated>) : Result<MRN<Valid>,string> =
-                if Regex("^(\d|[a-z]|[A-Z])+$").Match(mrn).Success then
-                    Ok (MRN mrn)
-                else
-                    Error $"Invalid MRN: {mrn}"
 
         module Gender =
-            let validate ((Gender gender): Gender<Unvalidated>) : Result<Gender<Valid>,string> =
-                match gender with
-                | "male" | "female" -> Ok (Gender gender)
-                | _ -> Error $"Invalid gender: {gender}"
+            type Input = Input of string
 
-        let validate (pmi: PMI<Unvalidated>) =
+            let validate (Input input) =
+                match input with
+                | "male" | "Male" -> Ok Male
+                | "female" | "Female" -> Ok Female
+                | _ -> Error $"Invalid gender: {input}"
+
+        type Input =
+            { MrnInput: MRN.Input
+              GenderInput: Gender.Input
+              LastName: LastName
+              FirstName: FirstName
+              SubmittedDiagnosis: SubmittedDiagnosis
+              DateOfBirth: DateOfBirth
+              SpecimenSite: SpecimenSite
+              CollectionDate: CollectionDate
+              OrderingMd: OrderingMd }
+
+        let validate (pmiInput: Input) =
             validation {
-                let! mrn = MRN.validate pmi.MRN
-                and! gender = Gender.validate pmi.Gender
+                let! mrn = MRN.validate pmiInput.MrnInput
+                and! gender = Gender.validate pmiInput.GenderInput
 
                 return { MRN = mrn
                          Gender = gender
-                         LastName = pmi.LastName
-                         FirstName = pmi.FirstName
-                         SubmittedDiagnosis = pmi.SubmittedDiagnosis
-                         DateOfBirth = pmi.DateOfBirth
-                         SpecimenSite = pmi.SpecimenSite
-                         CollectionDate = pmi.CollectionDate
-                         OrderingMd = pmi.OrderingMd }
+                         LastName = pmiInput.LastName
+                         FirstName = pmiInput.FirstName
+                         SubmittedDiagnosis = pmiInput.SubmittedDiagnosis
+                         DateOfBirth = pmiInput.DateOfBirth
+                         SpecimenSite = pmiInput.SpecimenSite
+                         CollectionDate = pmiInput.CollectionDate
+                         OrderingMd = pmiInput.OrderingMd }
             }
 
     module Variant =
@@ -273,28 +280,28 @@ module FoundationMedicine =
             member this.ReportSample = this.ClinicalReport.Sample
 
             /// Retrieve the report's sample
-            member this.Sample : Sample<Unvalidated> =
-                { SampleId = SampleId this.ClinicalReport.Sample.SampleId
-                  BlockId = BlockId this.ClinicalReport.Sample.BlockId
+            member this.SampleInput : Sample.Input =
+                { SampleIdInput = Sample.SampleId.Input this.ClinicalReport.Sample.SampleId
+                  BlockId = Sample.BlockId.Input this.ClinicalReport.Sample.BlockId
                   ReceivedDate = ReceivedDate this.ClinicalReport.Sample.ReceivedDate
-                  SpecimenFormat = SpecimenFormat this.ClinicalReport.Sample.SpecFormat }
+                  SpecimenFormat = Sample.SpecimenFormat.Input this.ClinicalReport.Sample.SpecFormat }
 
             /// Retrieve the report's patient medical information
-            member this.PMI : PMI<Unvalidated> =
+            member this.PMI : PMI.Input =
                 let pmi = this.ClinicalReport.Pmi
 
-                { MRN = MRN pmi.Mrn
+                { MrnInput = MRN.Input pmi.Mrn
                   LastName = LastName pmi.LastName
                   FirstName = FirstName pmi.FirstName
                   SubmittedDiagnosis = SubmittedDiagnosis pmi.SubmittedDiagnosis
-                  Gender = Gender pmi.Gender
+                  GenderInput = PMI.Gender.Input pmi.Gender
                   DateOfBirth = DateOfBirth pmi.Dob
                   SpecimenSite = SpecimenSite pmi.SpecSite
                   CollectionDate = CollectionDate pmi.CollDate
                   OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId } }
 
             /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
-            member this.VariantProperties : Variant.Input seq =
+            member this.VariantInputs : Variant.Input seq =
                 this.ClinicalReport.VariantProperties
                 |> Seq.map (fun variantProperty ->
                     { GeneName =  GeneName variantProperty.GeneName
