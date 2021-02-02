@@ -1,14 +1,16 @@
 namespace OSTOR.ClinicalTrials.Reports
 
+[<AutoOpen>]
 module Common =
-    type Patient =
-        { LastName: LastName
-          FirstName: FirstName
-          DateOfBirth: DateOfBirth
-          MRN: MRN
-          Gender: Gender }
-    and LastName = LastName of string
-    and FirstName = FirstName of string
-    and DateOfBirth = DateOfBirth of System.DateTime
-    and MRN = MRN of string
-    and Gender = Male | Female
+    type MRN = internal MRN of string
+
+    module MRN =
+        open System.Text.RegularExpressions
+
+        type Input = Input of string
+
+        let validate (Input input) =
+            if Regex("^(\d|[a-z]|[A-Z])+$").Match(input).Success then
+                Ok (MRN input)
+            else
+                Error $"Invalid MRN: {input}"
