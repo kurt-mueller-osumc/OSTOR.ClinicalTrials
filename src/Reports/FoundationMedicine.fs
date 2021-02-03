@@ -85,10 +85,10 @@ module FoundationMedicine =
     and CliaNumber = CliaNumber of string
 
     type Report =
-        { MicrosatelliteStatus: MicrosatelliteStatus option
-          TumorMutationBurden: TumorMutationBurden option
+        { ReportId: ReportId
           IssuedDate: IssuedDate
-          ReportId: ReportId
+          MicrosatelliteStatus: MicrosatelliteStatus option
+          TumorMutationBurden: TumorMutationBurden option
           Lab: Lab }
     and ReportId = internal ReportId of string
     and IssuedDate = IssuedDate of System.DateTime
@@ -245,10 +245,10 @@ module FoundationMedicine =
                 | _ -> Error $"Invalid variant: {variantInput}"
 
     module MicrosatelliteStatus =
-        type Input = Input of string
+        type MsInput = MsInput of string
 
         module Input =
-            let (|MsiHigh|MsStable|CannotBeDetermined|InvalidMsStatus|) (Input msInput) =
+            let (|MsiHigh|MsStable|CannotBeDetermined|InvalidMsStatus|) (MsInput msInput) =
                 match msInput with
                 | "Cannot Be Determined" -> CannotBeDetermined
                 | "MS-Stable" -> MsStable
@@ -256,7 +256,7 @@ module FoundationMedicine =
                 | _ -> InvalidMsStatus
 
             /// Validate that if a microsatellite input exists, it either cannot be determined, is stable, or has high instability. If not, result in an error.
-            let validate (msInput: Input option) =
+            let validate (msInput: MsInput option) =
                 match msInput with
                 | None -> Ok None
                 | Some CannotBeDetermined -> Ok <| Some MicrosatelliteStatus.``Cannot Be Determined``
@@ -297,23 +297,42 @@ module FoundationMedicine =
                          Status = status }
             }
 
-        let validateOptional = Option.map validate
+        let validateOptional tmbInput =
+            match tmbInput with
+            | Some tmbI -> validate tmbI |> Result.map Some
+            | None -> Ok None
 
-    module LabAddress =
-        open System.Text.RegularExpressions
+    module Lab =
+        module Address =
+            open System.Text.RegularExpressions
 
-        type Input = Input of string
+            type Input = Input of string
 
-        /// Validate a FMI lab address is valid
-        let validate (Input input) =
-            let regex = Regex("(?<street_address>(.)+), (?<city>[a-zA-Z]+), (?<state>[a-zA-Z]{2}) (?<zip_code>\d+)$").Match(input)
+            /// Validate a FMI lab address is valid
+            let validate (Input input) =
+                let regex = Regex("(?<street_address>(.)+), (?<city>[a-zA-Z]+), (?<state>[a-zA-Z]{2}) (?<zip_code>\d+)$").Match(input)
 
-            if regex.Success then
-                Ok <| { StreetAddress = (StreetAddress regex.Groups.["streetAddress"].Value)
-                        City = City regex.Groups.["city"].Value
-                        State = State regex.Groups.["state"].Value
-                        Zipcode = Zipcode regex.Groups.["zip_code"].Value }
-            else Error $"Invalid lab address: {input}"
+                if regex.Success then
+                    Ok <| { StreetAddress = (StreetAddress regex.Groups.["streetAddress"].Value)
+                            City = City regex.Groups.["city"].Value
+                            State = State regex.Groups.["state"].Value
+                            Zipcode = Zipcode regex.Groups.["zip_code"].Value }
+                else Error $"Invalid lab address: {input}"
+
+        type Input =
+            { AddressInput: Address.Input
+              CliaNumber: CliaNumber}
+
+        open FsToolkit.ErrorHandling
+
+        /// Validate the report's lab address and clia number
+        let validate input =
+            validation {
+                let! address = Address.validate input.AddressInput
+
+                return { Address = address
+                         CliaNumber = input.CliaNumber }
+            }
 
     module Report =
         open FSharp.Data
@@ -389,7 +408,7 @@ module FoundationMedicine =
                 this.ClinicalReport.Genes
                 |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
                 |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
-                |> Option.map MicrosatelliteStatus.Input
+                |> Option.map MicrosatelliteStatus.MsInput
 
             member this.TumorMutationalBurden =
                 this.ClinicalReport.Genes
@@ -407,3 +426,26 @@ module FoundationMedicine =
             /// When the report was issued
             member this.ServerTime =
                 this.ClinicalReport.Signature.ServerTime
+
+        open FsToolkit.ErrorHandling
+
+        type Input =
+            { ReportIdInput: ReportId.Input
+              IssuedDate: IssuedDate
+              LabInput: Lab.Input
+              MsStatusInput: MicrosatelliteStatus.MsInput option
+              TmbInput: TumorMutationBurden.Input option }
+
+        let validate input =
+            validation {
+                let! reportId = ReportId.validate input.ReportIdInput
+                and! lab = Lab.validate input.LabInput
+                and! msStatus = MicrosatelliteStatus.Input.validate input.MsStatusInput
+                and! tmb = TumorMutationBurden.validateOptional input.TmbInput
+
+                return { ReportId = reportId
+                         IssuedDate = input.IssuedDate
+                         MicrosatelliteStatus = msStatus
+                         TumorMutationBurden = tmb
+                         Lab = lab }
+            }
