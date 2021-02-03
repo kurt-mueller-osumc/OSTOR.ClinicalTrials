@@ -87,6 +87,8 @@ module FoundationMedicine =
     type Report =
         { ReportId: ReportId
           IssuedDate: IssuedDate
+          Sample: Sample
+          PMI: PMI
           MicrosatelliteStatus: MicrosatelliteStatus option
           TumorMutationBurden: TumorMutationBurden option
           Lab: Lab }
@@ -433,17 +435,23 @@ module FoundationMedicine =
             { ReportIdInput: ReportId.Input
               IssuedDate: IssuedDate
               LabInput: Lab.Input
+              SampleInput: Sample.Input
+              PmiInput: PMI.Input
               MsStatusInput: MicrosatelliteStatus.MsInput option
               TmbInput: TumorMutationBurden.Input option }
 
         let validate input =
             validation {
                 let! reportId = ReportId.validate input.ReportIdInput
+                and! sample = Sample.validate input.SampleInput
+                and! pmi = PMI.validate input.PmiInput
                 and! lab = Lab.validate input.LabInput
                 and! msStatus = MicrosatelliteStatus.Input.validate input.MsStatusInput
                 and! tmb = TumorMutationBurden.validateOptional input.TmbInput
 
                 return { ReportId = reportId
+                         Sample = sample
+                         PMI = pmi
                          IssuedDate = input.IssuedDate
                          MicrosatelliteStatus = msStatus
                          TumorMutationBurden = tmb
