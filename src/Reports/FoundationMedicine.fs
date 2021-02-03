@@ -25,7 +25,7 @@ module FoundationMedicine =
     and SpecimenFormat = internal | SpecimenFormat of string
 
     type PMI =
-        { MRN: MRN
+        { MRN: MRN option
           LastName: LastName
           FirstName: FirstName
           SubmittedDiagnosis: SubmittedDiagnosis
@@ -169,6 +169,15 @@ module FoundationMedicine =
 
     module PMI =
         open FsToolkit.ErrorHandling
+
+        module MRN =
+            let validate (MRN.Input input) =
+                if input = "" then
+                    Ok None
+                else
+                    MRN.Input input
+                    |> MRN.validate
+                    |> Result.map Some
 
         module Gender =
             type Input = Input of string
