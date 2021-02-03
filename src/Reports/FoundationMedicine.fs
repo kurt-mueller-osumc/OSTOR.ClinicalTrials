@@ -4,7 +4,15 @@ module FoundationMedicine =
     [<Measure>] type mutation
     [<Measure>] type megabase
 
-    type ReportId = internal ReportId of string
+    type Address =
+        { StreetAddress: StreetAddress
+          City: City
+          State: State
+          Zipcode: Zipcode }
+    and StreetAddress = StreetAddress of string
+    and City = City of string
+    and State = State of string
+    and Zipcode = Zipcode of string
 
     type Sample =
         { SampleId: SampleId
@@ -71,9 +79,19 @@ module FoundationMedicine =
     and TmbScore = internal TmbScore of score: float<mutation/megabase>
     and TmbStatus = internal Low | Intermediate | High | UnknownStatus
 
+    type Lab =
+        { Address: Address
+          CliaNumber: CliaNumber }
+    and CliaNumber = CliaNumber of string
+
     type Report =
         { MicrosatelliteStatus: MicrosatelliteStatus option
-          TumorMutationBurden: TumorMutationBurden option }
+          TumorMutationBurden: TumorMutationBurden option
+          IssuedDate: IssuedDate
+          ReportId: ReportId
+          Lab: Lab }
+    and ReportId = internal ReportId of string
+    and IssuedDate = IssuedDate of System.DateTime
 
     module ReportId =
         open System.Text.RegularExpressions
@@ -281,6 +299,22 @@ module FoundationMedicine =
 
         let validateOptional = Option.map validate
 
+    module LabAddress =
+        open System.Text.RegularExpressions
+
+        type Input = Input of string
+
+        /// Validate a FMI lab address is valid
+        let validate (Input input) =
+            let regex = Regex("(?<street_address>(.)+), (?<city>[a-zA-Z]+), (?<state>[a-zA-Z]{2}) (?<zip_code>\d+)$").Match(input)
+
+            if regex.Success then
+                Ok <| { StreetAddress = (StreetAddress regex.Groups.["streetAddress"].Value)
+                        City = City regex.Groups.["city"].Value
+                        State = State regex.Groups.["state"].Value
+                        Zipcode = Zipcode regex.Groups.["zip_code"].Value }
+            else Error $"Invalid lab address: {input}"
+
     module Report =
         open FSharp.Data
         open System.IO
@@ -369,3 +403,7 @@ module FoundationMedicine =
                 match this.Biomarkers.TumorMutationBurden with
                 | Some tmb -> Some (tmb.Score, tmb.Status)
                 | None -> None
+
+            /// When the report was issued
+            member this.ServerTime =
+                this.ClinicalReport.Signature.ServerTime
