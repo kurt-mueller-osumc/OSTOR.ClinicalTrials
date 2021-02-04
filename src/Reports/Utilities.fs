@@ -7,12 +7,29 @@ module Utilities =
             | (true, dateTime) -> Some dateTime
             | _ -> None
 
+    module List =
+        /// Flatten list of lists into just a 1-d list
+        let flatten list =
+            List.collect id list
+
     module Regex =
         open System.Text.RegularExpressions
 
         /// Remove a regex expression from a string
         let remove regex string =
             Regex.Replace(string, regex, "")
+
+    module Result =
+        /// Combine a list of results into a result of lists
+        let combine (results: Result<'ok, 'err> list) : Result<'ok list, 'err list> =
+            let initial : Result<'ok list, 'err list> = Ok []
+
+            results
+            |> List.fold (fun agg res ->
+                match res with
+                | Ok ok -> Result.map (fun oks -> ok :: oks) agg
+                | Error err -> Result.mapError (fun errs -> err :: errs) agg
+            ) initial
 
     module String =
         open System.IO
