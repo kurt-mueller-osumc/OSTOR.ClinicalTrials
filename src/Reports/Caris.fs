@@ -1,6 +1,23 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Caris =
+
+    type Specimen =
+        { SpecimenId: SpecimenId
+          SpecimenType: SpecimenType
+          SpecimenSite: SpecimenSite
+          CollectionDate: CollectionDate
+          ReceivedDate: ReceivedDate }
+    and SpecimenId = SpecimenId of string
+    and SpecimenType =
+        internal
+        | ``Tissue Biopsy Formalin Vial``
+        | ``Tissue Biopsy Paraffin Blocks``
+        | ``Tissue Biopsy Slide Unstained``
+    and SpecimenSite = SpecimenSite of string
+    and CollectionDate = CollectionDate of System.DateTime
+    and ReceivedDate = ReceivedDate of System.DateTime
+
     module Report =
         open FSharp.Data
         open System.IO
