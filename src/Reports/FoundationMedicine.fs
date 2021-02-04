@@ -91,7 +91,8 @@ module FoundationMedicine =
           PMI: PMI
           MicrosatelliteStatus: MicrosatelliteStatus option
           TumorMutationBurden: TumorMutationBurden option
-          Lab: Lab }
+          Lab: Lab
+          Variants: Variant list }
     and ReportId = internal ReportId of string
     and IssuedDate = IssuedDate of System.DateTime
 
@@ -220,9 +221,9 @@ module FoundationMedicine =
     module Variant =
         type Input =
             { GeneName: GeneName
-              IsVus: IsVUS
+              IsVus: IsVus
               VariantName: VariantName }
-        and IsVUS = IsVUS of bool
+        and IsVus = IsVus of bool
 
         module Input =
             open Utilities
@@ -241,7 +242,7 @@ module FoundationMedicine =
                 if geneName <> "" then ValidGeneName (GeneName geneName)
                 else InvalidGeneName
 
-            let (|IsVus|NotVus|) (IsVUS isVus) =
+            let (|IsVus|NotVus|) (IsVus isVus) =
                 match isVus with
                 | true -> IsVus
                 | false -> NotVus
@@ -254,6 +255,13 @@ module FoundationMedicine =
                 | InvalidGeneName, _, ValidVariantNames _ -> Error $"Invalid gene name: {variantInput.GeneName}"
                 | ValidGeneName _, _, InvalidVariantNames -> Error $"Invalid variant names: {variantInput.VariantName}"
                 | _ -> Error $"Invalid variant: {variantInput}"
+
+    module Variants =
+        open Utilities
+
+        let validate =
+            List.map Variant.Input.validate
+            >> Result.combine
 
     module MicrosatelliteStatus =
         type MsInput = MsInput of string
@@ -410,8 +418,8 @@ module FoundationMedicine =
             member this.VariantInputs : Variant.Input seq =
                 this.ClinicalReport.VariantProperties
                 |> Seq.map (fun variantProperty ->
-                    { GeneName =  GeneName variantProperty.GeneName
-                      IsVus = Variant.IsVUS variantProperty.IsVus
+                    { GeneName = GeneName variantProperty.GeneName
+                      IsVus = Variant.IsVus variantProperty.IsVus
                       VariantName = VariantName variantProperty.VariantName })
 
             /// Retrieve the report's microsatellite status, if it exists.
@@ -447,7 +455,8 @@ module FoundationMedicine =
               SampleInput: Sample.Input
               PmiInput: PMI.Input
               MsStatusInput: MicrosatelliteStatus.MsInput option
-              TmbInput: TumorMutationBurden.Input option }
+              TmbInput: TumorMutationBurden.Input option
+              VariantsInput: Variant.Input list }
 
         let validate input =
             validation {
@@ -457,6 +466,7 @@ module FoundationMedicine =
                 and! lab = Lab.validate input.LabInput
                 and! msStatus = MicrosatelliteStatus.Input.validate input.MsStatusInput
                 and! tmb = TumorMutationBurden.validateOptional input.TmbInput
+                and! variants = Variants.validate input.VariantsInput
 
                 return { ReportId = reportId
                          Sample = sample
@@ -464,5 +474,6 @@ module FoundationMedicine =
                          IssuedDate = input.IssuedDate
                          MicrosatelliteStatus = msStatus
                          TumorMutationBurden = tmb
-                         Lab = lab }
+                         Lab = lab
+                         Variants = variants }
             }
