@@ -42,7 +42,7 @@ module Utilities =
             results
             |> List.fold (fun (oks, errors) result ->
                 match result with
-                | Ok ok -> ( ok :: oks, errors)
+                | Ok ok -> (ok :: oks, errors)
                 | Error error -> (oks, error :: errors)
             ) initialPartition
 
