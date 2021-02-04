@@ -9,6 +9,8 @@ module Utilities =
 
     module List =
         /// Flatten list of lists into just a 1-d list
+        ///
+        ///    flatten [[1]; [2; 3; 4]; [5; 6]] = [1; 2; 3; 4; 5; 6]
         let flatten list =
             List.collect id list
 
