@@ -111,6 +111,15 @@ module FoundationMedicine =
             else
                 Error <| $"Invalid report id: {reportId}"
 
+    module IssuedDate =
+        open Utilities
+        type Input = Input of string
+
+        let validate (Input input) =
+            match DateTime.tryParse input with
+            | Some issuedDate ->  Ok <| IssuedDate issuedDate
+            | None -> Error $"Invalid issued date: {input}"
+
     module Sample =
         open FsToolkit.ErrorHandling
 
@@ -358,6 +367,16 @@ module FoundationMedicine =
         open System.IO
         open System.Xml.Linq
 
+        type Input =
+            { ReportIdInput: ReportId.Input
+              IssuedDateInput: IssuedDate.Input
+              LabInput: Lab.Input
+              SampleInput: Sample.Input
+              PmiInput: PMI.Input
+              MsStatusInput: MicrosatelliteStatus.MsInput option
+              TmbInput: TumorMutationBurden.Input option
+              VariantsInput: Variant.Input list }
+
         [<Literal>]
         let ClinicalReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/clinicalReport.xsd"
         [<Literal>]
@@ -387,20 +406,49 @@ module FoundationMedicine =
 
             member _.ClinicalReport = ClinicalReportProvider.Parse(finalReportElement.ToString())
             member _.VariantReport = VariantReportProvider.Parse(variantReportElement.ToString())
-
-            member this.ReportId = ReportId this.ClinicalReport.ReportId
-
             member this.ReportSample = this.ClinicalReport.Sample
+
+            /// When the report was issued
+            member this.ServerTime =
+                this.ClinicalReport.Signature.ServerTime
+
+            /// Retrieve the report's microsatellite status, if it exists.
+            member this.MicrosatelliteStatus =
+                this.ClinicalReport.Genes
+                |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
+                |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
+
+            member this.Biomarkers =
+                this.VariantReport.Biomarkers
+
+            member this.TumorMutationBurden =
+                this.Biomarkers.TumorMutationBurden
+                |> Option.map (fun tmb -> (tmb.Score, tmb.Status))
+
+
+            (* Read in XML to report input *)
+
+            member this.ReportIdInput = ReportId.Input this.ClinicalReport.ReportId
+
+            member this.IssuedDateInput =
+                this.ServerTime |> IssuedDate.Input
+
+            /// Retrieve the lab's address and clia number
+            member this.LabInput: Lab.Input =
+                let processSite = this.ReportSample.ProcessSites.[0]
+
+                { AddressInput = Lab.Address.Input processSite.Address
+                  CliaNumber = CliaNumber processSite.CliaNumber }
 
             /// Retrieve the report's sample
             member this.SampleInput : Sample.Input =
-                { SampleIdInput = Sample.SampleId.Input this.ClinicalReport.Sample.SampleId
-                  BlockId = Sample.BlockId.Input this.ClinicalReport.Sample.BlockId
-                  ReceivedDate = ReceivedDate this.ClinicalReport.Sample.ReceivedDate
-                  SpecimenFormat = Sample.SpecimenFormat.Input this.ClinicalReport.Sample.SpecFormat }
+                { SampleIdInput = Sample.SampleId.Input this.ReportSample.SampleId
+                  BlockId = Sample.BlockId.Input this.ReportSample.BlockId
+                  ReceivedDate = ReceivedDate this.ReportSample.ReceivedDate
+                  SpecimenFormat = Sample.SpecimenFormat.Input this.ReportSample.SpecFormat }
 
             /// Retrieve the report's patient medical information
-            member this.PMI : PMI.Input =
+            member this.PmiInput : PMI.Input =
                 let pmi = this.ClinicalReport.Pmi
 
                 { MrnInput = MRN.Input pmi.Mrn
@@ -422,41 +470,28 @@ module FoundationMedicine =
                       IsVus = Variant.IsVus variantProperty.IsVus
                       VariantName = VariantName variantProperty.VariantName })
 
-            /// Retrieve the report's microsatellite status, if it exists.
-            member this.MicrosatelliteStatus =
-                this.ClinicalReport.Genes
-                |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
-                |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
+            member this.MicrosatelliteStatusInput =
+                this.MicrosatelliteStatus
                 |> Option.map MicrosatelliteStatus.MsInput
 
-            member this.TumorMutationalBurden =
-                this.ClinicalReport.Genes
-                |> Seq.tryFind (fun gene -> gene.Name = "Tumor Mutation Burden")
-                |> Option.map (fun tmb -> Seq.head(tmb.Alterations).Name)
+            member this.TmbInput : TumorMutationBurden.Input option =
+                this.TumorMutationBurden
+                |> Option.map (fun (score, status) ->
+                    { ScoreInput = TumorMutationBurden.ScoreInput (float score)
+                      StatusInput = TumorMutationBurden.StatusInput status })
 
-            member this.Biomarkers =
-                this.VariantReport.Biomarkers
+            member this.ReportInput =
+                { ReportIdInput = this.ReportIdInput
+                  IssuedDateInput = this.IssuedDateInput
+                  LabInput = this.LabInput
+                  SampleInput = this.SampleInput
+                  PmiInput = this.PmiInput
+                  MsStatusInput = this.MicrosatelliteStatusInput
+                  TmbInput = this.TmbInput
+                  VariantsInput = this.VariantInputs |> Seq.toList }
 
-            member this.TMB =
-                match this.Biomarkers.TumorMutationBurden with
-                | Some tmb -> Some (tmb.Score, tmb.Status)
-                | None -> None
-
-            /// When the report was issued
-            member this.ServerTime =
-                this.ClinicalReport.Signature.ServerTime
 
         open FsToolkit.ErrorHandling
-
-        type Input =
-            { ReportIdInput: ReportId.Input
-              IssuedDate: IssuedDate
-              LabInput: Lab.Input
-              SampleInput: Sample.Input
-              PmiInput: PMI.Input
-              MsStatusInput: MicrosatelliteStatus.MsInput option
-              TmbInput: TumorMutationBurden.Input option
-              VariantsInput: Variant.Input list }
 
         let validate input =
             validation {
@@ -467,11 +502,12 @@ module FoundationMedicine =
                 and! msStatus = MicrosatelliteStatus.Input.validate input.MsStatusInput
                 and! tmb = TumorMutationBurden.validateOptional input.TmbInput
                 and! variants = Variants.validate input.VariantsInput
+                and! issuedDate = IssuedDate.validate input.IssuedDateInput
 
                 return { ReportId = reportId
                          Sample = sample
                          PMI = pmi
-                         IssuedDate = input.IssuedDate
+                         IssuedDate = issuedDate
                          MicrosatelliteStatus = msStatus
                          TumorMutationBurden = tmb
                          Lab = lab
