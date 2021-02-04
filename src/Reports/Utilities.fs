@@ -23,7 +23,7 @@ module Utilities =
 
     module Result =
         /// Combine a list of results into a result of lists
-        let combine (results: Result<'ok, 'err> list) : Result<'ok list, 'err list> =
+        let combine (results: Result<'ok, 'err> list): Result<'ok list, 'err list> =
             let initial : Result<'ok list, 'err list> = Ok []
 
             results
@@ -32,6 +32,19 @@ module Utilities =
                 | Ok ok -> Result.map (fun oks -> ok :: oks) agg
                 | Error err -> Result.mapError (fun errs -> err :: errs) agg
             ) initial
+
+        /// Partition a list of results into a tuple of successes and errors.
+        ///
+        ///    partition (Ok 1; Ok 2; Error "foo"; Ok 3; Error "bar") = ([1; 2; 3], ["foo"; "bar"])
+        let partition (results: Result<'ok, 'err> list) =
+            let initialPartition = ([], [])
+
+            results
+            |> List.fold (fun (oks, errors) result ->
+                match result with
+                | Ok ok -> ( ok :: oks, errors)
+                | Error error -> (oks, error :: errors)
+            ) initialPartition
 
     module String =
         open System.IO
