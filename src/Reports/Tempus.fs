@@ -61,7 +61,7 @@ module Tempus =
           Sex: string
           DateOfBirth: System.DateTime
           Diagnosis: string
-          DiagnosisDate: System.DateTime }
+          DiagnosisDate: string }
 
     and OrderJson =
         { Institution: string
@@ -106,14 +106,24 @@ module Tempus =
             )
 
     type LabJson with
-        static member Decoder : Decoder<LabJson> =
+        static member PascalCaseDecoder : Decoder<LabJson> =
             Decode.object (fun get ->
-                { Name = get.Required.Field "name" Decode.string
+                { Name = get.Required.Field "Name" Decode.string
                   StreetAddress = get.Required.Field "StreetAddress" Decode.string
                   City = get.Required.Field "City" Decode.string
                   State = get.Required.Field "State" Decode.string
-                  Zip = get.Required.Field "zip" Decode.string
+                  Zip = get.Required.Field "Zip" Decode.string
                   CliaNumber = get.Required.Field "clia_no" Decode.string }
+            )
+
+        static member CamelCaseDecoder : Decoder<LabJson> =
+            Decode.object (fun get ->
+                { Name = get.Required.Field "name" Decode.string
+                  StreetAddress = get.Required.Field "streetAddress" Decode.string
+                  City = get.Required.Field "city" Decode.string
+                  State = get.Required.Field "state" Decode.string
+                  Zip = get.Required.Field "zip" Decode.string
+                  CliaNumber = get.Required.Field "cliaNo" Decode.string }
             )
 
     type PatientJson with
@@ -126,13 +136,13 @@ module Tempus =
                   Sex = get.Required.Field "sex" Decode.string
                   DateOfBirth = get.Required.Field "DoB" Decode.datetime
                   Diagnosis = get.Required.Field "diagnosis" Decode.string
-                  DiagnosisDate = get.Required.Field "diagnosisDate" Decode.datetime }
+                  DiagnosisDate = get.Required.Field "diagnosisDate" Decode.string }
             )
 
     type Json with
         static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
-                { Lab = get.Required.Field "lab" LabJson.Decoder
+                { Lab = get.Required.Field "lab" (Decode.oneOf [LabJson.PascalCaseDecoder; LabJson.CamelCaseDecoder])
                   Report = get.Required.Field "report" ReportJson.Decoder
                   Patient = get.Required.Field "patient" PatientJson.Decoder
                   Order = get.Required.Field "order" OrderJson.Decoder }
@@ -140,66 +150,13 @@ module Tempus =
 
 
     module Json =
+        type Error =
+          { FileName: string
+            Error: string }
+
         let deserialize =
             Decode.fromString Json.Decoder
 
-
-    // let foo =
-      // Decode.
-
-    // type Json =
-    //     { Lab: LabJson
-    //       Report: ReportJson
-    //       Patient: PatientJson
-    //       Order: OrderJson
-    //       Samples: SampleJson list }
-    // and LabJson =
-    //     { Name: string
-    //       StreetAddress: string
-    //       City: string
-    //       State: string
-    //       Zip: string
-    //       CliaNumber: string }
-    // and ReportJson =
-    //     { ReportId: string
-    //       SigningPathologist: string option
-    //       SignoutDate: System.DateTime option }
-    // and PatientJson =
-    //     { FirstName: string
-    //       LastName: string
-    //       TempusId: string
-    //       MRN: string
-    //       Sex: string
-    //       DateOfBirth: System.DateTime
-    //       Diagnosis: string
-    //       DiagnosisDate: string }
-    // and OrderJson =
-    //     { Institution: string
-    //       Physician: string
-    //       OrderId: string
-    //       AccessionId: string
-    //       OrderTest: OrderTestJson }
-    // and OrderTestJson =
-    //     { Code: string
-    //       Name: string
-    //       Description: string }
-    // and SampleJson =
-    //     { SampleId: string
-    //       CollectionDate: string
-    //       ReceivedDate: string
-    //       SampleCategory: string
-    //       SampleSite: string
-    //       SampleType: string
-    //       Notes: string
-    //       InstitutionData: InstitutionJson }
-    // and InstitutionJson =
-    //     { CaseId: string
-    //       BlockId: string option
-    //       TumorPercentage: int option }
-
-    //       static member Decoder : Decoder<InstitutionJson> =
-    //         Decode.object (fun get ->
-    //           { CaseId = get.Required.Field "caseId" Decode.string
-    //             BlockId = get.Optional.Field "blockId" Decode.string
-    //             TumorPercentage = get.Optional.Field "tumorPercentage" Decode.int }
-    //         )
+        let deserializeWithError fileName =
+            deserialize
+            >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
