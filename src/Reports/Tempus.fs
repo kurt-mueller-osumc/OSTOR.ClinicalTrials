@@ -97,13 +97,22 @@ module Tempus =
             )
 
     type ReportJson with
-        static member Decoder : Decoder<ReportJson> =
+        static member SnakeCaseDecoder : Decoder<ReportJson> =
             Decode.object (fun get ->
                 { ReportId = get.Required.Field "reportId" Decode.guid
                   SigningPathologist = get.Required.Field "signing_pathologist" Decode.string
                   SignoutDate = get.Required.Field "signout_date" Decode.datetime
                 }
             )
+
+        static member CamelCaseDecoder : Decoder<ReportJson> =
+            Decode.object (fun get ->
+                { ReportId = get.Required.Field "reportId" Decode.guid
+                  SigningPathologist = get.Required.Field "signingPathologist" Decode.string
+                  SignoutDate = get.Required.Field "signoutDate" Decode.datetime
+                }
+            )
+
 
     type LabJson with
         static member PascalCaseDecoder : Decoder<LabJson> =
@@ -143,7 +152,7 @@ module Tempus =
         static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
                 { Lab = get.Required.Field "lab" (Decode.oneOf [LabJson.PascalCaseDecoder; LabJson.CamelCaseDecoder])
-                  Report = get.Required.Field "report" ReportJson.Decoder
+                  Report = get.Required.Field "report" (Decode.oneOf [ReportJson.CamelCaseDecoder; ReportJson.SnakeCaseDecoder])
                   Patient = get.Required.Field "patient" PatientJson.Decoder
                   Order = get.Required.Field "order" OrderJson.Decoder }
             )
