@@ -7,6 +7,12 @@ module Utilities =
             | (true, dateTime) -> Some dateTime
             | _ -> None
 
+    module Guid =
+        let tryParse(input: string) =
+            match System.Guid.TryParse(input) with
+            | (true, guid) -> Some guid
+            | _ -> None
+
     module List =
         /// Flatten list of lists into just a 1-d list
         ///
