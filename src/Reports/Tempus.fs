@@ -35,12 +35,14 @@ module Tempus =
 
     type Json =
         { Order: OrderJson
-          Lab: LabJson }
+          Lab: LabJson
+          Report: ReportJson }
 
         static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
-              { Order = get.Required.Field "order" OrderJson.Decoder
-                Lab = get.Required.Field "lab" LabJson.Decoder }
+                { Order = get.Required.Field "order" OrderJson.Decoder
+                  Lab = get.Required.Field "lab" LabJson.Decoder
+                  Report = get.Required.Field "report" ReportJson.Decoder }
             )
 
     and LabJson =
@@ -53,12 +55,25 @@ module Tempus =
 
         static member Decoder : Decoder<LabJson> =
             Decode.object (fun get ->
-              { Name = get.Required.Field "name" Decode.string
-                StreetAddress = get.Required.Field "StreetAddress" Decode.string
-                City = get.Required.Field "City" Decode.string
-                State = get.Required.Field "State" Decode.string
-                Zip = get.Required.Field "zip" Decode.string
-                CliaNumber = get.Required.Field "clia_no" Decode.string }
+                { Name = get.Required.Field "name" Decode.string
+                  StreetAddress = get.Required.Field "StreetAddress" Decode.string
+                  City = get.Required.Field "City" Decode.string
+                  State = get.Required.Field "State" Decode.string
+                  Zip = get.Required.Field "zip" Decode.string
+                  CliaNumber = get.Required.Field "clia_no" Decode.string }
+            )
+
+    and ReportJson =
+        { ReportId: System.Guid
+          SigningPathologist: string
+          SignoutDate: string }
+
+        static member Decoder : Decoder<ReportJson> =
+            Decode.object (fun get ->
+                { ReportId = get.Required.Field "reportId" Decode.guid
+                  SigningPathologist = get.Required.Field "signing_pathologist" Decode.string
+                  SignoutDate = get.Required.Field "signout_date" Decode.string
+                }
             )
 
     and OrderJson =
@@ -70,11 +85,11 @@ module Tempus =
 
         static member Decoder : Decoder<OrderJson> =
             Decode.object (fun get ->
-              { Institution = get.Required.Field "institution" Decode.string
-                Physician = get.Required.Field "physician" Decode.string
-                OrderId = get.Required.Field "tempusOrder_id" Decode.string
-                AccessionId = get.Required.Field "accessionId" Decode.string
-                OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
+                { Institution = get.Required.Field "institution" Decode.string
+                  Physician = get.Required.Field "physician" Decode.string
+                  OrderId = get.Required.Field "tempusOrder_id" Decode.string
+                  AccessionId = get.Required.Field "accessionId" Decode.string
+                  OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
             )
 
     and OrderTestJson =
