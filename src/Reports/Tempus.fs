@@ -33,17 +33,12 @@ module Tempus =
           GermlineSample: Sample<GermlineCategory> option
           TumorSample: Sample<TumorCategory> }
 
+
     type Json =
         { Order: OrderJson
           Lab: LabJson
-          Report: ReportJson }
-
-        static member Decoder : Decoder<Json> =
-            Decode.object (fun get ->
-                { Order = get.Required.Field "order" OrderJson.Decoder
-                  Lab = get.Required.Field "lab" LabJson.Decoder
-                  Report = get.Required.Field "report" ReportJson.Decoder }
-            )
+          Report: ReportJson
+          Patient: PatientJson }
 
     and LabJson =
         { Name: string
@@ -53,6 +48,64 @@ module Tempus =
           Zip: string
           CliaNumber: string }
 
+    and ReportJson =
+        { ReportId: System.Guid
+          SigningPathologist: string
+          SignoutDate: System.DateTime }
+
+    and PatientJson =
+        { FirstName: string
+          LastName: string
+          TempusId: System.Guid
+          MRN: string
+          Sex: string
+          DateOfBirth: System.DateTime
+          Diagnosis: string
+          DiagnosisDate: System.DateTime }
+
+    and OrderJson =
+        { Institution: string
+          Physician: string
+          OrderId: string
+          AccessionId: string
+          OrderTest: OrderTestJson }
+
+    and OrderTestJson =
+        { Code: string
+          Name: string
+          Description: string }
+
+
+    (* Decoders *)
+
+    type OrderTestJson with
+        static member Decoder : Decoder<OrderTestJson> =
+            Decode.object (fun get ->
+                { Code = get.Required.Field "code" Decode.string
+                  Name = get.Required.Field "name" Decode.string
+                  Description = get.Required.Field "description" Decode.string }
+            )
+
+    type OrderJson with
+        static member Decoder : Decoder<OrderJson> =
+            Decode.object (fun get ->
+                { Institution = get.Required.Field "institution" Decode.string
+                  Physician = get.Required.Field "physician" Decode.string
+                  OrderId = get.Required.Field "tempusOrder_id" Decode.string
+                  AccessionId = get.Required.Field "accessionId" Decode.string
+                  OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
+            )
+
+    type ReportJson with
+        static member Decoder : Decoder<ReportJson> =
+            Decode.object (fun get ->
+                { ReportId = get.Required.Field "reportId" Decode.guid
+                  SigningPathologist = get.Required.Field "signing_pathologist" Decode.string
+                  SignoutDate = get.Required.Field "signout_date" Decode.datetime
+                }
+            )
+
+    type LabJson with
         static member Decoder : Decoder<LabJson> =
             Decode.object (fun get ->
                 { Name = get.Required.Field "name" Decode.string
@@ -63,46 +116,28 @@ module Tempus =
                   CliaNumber = get.Required.Field "clia_no" Decode.string }
             )
 
-    and ReportJson =
-        { ReportId: System.Guid
-          SigningPathologist: string
-          SignoutDate: string }
-
-        static member Decoder : Decoder<ReportJson> =
+    type PatientJson with
+        static member Decoder : Decoder<PatientJson> =
             Decode.object (fun get ->
-                { ReportId = get.Required.Field "reportId" Decode.guid
-                  SigningPathologist = get.Required.Field "signing_pathologist" Decode.string
-                  SignoutDate = get.Required.Field "signout_date" Decode.string
-                }
+                { FirstName = get.Required.Field "firstName" Decode.string
+                  LastName = get.Required.Field "lastName" Decode.string
+                  TempusId = get.Required.Field "tempusId" Decode.guid
+                  MRN = get.Required.Field "emr_id" Decode.string
+                  Sex = get.Required.Field "sex" Decode.string
+                  DateOfBirth = get.Required.Field "DoB" Decode.datetime
+                  Diagnosis = get.Required.Field "diagnosis" Decode.string
+                  DiagnosisDate = get.Required.Field "diagnosisDate" Decode.datetime }
             )
 
-    and OrderJson =
-        { Institution: string
-          Physician: string
-          OrderId: string
-          AccessionId: string
-          OrderTest: OrderTestJson }
-
-        static member Decoder : Decoder<OrderJson> =
+    type Json with
+        static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
-                { Institution = get.Required.Field "institution" Decode.string
-                  Physician = get.Required.Field "physician" Decode.string
-                  OrderId = get.Required.Field "tempusOrder_id" Decode.string
-                  AccessionId = get.Required.Field "accessionId" Decode.string
-                  OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
+                { Lab = get.Required.Field "lab" LabJson.Decoder
+                  Report = get.Required.Field "report" ReportJson.Decoder
+                  Patient = get.Required.Field "patient" PatientJson.Decoder
+                  Order = get.Required.Field "order" OrderJson.Decoder }
             )
 
-    and OrderTestJson =
-        { Code: string
-          Name: string
-          Description: string }
-
-        static member Decoder : Decoder<OrderTestJson> =
-            Decode.object (fun get ->
-                { Code = get.Required.Field "code" Decode.string
-                  Name = get.Required.Field "name" Decode.string
-                  Description = get.Required.Field "description" Decode.string }
-            )
 
     module Json =
         let deserialize =
@@ -168,8 +203,3 @@ module Tempus =
     //             BlockId = get.Optional.Field "blockId" Decode.string
     //             TumorPercentage = get.Optional.Field "tumorPercentage" Decode.int }
     //         )
-
-
-    // module Json =
-        // let deserialize jsonText =
-            // Json.deserialize<Json>(jsonText)
