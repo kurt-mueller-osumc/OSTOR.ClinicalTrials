@@ -87,7 +87,16 @@ module Tempus =
             )
 
     type OrderJson with
-        static member Decoder : Decoder<OrderJson> =
+        static member CamelCaseDecoder: Decoder<OrderJson> =
+            Decode.object (fun get ->
+                { Institution = get.Required.Field "institution" Decode.string
+                  Physician = get.Required.Field "physician" Decode.string
+                  OrderId = get.Required.Field "tempusOrderId" Decode.string
+                  AccessionId = get.Required.Field "accessionId" Decode.string
+                  OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
+            )
+
+        static member SnakeCaseDecoder: Decoder<OrderJson> =
             Decode.object (fun get ->
                 { Institution = get.Required.Field "institution" Decode.string
                   Physician = get.Required.Field "physician" Decode.string
@@ -95,6 +104,8 @@ module Tempus =
                   AccessionId = get.Required.Field "accessionId" Decode.string
                   OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
             )
+        static member Decoder : Decoder<OrderJson> =
+            Decode.oneOf [OrderJson.CamelCaseDecoder; OrderJson.SnakeCaseDecoder]
 
     type ReportJson with
         static member SnakeCaseDecoder : Decoder<ReportJson> =
@@ -113,18 +124,10 @@ module Tempus =
                 }
             )
 
+        static member Decoder : Decoder<ReportJson> =
+           Decode.oneOf [ReportJson.CamelCaseDecoder; ReportJson.SnakeCaseDecoder]
 
     type LabJson with
-        static member PascalCaseDecoder : Decoder<LabJson> =
-            Decode.object (fun get ->
-                { Name = get.Required.Field "Name" Decode.string
-                  StreetAddress = get.Required.Field "StreetAddress" Decode.string
-                  City = get.Required.Field "City" Decode.string
-                  State = get.Required.Field "State" Decode.string
-                  Zip = get.Required.Field "Zip" Decode.string
-                  CliaNumber = get.Required.Field "clia_no" Decode.string }
-            )
-
         static member CamelCaseDecoder : Decoder<LabJson> =
             Decode.object (fun get ->
                 { Name = get.Required.Field "name" Decode.string
@@ -135,8 +138,33 @@ module Tempus =
                   CliaNumber = get.Required.Field "cliaNo" Decode.string }
             )
 
+        static member PascalCaseDecoder : Decoder<LabJson> =
+            Decode.object (fun get ->
+                { Name = get.Required.Field "Name" Decode.string
+                  StreetAddress = get.Required.Field "StreetAddress" Decode.string
+                  City = get.Required.Field "City" Decode.string
+                  State = get.Required.Field "State" Decode.string
+                  Zip = get.Required.Field "Zip" Decode.string
+                  CliaNumber = get.Required.Field "clia_no" Decode.string }
+            )
+
+        static member Decoder =
+            Decode.oneOf [LabJson.CamelCaseDecoder; LabJson.PascalCaseDecoder]
+
     type PatientJson with
-        static member Decoder : Decoder<PatientJson> =
+        static member CamelCaseDecoder : Decoder<PatientJson> =
+            Decode.object (fun get ->
+                { FirstName = get.Required.Field "firstName" Decode.string
+                  LastName = get.Required.Field "lastName" Decode.string
+                  TempusId = get.Required.Field "tempusId" Decode.guid
+                  MRN = get.Required.Field "emrId" Decode.string
+                  Sex = get.Required.Field "sex" Decode.string
+                  DateOfBirth = get.Required.Field "dateOfBirth" Decode.datetime
+                  Diagnosis = get.Required.Field "diagnosis" Decode.string
+                  DiagnosisDate = get.Required.Field "diagnosisDate" Decode.string }
+            )
+
+        static member SnakeCaseDecoder : Decoder<PatientJson> =
             Decode.object (fun get ->
                 { FirstName = get.Required.Field "firstName" Decode.string
                   LastName = get.Required.Field "lastName" Decode.string
@@ -148,11 +176,14 @@ module Tempus =
                   DiagnosisDate = get.Required.Field "diagnosisDate" Decode.string }
             )
 
+        static member Decoder =
+            Decode.oneOf [PatientJson.CamelCaseDecoder; PatientJson.SnakeCaseDecoder]
+
     type Json with
         static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
-                { Lab = get.Required.Field "lab" (Decode.oneOf [LabJson.PascalCaseDecoder; LabJson.CamelCaseDecoder])
-                  Report = get.Required.Field "report" (Decode.oneOf [ReportJson.CamelCaseDecoder; ReportJson.SnakeCaseDecoder])
+                { Lab = get.Required.Field "lab" LabJson.Decoder
+                  Report = get.Required.Field "report" ReportJson.Decoder
                   Patient = get.Required.Field "patient" PatientJson.Decoder
                   Order = get.Required.Field "order" OrderJson.Decoder }
             )
