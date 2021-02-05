@@ -12,7 +12,8 @@ module Tempus =
     type Json =
         { [<JsonProperty("lab")>] Lab: LabJson
           [<JsonProperty("report")>] Report: ReportJson
-          [<JsonProperty("patient")>] Patient: PatientJson }
+          [<JsonProperty("patient")>] Patient: PatientJson
+          [<JsonProperty("order")>] Order: OrderJson }
     and LabJson =
         { Name: string
           StreetAddress: string
@@ -33,6 +34,16 @@ module Tempus =
           [<JsonProperty("DoB")>] DateOfBirth: string
           [<JsonProperty("diagnosis")>] Diagnosis: string
           [<JsonProperty("diagnosisDate")>] DiagnosisDate: string }
+    and OrderJson =
+        { [<JsonProperty("institution")>] Institution: string
+          [<JsonProperty("physician")>] Physician: string
+          [<JsonProperty("tempusOrder_id")>] OrderId: string
+          [<JsonProperty("accessionId")>] AccessionId: string
+          [<JsonProperty("test")>] OrderTest: OrderTestJson }
+    and OrderTestJson =
+        { [<JsonProperty("code")>] Code: string
+          [<JsonProperty("name")>] Name: string
+          [<JsonProperty("description")>] Description: string }
 
     module Json =
         let deserialize jsonText =
