@@ -7,11 +7,13 @@
     <Compile Include="Common.fs" />
     <Compile Include="Caris.fs" />
     <Compile Include="FoundationMedicine.fs" />
+    <Compile Include="Tempus.fs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="data/FMI/clinicalReport.xsd" />
     <EmbeddedResource Include="data/FMI/resultsReport.xsd" />
     <EmbeddedResource Include="data/FMI/variantReport.xsd" />
+    <EmbeddedResource Include="data/carisReport.xsd" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
