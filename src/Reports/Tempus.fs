@@ -34,11 +34,31 @@ module Tempus =
           TumorSample: Sample<TumorCategory> }
 
     type Json =
-        { Order: OrderJson}
+        { Order: OrderJson
+          Lab: LabJson }
 
         static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
-              { Order = get.Required.Field "order" OrderJson.Decoder }
+              { Order = get.Required.Field "order" OrderJson.Decoder
+                Lab = get.Required.Field "lab" LabJson.Decoder }
+            )
+
+    and LabJson =
+        { Name: string
+          StreetAddress: string
+          City: string
+          State: string
+          Zip: string
+          CliaNumber: string }
+
+        static member Decoder : Decoder<LabJson> =
+            Decode.object (fun get ->
+              { Name = get.Required.Field "name" Decode.string
+                StreetAddress = get.Required.Field "StreetAddress" Decode.string
+                City = get.Required.Field "City" Decode.string
+                State = get.Required.Field "State" Decode.string
+                Zip = get.Required.Field "zip" Decode.string
+                CliaNumber = get.Required.Field "clia_no" Decode.string }
             )
 
     and OrderJson =
@@ -70,7 +90,7 @@ module Tempus =
             )
 
     module Json =
-        let decode =
+        let deserialize =
             Decode.fromString Json.Decoder
 
 
