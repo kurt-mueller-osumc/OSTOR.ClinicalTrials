@@ -38,7 +38,8 @@ module Tempus =
         { Order: OrderJson
           Lab: LabJson
           Report: ReportJson
-          Patient: PatientJson }
+          Patient: PatientJson
+          Samples: SampleJson list }
 
     and LabJson =
         { Name: string
@@ -75,8 +76,39 @@ module Tempus =
           Name: string
           Description: string }
 
+    and SampleJson =
+        { SampleId: System.Guid
+          CollectionDate: System.DateTime
+          ReceivedDate: System.DateTime
+          SampleCategory: string
+          SampleSite: string
+          SampleType: string
+          Institution: InstitutionJson }
+
+    and InstitutionJson =
+        { BlockId: string option
+          TumorPercentage: int option }
+
 
     (* Decoders *)
+
+    type InstitutionJson with
+        static member Decoder : Decoder<InstitutionJson> =
+            Decode.object (fun get ->
+                { BlockId = get.Optional.Field "blockId" Decode.string
+                  TumorPercentage = get.Optional.Field "tumorPercentage" Decode.int }
+            )
+
+    type SampleJson with
+        static member Decoder : Decoder<SampleJson> =
+            Decode.object (fun get ->
+                { SampleId = get.Required.Field "tempusSampleId" Decode.guid
+                  CollectionDate = get.Required.Field "collectionDate" Decode.datetime
+                  ReceivedDate = get.Required.Field "receiptDate" Decode.datetime
+                  SampleCategory = get.Required.Field "sampleCategory" Decode.string
+                  SampleSite = get.Required.Field "sampleSite" Decode.string
+                  SampleType = get.Required.Field "sampleType" Decode.string
+                  Institution = get.Required.Field "institutionData" InstitutionJson.Decoder })
 
     type OrderTestJson with
         static member Decoder : Decoder<OrderTestJson> =
@@ -104,6 +136,7 @@ module Tempus =
                   AccessionId = get.Required.Field "accessionId" Decode.string
                   OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
             )
+
         static member Decoder : Decoder<OrderJson> =
             Decode.oneOf [OrderJson.CamelCaseDecoder; OrderJson.SnakeCaseDecoder]
 
@@ -185,9 +218,9 @@ module Tempus =
                 { Lab = get.Required.Field "lab" LabJson.Decoder
                   Report = get.Required.Field "report" ReportJson.Decoder
                   Patient = get.Required.Field "patient" PatientJson.Decoder
-                  Order = get.Required.Field "order" OrderJson.Decoder }
+                  Order = get.Required.Field "order" OrderJson.Decoder
+                  Samples = get.Required.Field "order" (Decode.list SampleJson.Decoder) }
             )
-
 
     module Json =
         type Error =
