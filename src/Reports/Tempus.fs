@@ -219,7 +219,7 @@ module Tempus =
                   Report = get.Required.Field "report" ReportJson.Decoder
                   Patient = get.Required.Field "patient" PatientJson.Decoder
                   Order = get.Required.Field "order" OrderJson.Decoder
-                  Samples = get.Required.Field "order" (Decode.list SampleJson.Decoder) }
+                  Samples = get.Required.Field "specimens" (Decode.list SampleJson.Decoder) }
             )
 
     module Json =
