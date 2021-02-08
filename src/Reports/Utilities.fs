@@ -52,6 +52,24 @@ module Utilities =
                 | Error error -> (oks, error :: errors)
             ) initialPartition
 
+        let isOk result =
+            match result with
+            | Ok _ -> true
+            | _ -> false
+
+        let isError result =
+            not (isOk result)
+
+        let toOk result =
+            match result with
+            | Ok ok -> Some ok
+            | _ -> None
+
+        let toError result =
+            match result with
+            | Error err -> Some err
+            | _ -> None
+
     module String =
         open System.IO
 
