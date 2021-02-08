@@ -1,6 +1,10 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Utilities =
+
+    let flip f a b =
+        f b a
+
     module DateTime =
         let tryParse(input: string) =
             match System.DateTime.TryParse(input) with
