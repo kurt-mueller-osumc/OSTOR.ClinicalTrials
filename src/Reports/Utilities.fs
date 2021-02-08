@@ -11,6 +11,12 @@ module Utilities =
             | (true, dateTime) -> Some dateTime
             | _ -> None
 
+    module Float =
+        let tryParse(input: string) =
+            match System.Double.TryParse(input) with
+            | (true, num) -> Some num
+            | _ -> None
+
     module Guid =
         let tryParse(input: string) =
             match System.Guid.TryParse(input) with
