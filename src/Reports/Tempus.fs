@@ -62,6 +62,46 @@ module Tempus =
     and NucleotideAlteration = NucleotideAlteration of string
     and AllelicFraction = AllelicFraction of float
 
+    module Gene =
+        open Thoth.Json.Net
+
+        /// Json object attributes that identifies genes
+        type Json =
+            { GeneId: string // 'gene' attribute
+              HgncId: string
+              EntrezId: string }
+
+            /// Deserializes a gene's json object attributes
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { GeneId   = "gene"     |> flip get.Required.Field Decode.string
+                      HgncId   = "hgncId"   |> flip get.Required.Field Decode.string
+                      EntrezId = "entrezId" |> flip get.Required.Field Decode.string })
+
+            /// Deserializes Gene 5 json object attributes
+            static member Gene5Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { GeneId   = "gene5"         |> flip get.Required.Field Decode.string
+                      HgncId   = "gene5hgncId"   |> flip get.Required.Field Decode.string
+                      EntrezId = "gene5entrezId" |> flip get.Required.Field Decode.string })
+
+            /// Deserializes Gene 3 json object attributes
+            static member Gene3Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { GeneId   = "gene3"         |> flip get.Required.Field Decode.string
+                      HgncId   = "gene3hgncId"   |> flip get.Required.Field Decode.string
+                      EntrezId = "gene3entrezId" |> flip get.Required.Field Decode.string })
+
+        module Json =
+            let (|NotBlank|BlankString|) string =
+                if string = "" then BlankString
+                else NotBlank
+
+            let validate (json: Json) =
+                match (json.GeneId, json.HgncId, json.EntrezId) with
+                | (NotBlank, NotBlank, NotBlank) -> Ok { GeneName = GeneName json.GeneId; HgncId = HgncId json.HgncId; EntrezId = EntrezId json.EntrezId }
+                | _ -> Error $"Gene missing name, hgnc id, or entrez id: {json}"
+
 
     module Json =
         open Thoth.Json.Net
