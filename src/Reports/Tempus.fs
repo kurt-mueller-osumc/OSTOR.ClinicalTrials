@@ -37,7 +37,7 @@ module Tempus =
         | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
 
     and ``Somatic Biologically Relevant Variant`` =
-        { Gene: Gene
+        { Gene: ``Somatic Biologically Relevant Gene``
           HGVS: HGVS option
           AllelicFraction: AllelicFraction option
           NucleotideAlteration: NucleotideAlteration option }
@@ -52,6 +52,13 @@ module Tempus =
     and GeneName = internal GeneName of string
     and HgncId = internal HgncId of string
     and EntrezId = internal EntrezId of string
+
+    and ``Somatic Biologically Relevant Gene`` =
+        | Gene of Gene
+        | FusionGene of FusionGene
+
+    and FusionGene =
+        { ``5' Gene``: Gene; ``3' Gene``: Gene }
     and VariantType = VariantType of string
     and VariantDescription = VariantDescription of string
     and MutationEffect = MutationEffect of string
@@ -197,6 +204,8 @@ module Tempus =
 
         and ``Somatic Biologically Relevant Variant Json`` =
             { Gene: GeneJson
+              Gene5: GeneJson
+              Gene3: GeneJson
               VariantType: string
               VariantDescription: string
               Hgvs: HgvsJson
