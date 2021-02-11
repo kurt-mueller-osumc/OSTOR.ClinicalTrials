@@ -34,9 +34,9 @@ module Tempus =
           TumorSample: Sample<TumorCategory> }
 
     type Variant =
-        | SomaticBiologicallyRelevantVariant of SomaticBiologicallyRelevantVariant
+        | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
 
-    and SomaticBiologicallyRelevantVariant =
+    and ``Somatic Biologically Relevant Variant`` =
         { Gene: Gene
           HGVS: HGVS option
           AllelicFraction: AllelicFraction option
@@ -45,8 +45,13 @@ module Tempus =
     and HGVS =
         { ReferenceSequence: string }
 
-    and Gene = Gene of string
-    and HgncId = HgncId of string
+    and Gene =
+        { GeneName: GeneName
+          HgncId: HgncId
+          EntrezId: EntrezId }
+    and GeneName = internal GeneName of string
+    and HgncId = internal HgncId of string
+    and EntrezId = internal EntrezId of string
     and VariantType = VariantType of string
     and VariantDescription = VariantDescription of string
     and MutationEffect = MutationEffect of string
@@ -123,19 +128,49 @@ module Tempus =
               TumorMutationBurdenPercentile: string
               MsiStatus: string }
 
-        and SomaticBiologicallyRelevantVariantJson =
-            { Gene: string
+        and GeneJson =
+            { GeneId: string // 'gene' attribute
               HgncId: string
-              EntrezId: string
-              VariantType: string
-              VariantDescription: string
-              MutationEffect: string
-              ``HGVS.p``: string
+              EntrezId: string }
+
+        and HgvsJson =
+            { ``HGVS.p``: string // same as mutation effect
               ``HGVS.pFull``: string
               ``HGVS.c``: string
-              Transcript: string
+              MutationEffect: string
+              Transcript: string }
+
+        and ``Somatic Potentially Actionable Mutation Json`` =
+            { Gene: GeneJson
+              Variants: ``Somatic Potentially Actionable Mutation Variant Json`` list }
+
+        and ``Somatic Potentially Actionable Mutation Variant Json`` =
+            { Hgvs: HgvsJson
+              NucleotideAlteration: string
+              AllelicFraction: string
+              VariantDescription: string }
+
+        and ``Somatic Potentially Actionable Copy Number Variant Json`` =
+            { Gene: GeneJson
+              VariantDescription: string
+              VariantType: string  }
+
+        and ``Somatic Biologically Relevant Variant Json`` =
+            { Gene: GeneJson
+              VariantType: string
+              VariantDescription: string
+              Hgvs: HgvsJson
               NucleotideAlteration: string
               AllelicFraction: string }
+
+        and ``Somatic Variant Of Unknown Significance Json`` =
+            { Gene: GeneJson
+              VariantType: string
+              VariantDescription: string
+              Hgvs: HgvsJson
+              NucleotideAlteration: string
+              AllelicFraction: string }
+
 
         (* Decoders *)
 
@@ -234,6 +269,7 @@ module Tempus =
             static member Decoder =
                 Decode.oneOf [LabJson.CamelCaseDecoder; LabJson.PascalCaseDecoder]
 
+
         type PatientJson with
             static member CamelCaseDecoder : Decoder<PatientJson> =
                 Decode.object (fun get ->
@@ -265,6 +301,7 @@ module Tempus =
             static member Decoder =
                 Decode.oneOf [PatientJson.CamelCaseDecoder; PatientJson.SnakeCaseDecoder]
 
+
         type ResultsJson with
             static member Decoder : Decoder<ResultsJson> =
                 Decode.object (fun get ->
@@ -272,6 +309,7 @@ module Tempus =
                       TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decode.string
                       MsiStatus                     = "msiStatus"                     |> flip get.Required.Field Decode.string }
                 )
+
 
         type TempusJson with
             /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
