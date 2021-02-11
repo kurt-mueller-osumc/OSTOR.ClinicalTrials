@@ -42,9 +42,6 @@ module Tempus =
           AllelicFraction: AllelicFraction option
           NucleotideAlteration: NucleotideAlteration option }
 
-    and HGVS =
-        { ReferenceSequence: string }
-
     and Gene =
         { GeneName: GeneName
           HgncId: HgncId
@@ -59,6 +56,9 @@ module Tempus =
 
     and FusionGene =
         { ``5' Gene``: Gene; ``3' Gene``: Gene }
+
+    and HGVS =
+        { ReferenceSequence: string }
     and VariantType = VariantType of string
     and VariantDescription = VariantDescription of string
     and MutationEffect = MutationEffect of string
