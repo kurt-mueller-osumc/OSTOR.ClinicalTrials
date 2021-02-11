@@ -171,6 +171,12 @@ module Tempus =
               NucleotideAlteration: string
               AllelicFraction: string }
 
+        and ``Fusion Variant Json`` =
+            { Gene5: GeneJson
+              Gene3: GeneJson
+              VariantDescription: string
+              FusionType: string }
+
 
         (* Decoders *)
 
