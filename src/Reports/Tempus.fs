@@ -2,6 +2,7 @@ namespace OSTOR.ClinicalTrials.Reports
 
 module Tempus =
     open Thoth.Json.Net
+    open Utilities
 
     type Diagnosis =
         { DiagnosisName: DiagnosisName
@@ -32,6 +33,30 @@ module Tempus =
         { Diagnosis: Diagnosis
           GermlineSample: Sample<GermlineCategory> option
           TumorSample: Sample<TumorCategory> }
+
+    type Variant =
+        | SomaticBiologicallyRelevantVariant of SomaticBiologicallyRelevantVariant
+
+    and SomaticBiologicallyRelevantVariant =
+        { Gene: Gene
+          HGVS: HGVS option
+          AllelicFraction: AllelicFraction option
+          NucleotideAlteration: NucleotideAlteration option }
+
+    and HGVS =
+        { ReferenceSequence: string }
+
+    and Gene = Gene of string
+    and HgncId = HgncId of string
+    and VariantType = VariantType of string
+    and VariantDescription = VariantDescription of string
+    and MutationEffect = MutationEffect of string
+    and ``HGVS protein`` = ``HGVS protein`` of string
+    and ``HGVS protein full`` = ``HGVS protein full`` of string
+    and ``HGVS change`` = ``HGVS change`` of string
+    and Transcript = Transcript of string
+    and NucleotideAlteration = NucleotideAlteration of string
+    and AllelicFraction = AllelicFraction of float
 
 
     type Json =
@@ -89,52 +114,70 @@ module Tempus =
         { BlockId: string option
           TumorPercentage: int option }
 
+    and ResultsJson =
+        { TumorMutationBurden: string
+          TumorMutationBurdenPercentile: string
+          MsiStatus: string }
+
+    and SomaticBiologicallyRelevantVariantJson =
+        { Gene: string
+          HgncId: string
+          EntrezId: string
+          VariantType: string
+          VariantDescription: string
+          MutationEffect: string
+          ``HGVS.p``: string
+          ``HGVS.pFull``: string
+          ``HGVS.c``: string
+          Transcript: string
+          NucleotideAlteration: string
+          AllelicFraction: string }
 
     (* Decoders *)
 
     type InstitutionJson with
         static member Decoder : Decoder<InstitutionJson> =
             Decode.object (fun get ->
-                { BlockId = get.Optional.Field "blockId" Decode.string
-                  TumorPercentage = get.Optional.Field "tumorPercentage" Decode.int }
+                { BlockId         = "blockId"         |> flip get.Optional.Field Decode.string
+                  TumorPercentage = "tumorPercentage" |> flip get.Optional.Field Decode.int }
             )
 
     type SampleJson with
         static member Decoder : Decoder<SampleJson> =
             Decode.object (fun get ->
-                { SampleId = get.Required.Field "tempusSampleId" Decode.guid
-                  CollectionDate = get.Required.Field "collectionDate" Decode.datetime
-                  ReceivedDate = get.Required.Field "receiptDate" Decode.datetime
-                  SampleCategory = get.Required.Field "sampleCategory" Decode.string
-                  SampleSite = get.Required.Field "sampleSite" Decode.string
-                  SampleType = get.Required.Field "sampleType" Decode.string
-                  Institution = get.Required.Field "institutionData" InstitutionJson.Decoder })
+                { SampleId       = "tempusSampleId"  |> flip get.Required.Field Decode.guid
+                  CollectionDate = "collectionDate"  |> flip get.Required.Field Decode.datetime
+                  ReceivedDate   = "receiptDate"     |> flip get.Required.Field Decode.datetime
+                  SampleCategory = "sampleCategory"  |> flip get.Required.Field Decode.string
+                  SampleSite     = "sampleSite"      |> flip get.Required.Field Decode.string
+                  SampleType     = "sampleType"      |> flip get.Required.Field Decode.string
+                  Institution    = "institutionData" |> flip get.Required.Field InstitutionJson.Decoder })
 
     type OrderTestJson with
         static member Decoder : Decoder<OrderTestJson> =
             Decode.object (fun get ->
-                { Code = get.Required.Field "code" Decode.string
-                  Name = get.Required.Field "name" Decode.string
-                  Description = get.Required.Field "description" Decode.string }
+                { Code        = "code" |> flip get.Required.Field Decode.string
+                  Name        = "name" |> flip get.Required.Field Decode.string
+                  Description = "description" |> flip get.Required.Field Decode.string }
             )
 
     type OrderJson with
         static member CamelCaseDecoder: Decoder<OrderJson> =
             Decode.object (fun get ->
-                { Institution = get.Required.Field "institution" Decode.string
-                  Physician = get.Required.Field "physician" Decode.string
-                  OrderId = get.Required.Field "tempusOrderId" Decode.string
-                  AccessionId = get.Required.Field "accessionId" Decode.string
-                  OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
+                { Institution = "institution"   |> flip get.Required.Field Decode.string
+                  Physician   = "physician"     |> flip get.Required.Field Decode.string
+                  OrderId     = "tempusOrderId" |> flip get.Required.Field Decode.string
+                  AccessionId = "accessionId"   |> flip get.Required.Field Decode.string
+                  OrderTest   = "test"          |> flip get.Required.Field OrderTestJson.Decoder }
             )
 
         static member SnakeCaseDecoder: Decoder<OrderJson> =
             Decode.object (fun get ->
-                { Institution = get.Required.Field "institution" Decode.string
-                  Physician = get.Required.Field "physician" Decode.string
-                  OrderId = get.Required.Field "tempusOrder_id" Decode.string
-                  AccessionId = get.Required.Field "accessionId" Decode.string
-                  OrderTest = get.Required.Field "test" OrderTestJson.Decoder }
+                { Institution = "institution"    |> flip get.Required.Field Decode.string
+                  Physician   = "physician"      |> flip get.Required.Field Decode.string
+                  OrderId     = "tempusOrder_id" |> flip get.Required.Field Decode.string
+                  AccessionId = "accessionId"    |> flip get.Required.Field Decode.string
+                  OrderTest   = "test"           |> flip get.Required.Field OrderTestJson.Decoder }
             )
 
         static member Decoder : Decoder<OrderJson> =
@@ -143,83 +186,98 @@ module Tempus =
     type ReportJson with
         static member SnakeCaseDecoder : Decoder<ReportJson> =
             Decode.object (fun get ->
-                { ReportId = get.Required.Field "reportId" Decode.guid
-                  SigningPathologist = get.Required.Field "signing_pathologist" Decode.string
-                  SignoutDate = get.Required.Field "signout_date" Decode.datetime
+                { ReportId           = "reportId"            |> flip get.Required.Field Decode.guid
+                  SigningPathologist = "signing_pathologist" |> flip get.Required.Field Decode.string
+                  SignoutDate        = "signout_date"        |> flip get.Required.Field Decode.datetime
                 }
             )
 
         static member CamelCaseDecoder : Decoder<ReportJson> =
             Decode.object (fun get ->
-                { ReportId = get.Required.Field "reportId" Decode.guid
-                  SigningPathologist = get.Required.Field "signingPathologist" Decode.string
-                  SignoutDate = get.Required.Field "signoutDate" Decode.datetime
+                { ReportId           = "reportId"           |> flip get.Required.Field Decode.guid
+                  SigningPathologist = "signingPathologist" |> flip get.Required.Field Decode.string
+                  SignoutDate        = "signoutDate"        |> flip get.Required.Field Decode.datetime
                 }
             )
 
+        /// Deserializer for the 'report' json object. Object attributes can be either snake-case or camel-case.
         static member Decoder : Decoder<ReportJson> =
            Decode.oneOf [ReportJson.CamelCaseDecoder; ReportJson.SnakeCaseDecoder]
 
     type LabJson with
         static member CamelCaseDecoder : Decoder<LabJson> =
             Decode.object (fun get ->
-                { Name = get.Required.Field "name" Decode.string
-                  StreetAddress = get.Required.Field "streetAddress" Decode.string
-                  City = get.Required.Field "city" Decode.string
-                  State = get.Required.Field "state" Decode.string
-                  Zip = get.Required.Field "zip" Decode.string
-                  CliaNumber = get.Required.Field "cliaNo" Decode.string }
+                { Name          = "name"          |> flip get.Required.Field Decode.string
+                  StreetAddress = "streetAddress" |> flip get.Required.Field Decode.string
+                  City          = "city"          |> flip get.Required.Field Decode.string
+                  State         = "state"         |> flip get.Required.Field Decode.string
+                  Zip           = "zip"           |> flip get.Required.Field Decode.string
+                  CliaNumber    = "cliaNo"        |> flip get.Required.Field Decode.string }
             )
 
         static member PascalCaseDecoder : Decoder<LabJson> =
             Decode.object (fun get ->
-                { Name = get.Required.Field "Name" Decode.string
-                  StreetAddress = get.Required.Field "StreetAddress" Decode.string
-                  City = get.Required.Field "City" Decode.string
-                  State = get.Required.Field "State" Decode.string
-                  Zip = get.Required.Field "Zip" Decode.string
-                  CliaNumber = get.Required.Field "clia_no" Decode.string }
+                { Name          = "Name"          |> flip get.Required.Field Decode.string
+                  StreetAddress = "StreetAddress" |> flip get.Required.Field Decode.string
+                  City          = "City"          |> flip get.Required.Field Decode.string
+                  State         = "State"         |> flip get.Required.Field Decode.string
+                  Zip           = "Zip"           |> flip get.Required.Field Decode.string
+                  CliaNumber    = "clia_no"       |> flip get.Required.Field Decode.string }
             )
 
+        /// Deserializer for the 'lab' json object. Object attributes can be camel-cased or pascal-cased, save
+        /// for the lab's clia #, which is camel-cased or snake-cased
         static member Decoder =
             Decode.oneOf [LabJson.CamelCaseDecoder; LabJson.PascalCaseDecoder]
 
     type PatientJson with
         static member CamelCaseDecoder : Decoder<PatientJson> =
             Decode.object (fun get ->
-                { FirstName = get.Required.Field "firstName" Decode.string
-                  LastName = get.Required.Field "lastName" Decode.string
-                  TempusId = get.Required.Field "tempusId" Decode.guid
-                  MRN = get.Required.Field "emrId" Decode.string
-                  Sex = get.Required.Field "sex" Decode.string
-                  DateOfBirth = get.Required.Field "dateOfBirth" Decode.datetime
-                  Diagnosis = get.Required.Field "diagnosis" Decode.string
-                  DiagnosisDate = get.Required.Field "diagnosisDate" Decode.string }
+                { FirstName     = "firstName" |> flip get.Required.Field Decode.string
+                  LastName      = "lastName"  |> flip get.Required.Field Decode.string
+                  TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
+                  MRN           = "emrId"     |> flip get.Required.Field Decode.string
+                  Sex           = "sex"       |> flip get.Required.Field Decode.string
+                  DateOfBirth   = "dateOfBirth"   |> flip get.Required.Field Decode.datetime
+                  Diagnosis     = "diagnosis"     |> flip get.Required.Field Decode.string
+                  DiagnosisDate = "diagnosisDate" |> flip get.Required.Field Decode.string }
             )
 
         static member SnakeCaseDecoder : Decoder<PatientJson> =
             Decode.object (fun get ->
-                { FirstName = get.Required.Field "firstName" Decode.string
-                  LastName = get.Required.Field "lastName" Decode.string
-                  TempusId = get.Required.Field "tempusId" Decode.guid
-                  MRN = get.Required.Field "emr_id" Decode.string
-                  Sex = get.Required.Field "sex" Decode.string
-                  DateOfBirth = get.Required.Field "DoB" Decode.datetime
-                  Diagnosis = get.Required.Field "diagnosis" Decode.string
-                  DiagnosisDate = get.Required.Field "diagnosisDate" Decode.string }
+                { FirstName     = "firstName" |> flip get.Required.Field Decode.string
+                  LastName      = "lastName"  |> flip get.Required.Field Decode.string
+                  TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
+                  MRN           = "emr_id"    |> flip get.Required.Field Decode.string
+                  Sex           = "sex"       |> flip get.Required.Field Decode.string
+                  DateOfBirth   = "DoB"       |> flip get.Required.Field Decode.datetime
+                  Diagnosis     = "diagnosis" |> flip get.Required.Field Decode.string
+                  DiagnosisDate = "diagnosisDate" |> flip get.Required.Field Decode.string }
             )
 
+        /// Deserializer for the 'patient' json object. The following object attributes can be camel-cased or snake-cased:
+        /// - emrId / emr_id
+        /// - dateOfBirth / DoB
         static member Decoder =
             Decode.oneOf [PatientJson.CamelCaseDecoder; PatientJson.SnakeCaseDecoder]
 
+    type ResultsJson with
+        static member Decoder : Decoder<ResultsJson> =
+            Decode.object (fun get ->
+                { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decode.string
+                  TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decode.string
+                  MsiStatus                     = "msiStatus"                     |> flip get.Required.Field Decode.string }
+            )
+
     type Json with
+        /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
         static member Decoder : Decoder<Json> =
             Decode.object (fun get ->
-                { Lab = get.Required.Field "lab" LabJson.Decoder
-                  Report = get.Required.Field "report" ReportJson.Decoder
-                  Patient = get.Required.Field "patient" PatientJson.Decoder
-                  Order = get.Required.Field "order" OrderJson.Decoder
-                  Samples = get.Required.Field "specimens" (Decode.list SampleJson.Decoder) }
+                { Lab     = "lab"       |> flip get.Required.Field LabJson.Decoder
+                  Report  = "report"    |> flip get.Required.Field ReportJson.Decoder
+                  Patient = "patient"   |> flip get.Required.Field  PatientJson.Decoder
+                  Order   = "order"     |> flip get.Required.Field OrderJson.Decoder
+                  Samples = "specimens" |> flip get.Required.Field (Decode.list SampleJson.Decoder) }
             )
 
     module Json =
