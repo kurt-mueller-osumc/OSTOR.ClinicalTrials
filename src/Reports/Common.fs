@@ -4,6 +4,17 @@ namespace OSTOR.ClinicalTrials.Reports
 module Common =
     type MRN = internal MRN of string
 
+    type Address =
+        { StreetAddress: StreetAddress
+          City: City
+          State: State
+          Zipcode: Zipcode }
+
+    and StreetAddress = StreetAddress of string
+    and City = City of string
+    and State = State of string
+    and Zipcode = Zipcode of string
+
     module MRN =
         open System.Text.RegularExpressions
 
