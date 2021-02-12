@@ -4,16 +4,6 @@ module FoundationMedicine =
     [<Measure>] type mutation
     [<Measure>] type megabase
 
-    type Address =
-        { StreetAddress: StreetAddress
-          City: City
-          State: State
-          Zipcode: Zipcode }
-    and StreetAddress = StreetAddress of string
-    and City = City of string
-    and State = State of string
-    and Zipcode = Zipcode of string
-
     type Sample =
         { SampleId: SampleId
           ReceivedDate: ReceivedDate
