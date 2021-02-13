@@ -138,6 +138,34 @@ module Tempus =
                       MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
 
+    module ``Somatic Potentially Actionable Mutation`` =
+        open Thoth.Json.Net
+
+        type Json =
+            { GeneJson: Gene.Json
+              VariantJsons: VariantJson list }
+
+            static member Decoder =
+                Decode.object (fun get ->
+                    { GeneJson = get.Required.Raw Gene.Json.Decoder
+                      VariantJsons = "variants" |> flip get.Required.Field (Decode.list VariantJson.Decoder) }
+                )
+
+        and VariantJson =
+            { HgvsJson: HGVS.Json
+              NucleotideAlteration: string
+              AllelicFraction: float 
+              VariantDescription: string }
+
+            static member Decoder : Decoder<VariantJson> =
+                Decode.object (fun get ->
+                    { HgvsJson = get.Required.Raw HGVS.Json.Decoder
+                      NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
+                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.float
+                      VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
+                    }
+                )
+
     module ``Somatic Biologically Relevant Variant`` =
         open Thoth.Json.Net
 
@@ -188,6 +216,7 @@ module Tempus =
             { TumorMutationBurden: float option
               TumorMutationBurdenPercentile: int option
               MsiStatus: string option
+              ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation``.Json list
               ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
               ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list }
 
@@ -201,6 +230,7 @@ module Tempus =
                     { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decoder.optionalFloat // can either be a float, blank string (i.e. ""), or null
                       TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.optionalInteger // can either be an integer, blank string, or null
                       MsiStatus                     = msiStatus
+                      ``Somatic Potentially Actionable Mutations`` = "somaticPotentiallyActionableMutations" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Mutation``.Json.Decoder)
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
                       ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder) }
                 )
@@ -266,38 +296,16 @@ module Tempus =
             { BlockId: string option
               TumorPercentage: int option }
 
-        and GeneJson =
-            { GeneId: string // 'gene' attribute
-              HgncId: string
-              EntrezId: string }
+        // and ``Somatic Potentially Actionable Copy Number Variant Json`` =
+        //     { Gene: GeneJson
+        //       VariantDescription: string
+        //       VariantType: string  }
 
-        and HgvsJson =
-            { ``HGVS.p``: string // same as mutation effect
-              ``HGVS.pFull``: string
-              ``HGVS.c``: string
-              MutationEffect: string
-              Transcript: string }
-
-        and ``Somatic Potentially Actionable Mutation Json`` =
-            { Gene: GeneJson
-              Variants: ``Somatic Potentially Actionable Mutation Variant Json`` list }
-
-        and ``Somatic Potentially Actionable Mutation Variant Json`` =
-            { Hgvs: HgvsJson
-              NucleotideAlteration: string
-              AllelicFraction: string
-              VariantDescription: string }
-
-        and ``Somatic Potentially Actionable Copy Number Variant Json`` =
-            { Gene: GeneJson
-              VariantDescription: string
-              VariantType: string  }
-
-        and ``Fusion Variant Json`` =
-            { Gene5: GeneJson
-              Gene3: GeneJson
-              VariantDescription: string
-              FusionType: string }
+        // and ``Fusion Variant Json`` =
+        //     { Gene5: GeneJson
+        //       Gene3: GeneJson
+        //       VariantDescription: string
+        //       FusionType: string }
 
 
         (* Decoders *)
