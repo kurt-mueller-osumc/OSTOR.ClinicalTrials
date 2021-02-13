@@ -131,11 +131,11 @@ module Tempus =
             /// Deserializer for hgvs json object attributes
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
-                    { ``HGVS.p``           = "HGVS.p"               |> flip get.Required.Field Decode.string
-                      ``HGVS.pFull``       = "HGVS.pFull"           |> flip get.Required.Field Decode.string
-                      ``HGVS.c``           = "HGVS.c"               |> flip get.Required.Field Decode.string
-                      Transcript           = "transcript"           |> flip get.Required.Field Decode.string
-                      MutationEffect       = "mutationEffect"       |> flip get.Required.Field Decode.string }
+                    { ``HGVS.p``     = "HGVS.p"         |> flip get.Required.Field Decode.string
+                      ``HGVS.pFull`` = "HGVS.pFull"     |> flip get.Required.Field Decode.string
+                      ``HGVS.c``     = "HGVS.c"         |> flip get.Required.Field Decode.string
+                      Transcript     = "transcript"     |> flip get.Required.Field Decode.string
+                      MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
 
     module ``Somatic Biologically Relevant Variant`` =
@@ -149,15 +149,34 @@ module Tempus =
               NucleotideAlteration: string
               AllelicFraction: string }
 
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { GeneJson  = Gene.Json.Decoder      |> get.Required.Raw
+                      Gene5Json = Gene.Json.Gene5Decoder |> get.Required.Raw
+                      Gene3Json = Gene.Json.Gene3Decoder |> get.Required.Raw
+                      HgvsJson  = HGVS.Json.Decoder      |> get.Required.Raw
+                      NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
+                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
+                )
+
+    module ``Somatic Variant of Unknown Significance`` =
+        open Thoth.Json.Net
+        type Json =
+            { GeneJson: Gene.Json
+              HgvsJson: HGVS.Json
+              NucleotideAlteration: string
+              AllelicFraction: string
+              VariantType: string
+              VariantDescription: string }
+
             static member Decoder =
                 Decode.object (fun get ->
                     { GeneJson = Gene.Json.Decoder |> get.Required.Raw
-                      Gene5Json = Gene.Json.Gene5Decoder |> get.Required.Raw
-                      Gene3Json = Gene.Json.Gene3Decoder |> get.Required.Raw
                       HgvsJson = HGVS.Json.Decoder |> get.Required.Raw
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
-                      AllelicFraction = "allelicFraction" |> flip get.Required.Field Decode.string
-                    }
+                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
+                      VariantType          = "variantType"          |> flip get.Required.Field Decode.string
+                      VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
 
     module Json =
