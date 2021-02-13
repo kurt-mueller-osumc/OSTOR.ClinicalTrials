@@ -23,6 +23,29 @@ module Utilities =
             | (true, num) -> Some num
             | _ -> None
 
+    module Decoder =
+        open Thoth.Json.Net
+
+        /// Deserialize json field into an optional float from a value that can be one of:
+        ///
+        /// - `float`
+        /// - `null`
+        /// - blank string (i.e. `""`)
+        let optionalFloat : Decoder<float option> =
+            let strDecoder = Decode.map Float.tryParse Decode.string
+
+            Decode.oneOf [ Decode.option Decode.float; strDecoder ]
+
+        /// Deserialize json field into an optional integer from a value that can be one of:
+        ///
+        /// - `int`
+        /// - `null`
+        /// - blank string (i.e. `""`)
+        let optionalInteger : Decoder<int option> =
+            let strDecoder = Decode.map Integer.tryParse Decode.string
+
+            Decode.oneOf [ Decode.option Decode.int; strDecoder ]
+
     module Guid =
         let tryParse(input: string) =
             match System.Guid.TryParse(input) with
