@@ -187,15 +187,22 @@ module Tempus =
         type Json =
             { TumorMutationBurden: float option
               TumorMutationBurdenPercentile: int option
-              MsiStatus: string
-              ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list }
+              MsiStatus: string option
+              ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
+              ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
+                    // microsatellite instability status will either be a string field or an object that might have a 'Status' field
+                    let msiStringField = "msiStatus" |> flip get.Required.Field Decoder.optionalString // field could be null, blank string, or actual value
+                    let msiObject = ["microsatelliteInstability"; "status"] |> flip get.Required.At Decoder.optionalString // object with optional "status" field
+                    let msiStatus = msiStringField |> Option.orElse msiObject
+
                     { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decoder.optionalFloat // can either be a float, blank string (i.e. ""), or null
                       TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.optionalInteger // can either be an integer, blank string, or null
-                      MsiStatus                     = "msiStatus"                     |> flip get.Required.Field Decode.string
-                      ``Somatic Biologically Relevant Variants`` = "somaticBiologicallyRelevantVariants" |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder) }
+                      MsiStatus                     = msiStatus
+                      ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
+                      ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder) }
                 )
 
     module Json =
