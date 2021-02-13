@@ -58,14 +58,20 @@ module Tempus =
         { ``5' Gene``: Gene; ``3' Gene``: Gene }
 
     and HGVS =
-        { ReferenceSequence: string }
-    and VariantType = VariantType of string
+        { ReferenceSequence: ReferenceSequence // also known as the transcript
+          ``HGVS protein``: ``HGVS protein`` option
+          ``HGVS change``: ``HGVS change`` }
+    and ReferenceSequence = ReferenceSequence of string
     and VariantDescription = VariantDescription of string
+    and VariantType = VariantType of string
     and MutationEffect = MutationEffect of string
-    and ``HGVS protein`` = ``HGVS protein`` of string
-    and ``HGVS protein full`` = ``HGVS protein full`` of string
+    and ``HGVS protein`` =
+        { // HGVS.pFull
+          FullDescription: string 
+          // HGVS.p
+          NormalDescription: string }
+
     and ``HGVS change`` = ``HGVS change`` of string
-    and Transcript = Transcript of string
     and NucleotideAlteration = NucleotideAlteration of string
     and AllelicFraction = AllelicFraction of float
 
@@ -109,6 +115,50 @@ module Tempus =
                 | (NotBlank, NotBlank, NotBlank) -> Ok { GeneName = GeneName json.GeneId; HgncId = HgncId json.HgncId; EntrezId = EntrezId json.EntrezId }
                 | _ -> Error $"Gene missing name, hgnc id, or entrez id: {json}"
 
+    module HGVS =
+        open Thoth.Json.Net
+
+        // mutation effect will either be p or c
+        // p will sometimes not be there
+        type Json =
+            { ``HGVS.p``: string
+              ``HGVS.pFull``: string
+              ``HGVS.c``: string
+              Transcript: string // the reference sequence
+              MutationEffect: string // will either equal 'HGVS.p' or 'HGVS.c'
+            }
+
+            /// Deserializer for hgvs json object attributes
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { ``HGVS.p``           = "HGVS.p"               |> flip get.Required.Field Decode.string
+                      ``HGVS.pFull``       = "HGVS.pFull"           |> flip get.Required.Field Decode.string
+                      ``HGVS.c``           = "HGVS.c"               |> flip get.Required.Field Decode.string
+                      Transcript           = "transcript"           |> flip get.Required.Field Decode.string
+                      MutationEffect       = "mutationEffect"       |> flip get.Required.Field Decode.string }
+                )
+
+    module ``Somatic Biologically Relevant Variant`` =
+        open Thoth.Json.Net
+
+        type Json =
+            { GeneJson: Gene.Json
+              Gene5Json: Gene.Json
+              Gene3Json: Gene.Json
+              HgvsJson: HGVS.Json
+              NucleotideAlteration: string
+              AllelicFraction: string }
+
+            static member Decoder =
+                Decode.object (fun get ->
+                    { GeneJson = Gene.Json.Decoder |> get.Required.Raw
+                      Gene5Json = Gene.Json.Gene5Decoder |> get.Required.Raw
+                      Gene3Json = Gene.Json.Gene3Decoder |> get.Required.Raw
+                      HgvsJson = HGVS.Json.Decoder |> get.Required.Raw
+                      NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
+                      AllelicFraction = "allelicFraction" |> flip get.Required.Field Decode.string
+                    }
+                )
 
     module Json =
         open Thoth.Json.Net
@@ -387,3 +437,4 @@ module Tempus =
         let deserializeWithError fileName =
             deserialize
             >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
+
