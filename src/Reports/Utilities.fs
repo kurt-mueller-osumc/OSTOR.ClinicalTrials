@@ -17,6 +17,12 @@ module Utilities =
             | (true, num) -> Some num
             | _ -> None
 
+    module Integer =
+        let tryParse(input: string) =
+            match System.Int32.TryParse(input) with
+            | (true, num) -> Some num
+            | _ -> None
+
     module Guid =
         let tryParse(input: string) =
             match System.Guid.TryParse(input) with
