@@ -46,6 +46,16 @@ module Utilities =
 
             Decode.oneOf [ Decode.option Decode.int; strDecoder ]
 
+        /// Deserialize json field into an optional integer from a value that can be one of:
+        ///
+        /// - `string` -> `Some string`
+        /// - `null`  -> `None`
+        /// - blank string (i.e. `""`) -> `None`
+        let optionalString : Decoder<string option> =
+            let blankStringDecoder = Decode.map (fun str -> if str = "" then None else Some str) Decode.string
+
+            Decode.oneOf [Decode.option Decode.string; blankStringDecoder]
+
     module Guid =
         let tryParse(input: string) =
             match System.Guid.TryParse(input) with
