@@ -208,6 +208,25 @@ module Tempus =
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
 
+    module FusionVariant =
+        open Thoth.Json.Net
+
+        type Json =
+            { Gene5: Gene.Json
+              Gene3: Gene.Json
+              VariantDescription: string
+              FusionType: string
+              StructuralVariant: string option }
+
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { Gene5 = get.Required.Raw Gene.Json.Gene5Decoder
+                      Gene3 = get.Required.Raw Gene.Json.Gene3Decoder
+                      VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
+                      FusionType         = "fusionType"         |> flip get.Required.Field Decode.string
+                      StructuralVariant  = "structuralVariant"  |> flip get.Required.Field Decoder.optionalString }
+                )
+
     /// The 'results' section in the Tempus report
     module Results =
         open Thoth.Json.Net
@@ -218,7 +237,8 @@ module Tempus =
               MsiStatus: string option
               ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation``.Json list
               ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
-              ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list }
+              ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list
+              FusionVariants: FusionVariant.Json list }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
@@ -232,7 +252,8 @@ module Tempus =
                       MsiStatus                     = msiStatus
                       ``Somatic Potentially Actionable Mutations`` = "somaticPotentiallyActionableMutations" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Mutation``.Json.Decoder)
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
-                      ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder) }
+                      ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
+                      FusionVariants = "fusionVariants" |> flip get.Required.Field (Decode.list FusionVariant.Json.Decoder) }
                 )
 
     module Json =
@@ -295,17 +316,6 @@ module Tempus =
         and InstitutionJson =
             { BlockId: string option
               TumorPercentage: int option }
-
-        // and ``Somatic Potentially Actionable Copy Number Variant Json`` =
-        //     { Gene: GeneJson
-        //       VariantDescription: string
-        //       VariantType: string  }
-
-        // and ``Fusion Variant Json`` =
-        //     { Gene5: GeneJson
-        //       Gene3: GeneJson
-        //       VariantDescription: string
-        //       FusionType: string }
 
 
         (* Decoders *)
