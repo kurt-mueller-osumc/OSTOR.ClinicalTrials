@@ -154,14 +154,14 @@ module Tempus =
         and VariantJson =
             { HgvsJson: HGVS.Json
               NucleotideAlteration: string
-              AllelicFraction: float 
+              AllelicFraction: string
               VariantDescription: string }
 
             static member Decoder : Decoder<VariantJson> =
                 Decode.object (fun get ->
                     { HgvsJson = get.Required.Raw HGVS.Json.Decoder
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
-                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.float
+                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
                     }
                 )
