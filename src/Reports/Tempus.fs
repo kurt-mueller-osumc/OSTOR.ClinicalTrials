@@ -161,6 +161,7 @@ module Tempus =
 
     module ``Somatic Variant of Unknown Significance`` =
         open Thoth.Json.Net
+
         type Json =
             { GeneJson: Gene.Json
               HgvsJson: HGVS.Json
@@ -169,7 +170,7 @@ module Tempus =
               VariantType: string
               VariantDescription: string }
 
-            static member Decoder =
+            static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     { GeneJson = Gene.Json.Decoder |> get.Required.Raw
                       HgvsJson = HGVS.Json.Decoder |> get.Required.Raw
