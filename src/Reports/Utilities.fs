@@ -52,9 +52,11 @@ module Utilities =
         /// - `null`  -> `None`
         /// - blank string (i.e. `""`) -> `None`
         let optionalString : Decoder<string option> =
-            let blankStringDecoder = Decode.map (fun str -> if str = "" then None else Some str) Decode.string
-
-            Decode.oneOf [Decode.option Decode.string; blankStringDecoder]
+            Decode.string
+            |> Decode.map (fun str ->
+                match str with
+                | "" | null -> None
+                | _ -> Some str)
 
     module Guid =
         let tryParse(input: string) =

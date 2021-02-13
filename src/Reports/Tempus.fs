@@ -194,9 +194,9 @@ module Tempus =
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     // microsatellite instability status will either be a string field or an object that might have a 'Status' field
-                    let msiStringField = "msiStatus" |> flip get.Required.Field Decoder.optionalString // field could be null, blank string, or actual value
-                    let msiObject = ["microsatelliteInstability"; "status"] |> flip get.Required.At Decoder.optionalString // object with optional "status" field
-                    let msiStatus = msiStringField |> Option.orElse msiObject
+                    let msiObject = ["microsatelliteInstability"; "status"] |> flip get.Optional.At Decoder.optionalString // object with optional "status" field
+                    let msiStringField = "msiStatus" |> flip get.Optional.Field Decoder.optionalString // field could be null, blank string, or actual value
+                    let msiStatus = msiStringField |> Option.orElse msiObject |> Option.flatten
 
                     { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decoder.optionalFloat // can either be a float, blank string (i.e. ""), or null
                       TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.optionalInteger // can either be an integer, blank string, or null
