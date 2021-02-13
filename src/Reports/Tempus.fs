@@ -180,6 +180,24 @@ module Tempus =
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
 
+    /// The 'results' section in the Tempus report
+    module Results =
+        open Thoth.Json.Net
+
+        type Json =
+            { TumorMutationBurden: float option
+              TumorMutationBurdenPercentile: int option
+              MsiStatus: string
+              ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list }
+
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decoder.optionalFloat // can either be a float, blank string (i.e. ""), or null
+                      TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.optionalInteger // can either be an integer, blank string, or null
+                      MsiStatus                     = "msiStatus"                     |> flip get.Required.Field Decode.string
+                      ``Somatic Biologically Relevant Variants`` = "somaticBiologicallyRelevantVariants" |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder) }
+                )
+
     module Json =
         open Thoth.Json.Net
 
@@ -190,7 +208,8 @@ module Tempus =
               Lab: LabJson
               Report: ReportJson
               Patient: PatientJson
-              Samples: SampleJson list }
+              Samples: SampleJson list
+              Results: Results.Json }
 
         and LabJson =
             { Name: string
@@ -240,11 +259,6 @@ module Tempus =
             { BlockId: string option
               TumorPercentage: int option }
 
-        and ResultsJson =
-            { TumorMutationBurden: string
-              TumorMutationBurdenPercentile: string
-              MsiStatus: string }
-
         and GeneJson =
             { GeneId: string // 'gene' attribute
               HgncId: string
@@ -271,24 +285,6 @@ module Tempus =
             { Gene: GeneJson
               VariantDescription: string
               VariantType: string  }
-
-        and ``Somatic Biologically Relevant Variant Json`` =
-            { Gene: GeneJson
-              Gene5: GeneJson
-              Gene3: GeneJson
-              VariantType: string
-              VariantDescription: string
-              Hgvs: HgvsJson
-              NucleotideAlteration: string
-              AllelicFraction: string }
-
-        and ``Somatic Variant Of Unknown Significance Json`` =
-            { Gene: GeneJson
-              VariantType: string
-              VariantDescription: string
-              Hgvs: HgvsJson
-              NucleotideAlteration: string
-              AllelicFraction: string }
 
         and ``Fusion Variant Json`` =
             { Gene5: GeneJson
@@ -426,25 +422,16 @@ module Tempus =
             static member Decoder =
                 Decode.oneOf [PatientJson.CamelCaseDecoder; PatientJson.SnakeCaseDecoder]
 
-
-        type ResultsJson with
-            static member Decoder : Decoder<ResultsJson> =
-                Decode.object (fun get ->
-                    { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decode.string
-                      TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decode.string
-                      MsiStatus                     = "msiStatus"                     |> flip get.Required.Field Decode.string }
-                )
-
-
         type TempusJson with
             /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
             static member Decoder : Decoder<TempusJson> =
                 Decode.object (fun get ->
                     { Lab     = "lab"       |> flip get.Required.Field LabJson.Decoder
                       Report  = "report"    |> flip get.Required.Field ReportJson.Decoder
-                      Patient = "patient"   |> flip get.Required.Field  PatientJson.Decoder
+                      Patient = "patient"   |> flip get.Required.Field PatientJson.Decoder
                       Order   = "order"     |> flip get.Required.Field OrderJson.Decoder
-                      Samples = "specimens" |> flip get.Required.Field (Decode.list SampleJson.Decoder) }
+                      Samples = "specimens" |> flip get.Required.Field (Decode.list SampleJson.Decoder)
+                      Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
                 )
 
         type Error =
