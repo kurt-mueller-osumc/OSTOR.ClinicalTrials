@@ -38,7 +38,7 @@ module FoundationMedicine =
           MdId: OrderingMdId }
     and OrderingMdName = internal OrderingMdName of string
     and OrderingMdId = internal OrderingMdId of string
-    and Pathologist = internal Pathologist of string
+    and Pathologist = internal | PathologistNotProvided | PathologistName of string
 
     type Variant =
         | VariantOfUnknownSignificance of VariantInfo
@@ -224,6 +224,16 @@ module FoundationMedicine =
                 |> Result.map FirstName
                 |> Result.mapError (fun e -> $"FirstName: {e}")
 
+        module Pathologist =
+            type Input = Input of string
+
+            /// Validate that a pathologist's name is provided or is explicitly not provided
+            let validate (Input input) =
+                match input with
+                | "Provided, Not" -> Ok PathologistNotProvided
+                | NotBlank -> Ok (PathologistName input)
+                | _ -> Error "Pathologist cannot be blank"
+
         type Input =
             { MrnInput: MRN.Input
               GenderInput: Gender.Input
@@ -234,7 +244,7 @@ module FoundationMedicine =
               SpecimenSite: SpecimenSite
               CollectionDate: CollectionDate
               OrderingMd: OrderingMd
-              Pathologist: Pathologist }
+              Pathologist: Pathologist.Input }
 
         let validate (pmiInput: Input) =
             validation {
@@ -242,6 +252,7 @@ module FoundationMedicine =
                 and! gender = Gender.validate pmiInput.GenderInput
                 and! lastName = LastName.validate pmiInput.LastName
                 and! firstName = FirstName.validate pmiInput.FirstName
+                and! pathologist = Pathologist.validate pmiInput.Pathologist
 
                 return { MRN = mrn
                          Gender = gender
@@ -252,7 +263,7 @@ module FoundationMedicine =
                          SpecimenSite = pmiInput.SpecimenSite
                          CollectionDate = pmiInput.CollectionDate
                          OrderingMd = pmiInput.OrderingMd
-                         Pathologist = pmiInput.Pathologist }
+                         Pathologist = pathologist }
             }
 
     module Variant =
@@ -371,7 +382,7 @@ module FoundationMedicine =
 
         type Input =
             { AddressInput: Address.Input
-              CliaNumber: CliaNumber}
+              CliaNumber: CliaNumber }
 
         open FsToolkit.ErrorHandling
 
@@ -482,7 +493,7 @@ module FoundationMedicine =
                   SpecimenSite = SpecimenSite pmi.SpecSite
                   CollectionDate = CollectionDate pmi.CollDate
                   OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId }
-                  Pathologist = Pathologist pmi.Pathologist }
+                  Pathologist = PMI.Pathologist.Input pmi.Pathologist }
 
             /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
             member this.VariantInputs : Variant.Input seq =
