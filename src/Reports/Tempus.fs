@@ -174,6 +174,42 @@ module Tempus =
                       Name        = "name" |> flip get.Required.Field Decode.string
                       Description = "description" |> flip get.Required.Field Decode.string }
                 )
+    module Lab =
+        open Thoth.Json.Net
+
+        type Json =
+            { Name: string
+              StreetAddress: string
+              City: string
+              State: string
+              Zip: string
+              CliaNumber: string }
+
+            static member CamelCaseDecoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { Name          = "name"          |> flip get.Required.Field Decode.string
+                      StreetAddress = "streetAddress" |> flip get.Required.Field Decode.string
+                      City          = "city"          |> flip get.Required.Field Decode.string
+                      State         = "state"         |> flip get.Required.Field Decode.string
+                      Zip           = "zip"           |> flip get.Required.Field Decode.string
+                      CliaNumber    = "cliaNo"        |> flip get.Required.Field Decode.string }
+                )
+
+            static member PascalCaseDecoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { Name          = "Name"          |> flip get.Required.Field Decode.string
+                      StreetAddress = "StreetAddress" |> flip get.Required.Field Decode.string
+                      City          = "City"          |> flip get.Required.Field Decode.string
+                      State         = "State"         |> flip get.Required.Field Decode.string
+                      Zip           = "Zip"           |> flip get.Required.Field Decode.string
+                      CliaNumber    = "clia_no"       |> flip get.Required.Field Decode.string }
+                )
+
+            /// Deserializer for the `lab` json object. Object attributes can be camel-cased or pascal-cased, save
+            /// for the lab's clia #, which is camel-cased or snake-cased for some reason.
+            static member Decoder : Decoder<Json> =
+                Decode.oneOf [ Json.CamelCaseDecoder; Json.PascalCaseDecoder ]
+
 
     module Patient =
         open System
@@ -381,19 +417,11 @@ module Tempus =
 
         type TempusJson =
             { Order: Order.Json
-              Lab: LabJson
+              Lab: Lab.Json
               Report: ReportJson
               Patient: Patient.Json
               Samples: SampleJson list
               Results: Results.Json }
-
-        and LabJson =
-            { Name: string
-              StreetAddress: string
-              City: string
-              State: string
-              Zip: string
-              CliaNumber: string }
 
         and ReportJson =
             { ReportId: System.Guid
@@ -455,38 +483,12 @@ module Tempus =
             static member Decoder : Decoder<ReportJson> =
                Decode.oneOf [ReportJson.CamelCaseDecoder; ReportJson.SnakeCaseDecoder]
 
-        type LabJson with
-            static member CamelCaseDecoder : Decoder<LabJson> =
-                Decode.object (fun get ->
-                    { Name          = "name"          |> flip get.Required.Field Decode.string
-                      StreetAddress = "streetAddress" |> flip get.Required.Field Decode.string
-                      City          = "city"          |> flip get.Required.Field Decode.string
-                      State         = "state"         |> flip get.Required.Field Decode.string
-                      Zip           = "zip"           |> flip get.Required.Field Decode.string
-                      CliaNumber    = "cliaNo"        |> flip get.Required.Field Decode.string }
-                )
-
-            static member PascalCaseDecoder : Decoder<LabJson> =
-                Decode.object (fun get ->
-                    { Name          = "Name"          |> flip get.Required.Field Decode.string
-                      StreetAddress = "StreetAddress" |> flip get.Required.Field Decode.string
-                      City          = "City"          |> flip get.Required.Field Decode.string
-                      State         = "State"         |> flip get.Required.Field Decode.string
-                      Zip           = "Zip"           |> flip get.Required.Field Decode.string
-                      CliaNumber    = "clia_no"       |> flip get.Required.Field Decode.string }
-                )
-
-            /// Deserializer for the 'lab' json object. Object attributes can be camel-cased or pascal-cased, save
-            /// for the lab's clia #, which is camel-cased or snake-cased
-            static member Decoder =
-                Decode.oneOf [LabJson.CamelCaseDecoder; LabJson.PascalCaseDecoder]
-
 
         type TempusJson with
             /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
             static member Decoder : Decoder<TempusJson> =
                 Decode.object (fun get ->
-                    { Lab     = "lab"       |> flip get.Required.Field LabJson.Decoder
+                    { Lab     = "lab"       |> flip get.Required.Field Lab.Json.Decoder
                       Report  = "report"    |> flip get.Required.Field ReportJson.Decoder
                       Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
                       Order   = "order"     |> flip get.Required.Field Order.Json.Decoder
