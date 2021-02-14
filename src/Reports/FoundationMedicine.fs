@@ -224,6 +224,14 @@ module FoundationMedicine =
                 |> Result.map FirstName
                 |> Result.mapError (fun e -> $"FirstName: {e}")
 
+        module SubmittedDiagnosis =
+            type Input = Input of string
+
+            let validate (Input input) =
+                validateNotBlank input
+                |> Result.map SubmittedDiagnosis
+                |> Result.mapError (fun e -> $"SubmittedDiagnosis: {e}")
+
         module Pathologist =
             type Input = Input of string
 
@@ -239,7 +247,7 @@ module FoundationMedicine =
               GenderInput: Gender.Input
               LastName: LastName.Input
               FirstName: FirstName.Input
-              SubmittedDiagnosis: SubmittedDiagnosis
+              SubmittedDiagnosis: SubmittedDiagnosis.Input
               DateOfBirth: DateOfBirth
               SpecimenSite: SpecimenSite
               CollectionDate: CollectionDate
@@ -252,13 +260,14 @@ module FoundationMedicine =
                 and! gender = Gender.validate pmiInput.GenderInput
                 and! lastName = LastName.validate pmiInput.LastName
                 and! firstName = FirstName.validate pmiInput.FirstName
+                and! submittedDiagnosis = SubmittedDiagnosis.validate pmiInput.SubmittedDiagnosis
                 and! pathologist = Pathologist.validate pmiInput.Pathologist
 
                 return { MRN = mrn
                          Gender = gender
                          LastName = lastName
                          FirstName = firstName
-                         SubmittedDiagnosis = pmiInput.SubmittedDiagnosis
+                         SubmittedDiagnosis = submittedDiagnosis
                          DateOfBirth = pmiInput.DateOfBirth
                          SpecimenSite = pmiInput.SpecimenSite
                          CollectionDate = pmiInput.CollectionDate
@@ -487,7 +496,7 @@ module FoundationMedicine =
                 { MrnInput = MRN.Input pmi.Mrn
                   LastName = PMI.LastName.Input pmi.LastName
                   FirstName = PMI.FirstName.Input pmi.FirstName
-                  SubmittedDiagnosis = SubmittedDiagnosis pmi.SubmittedDiagnosis
+                  SubmittedDiagnosis = PMI.SubmittedDiagnosis.Input pmi.SubmittedDiagnosis
                   GenderInput = PMI.Gender.Input pmi.Gender
                   DateOfBirth = DateOfBirth pmi.Dob
                   SpecimenSite = SpecimenSite pmi.SpecSite
