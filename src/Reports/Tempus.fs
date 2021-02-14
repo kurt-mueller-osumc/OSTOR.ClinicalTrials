@@ -166,6 +166,21 @@ module Tempus =
                     }
                 )
 
+    module ``Somatic Potentially Actionable Copy Number Variant`` =
+        open Thoth.Json.Net
+
+        type Json =
+            { Gene: Gene.Json
+              VariantDescription: string
+              VariantType: string }
+
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { Gene = get.Required.Raw Gene.Json.Decoder
+                      VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
+                      VariantType = "variantType" |> flip get.Required.Field Decode.string }
+                )
+
     module ``Somatic Biologically Relevant Variant`` =
         open Thoth.Json.Net
 
@@ -236,6 +251,7 @@ module Tempus =
               TumorMutationBurdenPercentile: int option
               MsiStatus: string option
               ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation``.Json list
+              ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant``.Json list
               ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
               ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list
               FusionVariants: FusionVariant.Json list }
@@ -251,6 +267,7 @@ module Tempus =
                       TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.optionalInteger // can either be an integer, blank string, or null
                       MsiStatus                     = msiStatus
                       ``Somatic Potentially Actionable Mutations`` = "somaticPotentiallyActionableMutations" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Mutation``.Json.Decoder)
+                      ``Somatic Potentially Actionable Copy Number Variants`` = "somaticPotentiallyActionableCopyNumberVariants" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Copy Number Variant``.Json.Decoder)
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
                       ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
                       FusionVariants = "fusionVariants" |> flip get.Required.Field (Decode.list FusionVariant.Json.Decoder) }
