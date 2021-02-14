@@ -52,11 +52,7 @@ module FoundationMedicine =
     type Gene =
         { GeneName: GeneName
           GeneAlterations: GeneAlteration list }
-    and GeneAlteration =
-        { AlterationName: GeneAlterationName
-          Interpretation: GeneAlterationInterpretation }
-    and GeneAlterationName = internal GeneAlterationName of name: string
-    and GeneAlterationInterpretation = internal GeneAlterationInterpretation of interpretation: string
+    and GeneAlteration = internal GeneAlteration of alternationName : string
 
     type MicrosatelliteStatus =
         internal
@@ -83,6 +79,7 @@ module FoundationMedicine =
           MicrosatelliteStatus: MicrosatelliteStatus option
           TumorMutationBurden: TumorMutationBurden option
           Lab: Lab
+          Genes: Gene list
           Variants: Variant list }
     and ReportId = internal ReportId of string
     and IssuedDate = IssuedDate of System.DateTime
@@ -195,16 +192,7 @@ module FoundationMedicine =
                 | "female" | "Female" -> Ok Female
                 | _ -> Error $"Invalid gender: {input}"
 
-        [<AutoOpen>]
-        module private StringValidations =
-            let (|BlankString|NotBlank|) str =
-                if str <> "" then NotBlank
-                else BlankString
-
-            let validateNotBlank str =
-                match str with
-                | NotBlank -> Ok str
-                | _ -> Error "Can't be blank"
+        open Utilities.StringValidations
 
         module LastName =
             type Input = Input of string
@@ -343,7 +331,7 @@ module FoundationMedicine =
               StatusInput: StatusInput}
 
         module Score =
-            /// Validate that a tumor mutation burden score is greater than 0.0
+            /// Validate that a tumor mutation burden score is greater than or equal to 0.0
             let validate (ScoreInput input) =
                 if input >= 0.0 then Ok <| TmbScore (input * 1.0<mutation/megabase>)
                 else Error $"Invalid score: {input}"
@@ -404,6 +392,62 @@ module FoundationMedicine =
                          CliaNumber = input.CliaNumber }
             }
 
+    module Gene =
+        open FsToolkit.ErrorHandling
+        open Utilities
+        open Utilities.StringValidations
+
+        module Name =
+            type Input = Input of string
+
+            /// Validate a gene name is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map GeneName
+                |> Result.mapError (fun e -> $"Gene Name: {e}")
+
+        module Alteration =
+            type Input = Input of string
+
+            /// Validate a gene alteration is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map GeneAlteration
+                |> Result.mapError (fun e -> $"Gene Alteration: {e}")
+
+        module Alterations =
+            /// Validate a list of gene alteration inputs. Combine all alteration validations into either a list of:
+            /// - valid alterations OR
+            /// - validation errors
+            let validate =
+                List.map Alteration.validate >> Result.combine
+
+        type Input =
+            { NameInput: Name.Input
+              AlterationInputs: Alteration.Input list }
+
+        let validate geneInput =
+            validation {
+                let! geneName = Name.validate geneInput.NameInput
+                and! geneAlterations = Alterations.validate geneInput.AlterationInputs
+
+                return { GeneName = geneName
+                         GeneAlterations = geneAlterations }
+            }
+
+    module Genes =
+        open Utilities
+
+        /// Validate a list of gene inputs. Combine all gene input validations into either a lost of:
+        /// - valid genes OR
+        /// - validation errors
+        let validate =
+            List.map Gene.validate
+            >> Result.combine
+            >> Result.mapError List.flatten
+
     module Report =
         open FSharp.Data
         open System.IO
@@ -417,6 +461,7 @@ module FoundationMedicine =
               PmiInput: PMI.Input
               MsStatusInput: MicrosatelliteStatus.MsInput option
               TmbInput: TumorMutationBurden.Input option
+              GeneInputs: Gene.Input list
               VariantsInput: Variant.Input list }
 
         [<Literal>]
@@ -471,6 +516,7 @@ module FoundationMedicine =
                 this.Biomarkers.TumorMutationBurden
                 |> Option.map (fun tmb -> (tmb.Score, tmb.Status))
 
+
             (* Read in XML to report input *)
 
             member this.ReportIdInput = ReportId.Input this.ClinicalReport.ReportId
@@ -522,6 +568,14 @@ module FoundationMedicine =
                     { ScoreInput = TumorMutationBurden.ScoreInput (float score)
                       StatusInput = TumorMutationBurden.StatusInput status })
 
+            member this.GeneInputs =
+                this.Genes
+                |> Seq.map (fun gene ->
+                    { Gene.NameInput = Gene.Name.Input gene.Name
+                      Gene.AlterationInputs = gene.Alterations |> Seq.map (fun alteration -> Gene.Alteration.Input alteration.Name) |> Seq.toList
+                    }
+                ) |> Seq.toList
+
             member this.ReportInput =
                 { ReportIdInput = this.ReportIdInput
                   IssuedDateInput = IssuedDate.Input this.ServerTime
@@ -530,6 +584,7 @@ module FoundationMedicine =
                   PmiInput = this.PmiInput
                   MsStatusInput = this.MicrosatelliteStatusInput
                   TmbInput = this.TmbInput
+                  GeneInputs = this.GeneInputs
                   VariantsInput = this.VariantInputs |> Seq.toList }
 
 
@@ -545,6 +600,7 @@ module FoundationMedicine =
                 and! tmb = TumorMutationBurden.validateOptional input.TmbInput
                 and! variants = Variants.validate input.VariantsInput
                 and! issuedDate = IssuedDate.validate input.IssuedDateInput
+                and! genes = Genes.validate input.GeneInputs
 
                 return { ReportId = reportId
                          Sample = sample
@@ -553,5 +609,6 @@ module FoundationMedicine =
                          MicrosatelliteStatus = msStatus
                          TumorMutationBurden = tmb
                          Lab = lab
+                         Genes = genes
                          Variants = variants }
             }
