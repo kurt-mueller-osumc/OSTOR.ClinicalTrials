@@ -92,7 +92,7 @@ module FoundationMedicine =
 
         type Input = Input of string
 
-        /// Validate that a report id is in the following format where 'd' is a digit: ORD-ddddddd-dd
+        /// Validate that a report id is in the following format where 'd' is a digit: `ORD-ddddddd-dd`
         ///
         ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
         ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
@@ -104,8 +104,10 @@ module FoundationMedicine =
 
     module IssuedDate =
         open Utilities
+
         type Input = Input of string
 
+        /// Validate that a report has a valid issued date.
         let validate (Input input) =
             match DateTime.tryParse input with
             | Some issuedDate -> Ok <| IssuedDate issuedDate
@@ -120,7 +122,7 @@ module FoundationMedicine =
 
             type Input = Input of string
 
-            /// Validate that a sample's id is in the following format where 'd' is a digit: USddddddd.dd
+            /// Validate that a sample's id is in the following format where 'd' is a digit: `USddddddd.dd`
             ///
             ///    validate (SampleId "US0123456.78") = Ok (SampleId "US0123456.78")
             ///    validate (SampleId "invalidId") = Error "Invalid sample id: invalidId"
@@ -133,7 +135,7 @@ module FoundationMedicine =
         module BlockId =
             type Input = Input of string
 
-            /// Validate that a block id is not blank.
+            /// Validate that a sample's block id is not blank.
             let validate (Input input) =
                 if input <> "" then
                     Ok <| BlockId input
@@ -143,7 +145,7 @@ module FoundationMedicine =
         module SampleFormat =
             type Input = Input of string
 
-            /// Validate that a sample's specimen format is not blank.
+            /// Validate that a sample's format is either a 'Slide Deck', 'Block', and 'Tube Set'.
             let validate (Input input) =
                 match input with
                 | "Slide Deck" -> Ok SlideDeck
@@ -157,7 +159,7 @@ module FoundationMedicine =
               BlockId: BlockId.Input
               SampleFormat: SampleFormat.Input }
 
-        /// Validate a sample from a FMI report
+        /// Validate the FMI report's sample
         let validate (sampleInput: Input) =
             validation {
                 let! sampleId = SampleId.validate sampleInput.SampleIdInput
@@ -170,11 +172,12 @@ module FoundationMedicine =
                          SampleFormat = specimenFormat }
             }
 
-    /// Patient Medical Information
+    /// The Patient Medical Information section of an FMI report
     module PMI =
         open FsToolkit.ErrorHandling
 
         module MRN =
+            /// Validate that a patient's MRN is in the correct format or that the MRN is not provided at all.
             let validate (MRN.Input input) =
                 if input = "" then
                     Ok None
@@ -192,11 +195,40 @@ module FoundationMedicine =
                 | "female" | "Female" -> Ok Female
                 | _ -> Error $"Invalid gender: {input}"
 
+        [<AutoOpen>]
+        module private StringValidations =
+            let (|BlankString|NotBlank|) str =
+                if str <> "" then NotBlank
+                else BlankString
+
+            let validateNotBlank str =
+                match str with
+                | NotBlank -> Ok str
+                | _ -> Error "Can't be blank"
+
+        module LastName =
+            type Input = Input of string
+
+            /// Validate that a patient's last name is not blank
+            let validate (Input input) =
+                validateNotBlank input
+                |> Result.map LastName
+                |> Result.mapError (fun e -> $"LastName: {e}")
+
+        module FirstName =
+            type Input = Input of string
+
+            /// Validate that a patient's first name is not blank
+            let validate (Input input) =
+                validateNotBlank input
+                |> Result.map FirstName
+                |> Result.mapError (fun e -> $"FirstName: {e}")
+
         type Input =
             { MrnInput: MRN.Input
               GenderInput: Gender.Input
-              LastName: LastName
-              FirstName: FirstName
+              LastName: LastName.Input
+              FirstName: FirstName.Input
               SubmittedDiagnosis: SubmittedDiagnosis
               DateOfBirth: DateOfBirth
               SpecimenSite: SpecimenSite
@@ -208,11 +240,13 @@ module FoundationMedicine =
             validation {
                 let! mrn = MRN.validate pmiInput.MrnInput
                 and! gender = Gender.validate pmiInput.GenderInput
+                and! lastName = LastName.validate pmiInput.LastName
+                and! firstName = FirstName.validate pmiInput.FirstName
 
                 return { MRN = mrn
                          Gender = gender
-                         LastName = pmiInput.LastName
-                         FirstName = pmiInput.FirstName
+                         LastName = lastName
+                         FirstName = firstName
                          SubmittedDiagnosis = pmiInput.SubmittedDiagnosis
                          DateOfBirth = pmiInput.DateOfBirth
                          SpecimenSite = pmiInput.SpecimenSite
@@ -277,7 +311,6 @@ module FoundationMedicine =
                 | Some (MsInput "MS-Stable") -> Ok <| Some Stable
                 | Some (MsInput "MSI-High") -> Ok <| Some ``High Instability``
                 | Some _ -> Error $"Invalid MicrosatelliteStatusInput: {msInput}"
-
 
     module TumorMutationBurden =
         open FsToolkit.ErrorHandling
@@ -401,26 +434,26 @@ module FoundationMedicine =
             member this.ServerTime =
                 this.ClinicalReport.Signature.ServerTime
 
+            /// The `Genes` section of the XML report. Each `Gene` has a `Name` and  many `Alterations`, with their own `Name`s.
+            member this.Genes = this.ClinicalReport.Genes
+
             /// Retrieve the report's microsatellite status, if it exists.
             member this.MicrosatelliteStatus =
-                this.ClinicalReport.Genes
+                this.Genes
                 |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
                 |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
 
             member this.Biomarkers =
                 this.VariantReport.Biomarkers
 
+            /// The tumor mutation burden as a tuple where the `Score` is the first element and the `Status` the second.
             member this.TumorMutationBurden =
                 this.Biomarkers.TumorMutationBurden
                 |> Option.map (fun tmb -> (tmb.Score, tmb.Status))
 
-
             (* Read in XML to report input *)
 
             member this.ReportIdInput = ReportId.Input this.ClinicalReport.ReportId
-
-            member this.IssuedDateInput =
-                this.ServerTime |> IssuedDate.Input
 
             /// Retrieve the lab's address and clia number
             member this.LabInput: Lab.Input =
@@ -471,7 +504,7 @@ module FoundationMedicine =
 
             member this.ReportInput =
                 { ReportIdInput = this.ReportIdInput
-                  IssuedDateInput = this.IssuedDateInput
+                  IssuedDateInput = IssuedDate.Input this.ServerTime
                   LabInput = this.LabInput
                   SampleInput = this.SampleInput
                   PmiInput = this.PmiInput
