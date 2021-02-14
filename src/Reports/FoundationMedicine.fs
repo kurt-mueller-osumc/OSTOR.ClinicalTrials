@@ -4,6 +4,7 @@ module FoundationMedicine =
     [<Measure>] type mutation
     [<Measure>] type megabase
 
+    /// The sample for each FMI report
     type Sample =
         { SampleId: SampleId
           ReceivedDate: ReceivedDate
@@ -110,6 +111,7 @@ module FoundationMedicine =
             | Some issuedDate ->  Ok <| IssuedDate issuedDate
             | None -> Error $"Invalid issued date: {input}"
 
+    /// The ResultsPayload.FinalReport.Sample section of the XML report
     module Sample =
         open FsToolkit.ErrorHandling
 
@@ -372,8 +374,8 @@ module FoundationMedicine =
         [<Literal>]
         let VariantReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/variantReport.xsd"
 
-        type ClinicalReportProvider = XmlProvider<Schema=ClinicalReportXsdPath, EmbeddedResource="Reports, clinicalReport.xsd">
-        type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource="Reports, variantReport.xsd">
+        type ClinicalReportProvider = XmlProvider<Schema=ClinicalReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.clinicalReport.xsd">
+        type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource=" OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.variantReport.xsd">
 
         type Xml(filePath: string) =
             let filePath = filePath
