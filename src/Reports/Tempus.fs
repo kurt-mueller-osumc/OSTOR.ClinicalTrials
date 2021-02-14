@@ -146,45 +146,30 @@ module Tempus =
             { FirstName: string
               LastName: string
               TempusId: Guid
-              MRN: string
+              MRN: string option
               Sex: string
               DateOfBirth: DateTime
               Diagnosis: string
               DiagnosisDate: DateTime option }
 
-            static member CamelCaseDecoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.optionalDateTime
-
-                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
-                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
-                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
-                      MRN           = "emrId"     |> flip get.Required.Field Decode.string
-                      Sex           = "sex"       |> flip get.Required.Field Decode.string
-                      DateOfBirth   = "dateOfBirth" |> flip get.Required.Field Decode.datetime
-                      Diagnosis     = "diagnosis"   |> flip get.Required.Field Decode.string
-                      DiagnosisDate = diagnosisDate }
-                )
-
-            static member SnakeCaseDecoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.optionalDateTime
-
-                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
-                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
-                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
-                      MRN           = "emr_id"    |> flip get.Required.Field Decode.string
-                      Sex           = "sex"       |> flip get.Required.Field Decode.string
-                      DateOfBirth   = "DoB"       |> flip get.Required.Field Decode.datetime
-                      Diagnosis     = "diagnosis" |> flip get.Required.Field Decode.string
-                      DiagnosisDate = diagnosisDate }
-                )
-
             /// Deserializer for the 'patient' json object. The following object attributes can be camel-cased or snake-cased:
             /// - emrId / emr_id
             /// - dateOfBirth / DoB
             static member Decoder : Decoder<Json> =
-                Decode.oneOf [Json.CamelCaseDecoder; Json.SnakeCaseDecoder]
+                Decode.object (fun get ->
+                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.optionalDateTime
+                    let mrnDecoder = ["emrId"; "emr_id"] |> List.map (flip Decode.field Decoder.optionalString) |> Decode.oneOf
+                    let dobDecoder = ["dateOfBirth"; "DoB"] |> List.map (flip Decode.field Decode.datetime) |> Decode.oneOf
+
+                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
+                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
+                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
+                      MRN           = get.Required.Raw mrnDecoder
+                      Sex           = "sex"       |> flip get.Required.Field Decode.string
+                      DateOfBirth   = get.Required.Raw dobDecoder
+                      Diagnosis     = "diagnosis"   |> flip get.Required.Field Decode.string
+                      DiagnosisDate = diagnosisDate }
+                )
 
     module ``Somatic Potentially Actionable Mutation`` =
         open Thoth.Json.Net
