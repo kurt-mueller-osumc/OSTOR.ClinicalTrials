@@ -1,6 +1,7 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Tempus =
+    open Thoth.Json.Net
     open Utilities
 
     type Diagnosis =
@@ -67,7 +68,7 @@ module Tempus =
     and MutationEffect = MutationEffect of string
     and ``HGVS protein`` =
         { // HGVS.pFull
-          FullDescription: string 
+          FullDescription: string
           // HGVS.p
           NormalDescription: string }
 
@@ -76,8 +77,6 @@ module Tempus =
     and AllelicFraction = AllelicFraction of float
 
     module Gene =
-        open Thoth.Json.Net
-
         /// Json object attributes that identifies genes
         type Json =
             { GeneId: string // 'gene' attribute
@@ -116,9 +115,7 @@ module Tempus =
                 | _ -> Error $"Gene missing name, hgnc id, or entrez id: {json}"
 
     module HGVS =
-        open Thoth.Json.Net
-
-        // mutation effect will either be p or c
+        // mutation effect equals either be p or c
         // p will sometimes not be there
         type Json =
             { ``HGVS.p``: string
@@ -139,8 +136,6 @@ module Tempus =
                 )
 
     module Order =
-        open Thoth.Json.Net
-
         type Json =
             { Institution: string
               Physician: string
@@ -176,8 +171,6 @@ module Tempus =
                 )
 
     module Lab =
-        open Thoth.Json.Net
-
         type Json =
             { Name: string
               StreetAddress: string
@@ -213,7 +206,6 @@ module Tempus =
 
     module Report =
         open System
-        open Thoth.Json.Net
 
         type Json =
             { ReportId: Guid
@@ -227,13 +219,44 @@ module Tempus =
 
                     { ReportId           = "reportId"         |> flip get.Required.Field Decode.guid
                       SigningPathologist = pathologistDecoder |> get.Required.Raw
-                      SignoutDate        = signoutDateDecoder |> get.Required.Raw
-                    }
+                      SignoutDate        = signoutDateDecoder |> get.Required.Raw }
+                )
+
+
+    module Sample =
+        open System
+
+        type Json =
+            { SampleId: Guid
+              CollectionDate: DateTime
+              ReceivedDate: DateTime
+              SampleCategory: string
+              SampleSite: string
+              SampleType: string
+              Institution: InstitutionJson }
+
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { SampleId       = "tempusSampleId"  |> flip get.Required.Field Decode.guid
+                      CollectionDate = "collectionDate"  |> flip get.Required.Field Decode.datetime
+                      ReceivedDate   = "receiptDate"     |> flip get.Required.Field Decode.datetime
+                      SampleCategory = "sampleCategory"  |> flip get.Required.Field Decode.string
+                      SampleSite     = "sampleSite"      |> flip get.Required.Field Decode.string
+                      SampleType     = "sampleType"      |> flip get.Required.Field Decode.string
+                      Institution    = "institutionData" |> flip get.Required.Field InstitutionJson.Decoder })
+
+        and InstitutionJson =
+            { BlockId: string option
+              TumorPercentage: int option }
+
+            static member Decoder : Decoder<InstitutionJson> =
+                Decode.object (fun get ->
+                    { BlockId         = "blockId"         |> flip get.Optional.Field Decode.string
+                      TumorPercentage = "tumorPercentage" |> flip get.Optional.Field Decode.int }
                 )
 
     module Patient =
         open System
-        open Thoth.Json.Net
 
         type Json =
             { FirstName: string
@@ -265,8 +288,6 @@ module Tempus =
                 )
 
     module ``Somatic Potentially Actionable Mutation`` =
-        open Thoth.Json.Net
-
         type Json =
             { GeneJson: Gene.Json
               VariantJsons: VariantJson list }
@@ -293,8 +314,6 @@ module Tempus =
                 )
 
     module ``Somatic Potentially Actionable Copy Number Variant`` =
-        open Thoth.Json.Net
-
         type Json =
             { Gene: Gene.Json
               VariantDescription: string
@@ -308,8 +327,6 @@ module Tempus =
                 )
 
     module ``Somatic Biologically Relevant Variant`` =
-        open Thoth.Json.Net
-
         type Json =
             { GeneJson: Gene.Json
               Gene5Json: Gene.Json
@@ -329,8 +346,6 @@ module Tempus =
                 )
 
     module ``Somatic Variant of Unknown Significance`` =
-        open Thoth.Json.Net
-
         type Json =
             { GeneJson: Gene.Json
               HgvsJson: HGVS.Json
@@ -350,8 +365,6 @@ module Tempus =
                 )
 
     module FusionVariant =
-        open Thoth.Json.Net
-
         type Json =
             { Gene5: Gene.Json
               Gene3: Gene.Json
@@ -369,8 +382,6 @@ module Tempus =
                 )
 
     module InheritedRelevantVariant =
-        open Thoth.Json.Net
-
         type Json =
             { GeneJson: Gene.Json
               HgvsJson: HGVS.Json
@@ -397,10 +408,8 @@ module Tempus =
                     Pos = "pos" |> flip get.Required.Field Decode.int }
                 )
 
-    /// The 'results' section in the Tempus report
+    /// The `results` section in the Tempus report
     module Results =
-        open Thoth.Json.Net
-
         type Json =
             { TumorMutationBurden: float option
               TumorMutationBurdenPercentile: int option
@@ -430,71 +439,32 @@ module Tempus =
                       InheritedRelevantVariants = ["inheritedRelevantVariants"; "values"] |> flip get.Required.At (Decode.list InheritedRelevantVariant.Json.Decoder)}
                 )
 
+      type Json =
+          { Order: Order.Json
+            Lab: Lab.Json
+            Report: Report.Json
+            Patient: Patient.Json
+            Samples: Sample.Json list
+            Results: Results.Json }
+
+          /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
+          static member Decoder : Decoder<Json> =
+              Decode.object (fun get ->
+                  { Lab     = "lab"       |> flip get.Required.Field Lab.Json.Decoder
+                    Report  = "report"    |> flip get.Required.Field Report.Json.Decoder
+                    Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
+                    Order   = "order"     |> flip get.Required.Field Order.Json.Decoder
+                    Samples = "specimens" |> flip get.Required.Field (Decode.list Sample.Json.Decoder)
+                    Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
+              )
+
     module Json =
-        open Thoth.Json.Net
-
-        (* Json Definition *)
-
-        type TempusJson =
-            { Order: Order.Json
-              Lab: Lab.Json
-              Report: Report.Json
-              Patient: Patient.Json
-              Samples: SampleJson list
-              Results: Results.Json }
-
-        and SampleJson =
-            { SampleId: System.Guid
-              CollectionDate: System.DateTime
-              ReceivedDate: System.DateTime
-              SampleCategory: string
-              SampleSite: string
-              SampleType: string
-              Institution: InstitutionJson }
-
-        and InstitutionJson =
-            { BlockId: string option
-              TumorPercentage: int option }
-
-
-        (* Decoders *)
-
-        type InstitutionJson with
-            static member Decoder : Decoder<InstitutionJson> =
-                Decode.object (fun get ->
-                    { BlockId         = "blockId"         |> flip get.Optional.Field Decode.string
-                      TumorPercentage = "tumorPercentage" |> flip get.Optional.Field Decode.int }
-                )
-
-        type SampleJson with
-            static member Decoder : Decoder<SampleJson> =
-                Decode.object (fun get ->
-                    { SampleId       = "tempusSampleId"  |> flip get.Required.Field Decode.guid
-                      CollectionDate = "collectionDate"  |> flip get.Required.Field Decode.datetime
-                      ReceivedDate   = "receiptDate"     |> flip get.Required.Field Decode.datetime
-                      SampleCategory = "sampleCategory"  |> flip get.Required.Field Decode.string
-                      SampleSite     = "sampleSite"      |> flip get.Required.Field Decode.string
-                      SampleType     = "sampleType"      |> flip get.Required.Field Decode.string
-                      Institution    = "institutionData" |> flip get.Required.Field InstitutionJson.Decoder })
-
-        type TempusJson with
-            /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
-            static member Decoder : Decoder<TempusJson> =
-                Decode.object (fun get ->
-                    { Lab     = "lab"       |> flip get.Required.Field Lab.Json.Decoder
-                      Report  = "report"    |> flip get.Required.Field Report.Json.Decoder
-                      Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
-                      Order   = "order"     |> flip get.Required.Field Order.Json.Decoder
-                      Samples = "specimens" |> flip get.Required.Field (Decode.list SampleJson.Decoder)
-                      Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
-                )
-
         type Error =
           { FileName: string
             Error: string }
 
         let deserialize =
-            Decode.fromString TempusJson.Decoder
+            Decode.fromString Json.Decoder
 
         let deserializeWithError fileName =
             deserialize
