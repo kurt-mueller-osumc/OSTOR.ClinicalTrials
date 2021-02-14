@@ -9,7 +9,7 @@ module FoundationMedicine =
         { SampleId: SampleId
           ReceivedDate: ReceivedDate
           BlockId: BlockId
-          SpecimenFormat: SpecimenFormat }
+          SampleFormat: SampleFormat }
     and SampleId = internal | SampleId of string
     and ReceivedDate = internal | ReceivedDate of System.DateTime
     and BlockId = internal | BlockId of string
@@ -146,10 +146,11 @@ module FoundationMedicine =
 
             /// Validate that a sample's specimen format is not blank.
             let validate (Input input) =
-                if input <> "" then
-                    Ok <| SpecimenFormat input
-                else
-                    Error $"Specimen format cannot be blank"
+                match input with
+                | "Slide Deck" -> Ok SlideDeck
+                | "Block" -> Ok Block
+                | "Tube Set" -> Ok TubeSet
+                | _ -> Error $"Unknown sample format: {input}"
 
         type Input =
             { SampleIdInput: SampleId.Input
@@ -167,7 +168,7 @@ module FoundationMedicine =
                 return { SampleId = sampleId
                          ReceivedDate = sampleInput.ReceivedDate
                          BlockId = blockId
-                         SpecimenFormat = specimenFormat }
+                         SampleFormat = specimenFormat }
             }
 
     module PMI =
