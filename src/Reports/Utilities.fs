@@ -24,7 +24,11 @@ module Utilities =
             | _ -> None
 
     module Decoder =
+        open System
         open Thoth.Json.Net
+
+        let optionalDateTime :Decoder<DateTime option> =
+            Decode.map DateTime.tryParse Decode.string
 
         /// Deserialize json field into an optional float from a value that can be one of:
         ///
