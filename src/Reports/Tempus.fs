@@ -242,6 +242,35 @@ module Tempus =
                       StructuralVariant  = "structuralVariant"  |> flip get.Required.Field Decoder.optionalString }
                 )
 
+    module InheritedRelevantVariant =
+        open Thoth.Json.Net
+
+        type Json =
+            { GeneJson: Gene.Json
+              HgvsJson: HGVS.Json
+              VariantDescription: string
+              ClinicalSignificance: string
+              Disease: string
+              AllelicFraction: string
+              Chromosome: int
+              Ref: string
+              Alt: string
+              Pos: int }
+
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                  { GeneJson = get.Required.Raw Gene.Json.Decoder
+                    HgvsJson = get.Required.Raw HGVS.Json.Decoder
+                    VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
+                    ClinicalSignificance = "clinicalSignificance" |> flip get.Required.Field Decode.string
+                    Disease              = "disease"              |> flip get.Required.Field Decode.string
+                    AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
+                    Chromosome           = "chromosome"           |> flip get.Required.Field Decode.int
+                    Ref = "ref" |> flip get.Required.Field Decode.string
+                    Alt = "alt" |> flip get.Required.Field Decode.string
+                    Pos = "pos" |> flip get.Required.Field Decode.int }
+                )
+
     /// The 'results' section in the Tempus report
     module Results =
         open Thoth.Json.Net
@@ -254,7 +283,8 @@ module Tempus =
               ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant``.Json list
               ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
               ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list
-              FusionVariants: FusionVariant.Json list }
+              FusionVariants: FusionVariant.Json list
+              InheritedRelevantVariants: InheritedRelevantVariant.Json list }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
@@ -270,7 +300,8 @@ module Tempus =
                       ``Somatic Potentially Actionable Copy Number Variants`` = "somaticPotentiallyActionableCopyNumberVariants" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Copy Number Variant``.Json.Decoder)
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
                       ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
-                      FusionVariants = "fusionVariants" |> flip get.Required.Field (Decode.list FusionVariant.Json.Decoder) }
+                      FusionVariants = "fusionVariants" |> flip get.Required.Field (Decode.list FusionVariant.Json.Decoder)
+                      InheritedRelevantVariants = ["inheritedRelevantVariants"; "values"] |> flip get.Required.At (Decode.list InheritedRelevantVariant.Json.Decoder)}
                 )
 
     module Json =
