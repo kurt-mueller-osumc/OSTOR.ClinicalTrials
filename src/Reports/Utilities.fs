@@ -136,6 +136,16 @@ module Utilities =
         let writeToDisk path string =
             File.WriteAllText(path, string)
 
+    module StringValidations =
+        let (|BlankString|NotBlank|) str =
+            if str <> "" then NotBlank
+            else BlankString
+
+        let validateNotBlank str =
+            match str with
+            | NotBlank -> Ok str
+            | _ -> Error "Can't be blank"
+
     module Xml =
         open System.IO
         open System.Linq
