@@ -138,6 +138,43 @@ module Tempus =
                       MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
 
+    module Order =
+        open Thoth.Json.Net
+
+        type Json =
+            { Institution: string
+              Physician: string
+              OrderId: string
+              AccessionId: string
+              OrderTest: TestJson }
+
+            /// Deserializer for the 'report' json object.
+            ///
+            ///  The following object attributes can be camel-cased or snake-cased:
+            /// - tempusOrderId / tempusOrder_id
+            static member Decoder: Decoder<Json> =
+                Decode.object (fun get ->
+                    let orderIdDecoder = ["tempusOrderId"; "tempusOrder_id"] |> List.map (flip Decode.field Decode.string) |> Decode.oneOf
+
+                    { Institution = "institution"  |> flip get.Required.Field Decode.string
+                      Physician   = "physician"    |> flip get.Required.Field Decode.string
+                      OrderId     = orderIdDecoder |> get.Required.Raw
+                      AccessionId = "accessionId"  |> flip get.Required.Field Decode.string
+                      OrderTest   = "test"         |> flip get.Required.Field TestJson.Decoder }
+                )
+
+        and TestJson =
+            { Code: string
+              Name: string
+              Description: string }
+
+            static member Decoder : Decoder<TestJson> =
+                Decode.object (fun get ->
+                    { Code        = "code" |> flip get.Required.Field Decode.string
+                      Name        = "name" |> flip get.Required.Field Decode.string
+                      Description = "description" |> flip get.Required.Field Decode.string }
+                )
+
     module Patient =
         open System
         open Thoth.Json.Net
@@ -343,7 +380,7 @@ module Tempus =
         (* Json Definition *)
 
         type TempusJson =
-            { Order: OrderJson
+            { Order: Order.Json
               Lab: LabJson
               Report: ReportJson
               Patient: Patient.Json
@@ -362,18 +399,6 @@ module Tempus =
             { ReportId: System.Guid
               SigningPathologist: string
               SignoutDate: System.DateTime }
-
-        and OrderJson =
-            { Institution: string
-              Physician: string
-              OrderId: string
-              AccessionId: string
-              OrderTest: OrderTestJson }
-
-        and OrderTestJson =
-            { Code: string
-              Name: string
-              Description: string }
 
         and SampleJson =
             { SampleId: System.Guid
@@ -408,36 +433,6 @@ module Tempus =
                       SampleSite     = "sampleSite"      |> flip get.Required.Field Decode.string
                       SampleType     = "sampleType"      |> flip get.Required.Field Decode.string
                       Institution    = "institutionData" |> flip get.Required.Field InstitutionJson.Decoder })
-
-        type OrderTestJson with
-            static member Decoder : Decoder<OrderTestJson> =
-                Decode.object (fun get ->
-                    { Code        = "code" |> flip get.Required.Field Decode.string
-                      Name        = "name" |> flip get.Required.Field Decode.string
-                      Description = "description" |> flip get.Required.Field Decode.string }
-                )
-
-        type OrderJson with
-            static member CamelCaseDecoder: Decoder<OrderJson> =
-                Decode.object (fun get ->
-                    { Institution = "institution"   |> flip get.Required.Field Decode.string
-                      Physician   = "physician"     |> flip get.Required.Field Decode.string
-                      OrderId     = "tempusOrderId" |> flip get.Required.Field Decode.string
-                      AccessionId = "accessionId"   |> flip get.Required.Field Decode.string
-                      OrderTest   = "test"          |> flip get.Required.Field OrderTestJson.Decoder }
-                )
-
-            static member SnakeCaseDecoder: Decoder<OrderJson> =
-                Decode.object (fun get ->
-                    { Institution = "institution"    |> flip get.Required.Field Decode.string
-                      Physician   = "physician"      |> flip get.Required.Field Decode.string
-                      OrderId     = "tempusOrder_id" |> flip get.Required.Field Decode.string
-                      AccessionId = "accessionId"    |> flip get.Required.Field Decode.string
-                      OrderTest   = "test"           |> flip get.Required.Field OrderTestJson.Decoder }
-                )
-
-            static member Decoder : Decoder<OrderJson> =
-                Decode.oneOf [OrderJson.CamelCaseDecoder; OrderJson.SnakeCaseDecoder]
 
         type ReportJson with
             static member SnakeCaseDecoder : Decoder<ReportJson> =
@@ -494,7 +489,7 @@ module Tempus =
                     { Lab     = "lab"       |> flip get.Required.Field LabJson.Decoder
                       Report  = "report"    |> flip get.Required.Field ReportJson.Decoder
                       Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
-                      Order   = "order"     |> flip get.Required.Field OrderJson.Decoder
+                      Order   = "order"     |> flip get.Required.Field Order.Json.Decoder
                       Samples = "specimens" |> flip get.Required.Field (Decode.list SampleJson.Decoder)
                       Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
                 )
