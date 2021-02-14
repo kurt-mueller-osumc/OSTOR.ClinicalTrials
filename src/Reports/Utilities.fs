@@ -75,6 +75,12 @@ module Utilities =
         let flatten list =
             List.collect id list
 
+    module Option =
+        let toResult error option =
+            match option with
+            | Some a -> Ok a
+            | _ -> Error error
+
     module Regex =
         open System.Text.RegularExpressions
 
@@ -145,6 +151,12 @@ module Utilities =
             match str with
             | NotBlank -> Ok str
             | _ -> Error "Can't be blank"
+
+        let validateDateTime str =
+            str
+            |> DateTime.tryParse
+            |> Option.toResult $"Invalid DateTime: {str}"
+
 
     module Xml =
         open System.IO
