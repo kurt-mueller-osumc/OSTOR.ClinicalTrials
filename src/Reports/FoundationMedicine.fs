@@ -13,7 +13,6 @@ module FoundationMedicine =
     and SampleId = internal | SampleId of string
     and ReceivedDate = internal | ReceivedDate of System.DateTime
     and BlockId = internal | BlockId of string
-    and SpecimenFormat = internal | SpecimenFormat of string
     and SampleFormat = internal | SlideDeck | Block | TubeSet
 
     type PMI =
@@ -93,7 +92,7 @@ module FoundationMedicine =
 
         type Input = Input of string
 
-        /// Validate that a sample id is the following format where 'd' is a digit: ORD-ddddddd-dd
+        /// Validate that a report id is in the following format where 'd' is a digit: ORD-ddddddd-dd
         ///
         ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
         ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
@@ -109,10 +108,10 @@ module FoundationMedicine =
 
         let validate (Input input) =
             match DateTime.tryParse input with
-            | Some issuedDate ->  Ok <| IssuedDate issuedDate
+            | Some issuedDate -> Ok <| IssuedDate issuedDate
             | None -> Error $"Invalid issued date: {input}"
 
-    /// The ResultsPayload.FinalReport.Sample section of the XML report
+    /// A report's sample
     module Sample =
         open FsToolkit.ErrorHandling
 
@@ -141,7 +140,7 @@ module FoundationMedicine =
                 else
                     Error $"Invalid block id: {input}"
 
-        module SpecimenFormat =
+        module SampleFormat =
             type Input = Input of string
 
             /// Validate that a sample's specimen format is not blank.
@@ -156,14 +155,14 @@ module FoundationMedicine =
             { SampleIdInput: SampleId.Input
               ReceivedDate: ReceivedDate
               BlockId: BlockId.Input
-              SpecimenFormat: SpecimenFormat.Input }
+              SampleFormat: SampleFormat.Input }
 
         /// Validate a sample from a FMI report
         let validate (sampleInput: Input) =
             validation {
                 let! sampleId = SampleId.validate sampleInput.SampleIdInput
                 and! blockId = BlockId.validate sampleInput.BlockId
-                and! specimenFormat = SpecimenFormat.validate sampleInput.SpecimenFormat
+                and! specimenFormat = SampleFormat.validate sampleInput.SampleFormat
 
                 return { SampleId = sampleId
                          ReceivedDate = sampleInput.ReceivedDate
@@ -171,6 +170,7 @@ module FoundationMedicine =
                          SampleFormat = specimenFormat }
             }
 
+    /// Patient Medical Information
     module PMI =
         open FsToolkit.ErrorHandling
 
@@ -222,6 +222,7 @@ module FoundationMedicine =
             }
 
     module Variant =
+        /// A variant in an FMI report only has the gene name, whether or not it's a variant of unknown significance, and the variant name.
         type Input =
             { GeneName: GeneName
               IsVus: IsVus
@@ -231,37 +232,35 @@ module FoundationMedicine =
         module Input =
             open Utilities
 
-            let (|InvalidVariantNames|ValidVariantNames|) (VariantName variantName) =
+            /// Convert variant names from a comma-separated string to a list
+            let (|ValidVariantNames|_|) (VariantName variantName) =
                 if variantName <> "" then
-                    let variantNames =
-                        variantName
-                        |> String.split ','
-                        |> List.map VariantName
+                    variantName
+                    |> String.split ','
+                    |> List.map VariantName
+                    |> Some
 
-                    ValidVariantNames variantNames
-                else InvalidVariantNames
+                else None
 
-            let (|InvalidGeneName|ValidGeneName|) (GeneName geneName) =
-                if geneName <> "" then ValidGeneName (GeneName geneName)
-                else InvalidGeneName
-
-            let (|IsVus|NotVus|) (IsVus isVus) =
-                match isVus with
-                | true -> IsVus
-                | false -> NotVus
+            let (|ValidGeneName|_|) (GeneName geneName) =
+                if geneName <> "" then Some (GeneName geneName)
+                else None
 
             /// Validate that a variant input has a gene name and at least one variant name.
             let validate (variantInput: Input) =
-                match (variantInput.GeneName, variantInput.IsVus, variantInput.VariantName) with
-                | ValidGeneName geneName, IsVus, ValidVariantNames variantNames -> Ok <| VariantOfUnknownSignificance { GeneName = geneName; VariantNames = variantNames }
-                | ValidGeneName geneName, NotVus, ValidVariantNames variantNames -> Ok <| VariantOfKnownSignificance { GeneName = geneName; VariantNames = variantNames }
-                | InvalidGeneName, _, ValidVariantNames _ -> Error $"Invalid gene name: {variantInput.GeneName}"
-                | ValidGeneName _, _, InvalidVariantNames -> Error $"Invalid variant names: {variantInput.VariantName}"
+                let (IsVus isVus) = variantInput.IsVus
+
+                match (variantInput.GeneName, isVus, variantInput.VariantName) with
+                | ValidGeneName geneName, true, ValidVariantNames variantNames -> Ok <| VariantOfUnknownSignificance { GeneName = geneName; VariantNames = variantNames }
+                | ValidGeneName geneName, false, ValidVariantNames variantNames -> Ok <| VariantOfKnownSignificance { GeneName = geneName; VariantNames = variantNames }
+                | _, _, ValidVariantNames _ -> Error $"Invalid gene name: {variantInput.GeneName}"
+                | ValidGeneName _, _, _ -> Error $"Invalid variant names: {variantInput.VariantName}"
                 | _ -> Error $"Invalid variant: {variantInput}"
 
     module Variants =
         open Utilities
 
+        /// Validate a list of variant inputs
         let validate =
             List.map Variant.Input.validate
             >> Result.combine
@@ -270,21 +269,15 @@ module FoundationMedicine =
         type MsInput = MsInput of string
 
         module Input =
-            let (|MsiHigh|MsStable|CannotBeDetermined|InvalidMsStatus|) (MsInput msInput) =
-                match msInput with
-                | "Cannot Be Determined" -> CannotBeDetermined
-                | "MS-Stable" -> MsStable
-                | "MSI-High" -> MsiHigh
-                | _ -> InvalidMsStatus
-
-            /// Validate that if a microsatellite input exists, it either cannot be determined, is stable, or has high instability. If not, result in an error.
+            /// Validate that if a microsatellite input exists: it either cannot be determined, is stable, or has high instability. If not, result in an error.
             let validate (msInput: MsInput option) =
                 match msInput with
                 | None -> Ok None
-                | Some CannotBeDetermined -> Ok <| Some MicrosatelliteStatus.``Cannot Be Determined``
-                | Some MsStable -> Ok <| Some Stable
-                | Some MsiHigh -> Ok <| Some ``High Instability``
-                | Some _ -> Error $"Invalid MsStatusInput: {msInput}"
+                | Some (MsInput "Cannot Be Determined") -> Ok <| Some MicrosatelliteStatus.``Cannot Be Determined``
+                | Some (MsInput "MS-Stable") -> Ok <| Some Stable
+                | Some (MsInput "MSI-High") -> Ok <| Some ``High Instability``
+                | Some _ -> Error $"Invalid MicrosatelliteStatusInput: {msInput}"
+
 
     module TumorMutationBurden =
         open FsToolkit.ErrorHandling
@@ -297,11 +290,13 @@ module FoundationMedicine =
               StatusInput: StatusInput}
 
         module Score =
+            /// Validate that a tumor mutation burden score is greater than 0.0
             let validate (ScoreInput input) =
                 if input >= 0.0 then Ok <| TmbScore (input * 1.0<mutation/megabase>)
                 else Error $"Invalid score: {input}"
 
         module Status =
+            /// Validate that a tumor mutation burden status is either low, intermediate, high, or unknown.
             let validate (StatusInput input) =
                 match input with
                 | "low" -> Ok Low
@@ -439,7 +434,7 @@ module FoundationMedicine =
                 { SampleIdInput = Sample.SampleId.Input this.ReportSample.SampleId
                   BlockId = Sample.BlockId.Input this.ReportSample.BlockId
                   ReceivedDate = ReceivedDate this.ReportSample.ReceivedDate
-                  SpecimenFormat = Sample.SpecimenFormat.Input this.ReportSample.SpecFormat }
+                  SampleFormat = Sample.SampleFormat.Input this.ReportSample.SpecFormat }
 
             /// Retrieve the report's patient medical information
             member this.PmiInput : PMI.Input =
