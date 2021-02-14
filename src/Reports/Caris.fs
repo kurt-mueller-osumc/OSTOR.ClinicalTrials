@@ -9,8 +9,6 @@ module Caris =
           FirstName: FirstName
           DateOfBirth: DateOfBirth
           Sex: Sex }
-    and LastName = internal LastName of string
-    and FirstName = internal FirstName of string
     and Sex = internal Male | Female
     and DateOfBirth = internal DateOfBirth of System.DateTime
 
@@ -25,6 +23,10 @@ module Caris =
     and DiagnosisSite = internal DiagnosisSite of string
     and Lineage = internal Lineage of string
     and SubLineage = internal SubLineage of string
+
+    type OrderingMd =
+        { OrderingMdName: FullName
+          NationalProviderId: NationalProviderId }
 
     type Specimen =
         { SpecimenId: SpecimenId
@@ -53,28 +55,6 @@ module Caris =
 
     module Patient =
         open FsToolkit.ErrorHandling
-
-        module LastName =
-            open Utilities.StringValidations
-
-            type Input = Input of string
-
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map LastName
-                |> Result.mapError (fun e -> $"LastName: {e}")
-
-        module FirstName =
-            open Utilities.StringValidations
-
-            type Input = Input of string
-
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map FirstName
-                |> Result.mapError (fun e -> $"FirstName: {e}")
 
         module Sex =
             type Input = Input of string
@@ -105,6 +85,22 @@ module Caris =
                          FirstName = firstName
                          Sex = sex
                          DateOfBirth = DateOfBirth input.DateOfBirth }
+            }
+
+    module OrderingMd =
+        open FsToolkit.ErrorHandling
+
+        type Input =
+            { NameInput: FullName.Input
+              NationalProviderIdInput: NationalProviderId.Input }
+
+        /// Validate the presence an ordering md's name and the format of their national provider id
+        let validate input =
+            validation {
+                let! name = FullName.validate input.NameInput
+                and! npi = NationalProviderId.validate input.NationalProviderIdInput
+
+                return { OrderingMdName = name; NationalProviderId = npi }
             }
 
     module Test =
@@ -158,7 +154,6 @@ module Caris =
                          ReceivedDate = receivedDate }
             }
 
-
     type Report =
         { MRN: MRN option
           Specimen: Specimen }
@@ -203,8 +198,8 @@ module Caris =
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
 
             member _.PatientInput : Patient.Input =
-                { LastName = Patient.LastName.Input patientInfo.LastName
-                  FirstName = Patient.FirstName.Input patientInfo.FirstName
+                { LastName = LastName.Input patientInfo.LastName
+                  FirstName = FirstName.Input patientInfo.FirstName
                   DateOfBirth = patientInfo.Dob
                   Sex = Patient.Sex.Input patientInfo.Gender
                   MrnInput = MRN.Input patientInfo.Mrn }
