@@ -474,8 +474,8 @@ module FoundationMedicine =
                 let pmi = this.ClinicalReport.Pmi
 
                 { MrnInput = MRN.Input pmi.Mrn
-                  LastName = LastName pmi.LastName
-                  FirstName = FirstName pmi.FirstName
+                  LastName = PMI.LastName.Input pmi.LastName
+                  FirstName = PMI.FirstName.Input pmi.FirstName
                   SubmittedDiagnosis = SubmittedDiagnosis pmi.SubmittedDiagnosis
                   GenderInput = PMI.Gender.Input pmi.Gender
                   DateOfBirth = DateOfBirth pmi.Dob
