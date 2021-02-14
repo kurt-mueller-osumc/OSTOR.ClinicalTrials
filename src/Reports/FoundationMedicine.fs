@@ -14,6 +14,7 @@ module FoundationMedicine =
     and ReceivedDate = internal | ReceivedDate of System.DateTime
     and BlockId = internal | BlockId of string
     and SpecimenFormat = internal | SpecimenFormat of string
+    and SampleFormat = internal | SlideDeck | Block | TubeSet
 
     type PMI =
         { MRN: MRN option
