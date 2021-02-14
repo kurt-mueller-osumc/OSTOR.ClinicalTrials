@@ -138,6 +138,54 @@ module Tempus =
                       MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
 
+    module Patient =
+        open System
+        open Thoth.Json.Net
+
+        type Json =
+            { FirstName: string
+              LastName: string
+              TempusId: Guid
+              MRN: string
+              Sex: string
+              DateOfBirth: DateTime
+              Diagnosis: string
+              DiagnosisDate: DateTime option }
+
+            static member CamelCaseDecoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.optionalDateTime
+
+                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
+                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
+                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
+                      MRN           = "emrId"     |> flip get.Required.Field Decode.string
+                      Sex           = "sex"       |> flip get.Required.Field Decode.string
+                      DateOfBirth   = "dateOfBirth" |> flip get.Required.Field Decode.datetime
+                      Diagnosis     = "diagnosis"   |> flip get.Required.Field Decode.string
+                      DiagnosisDate = diagnosisDate }
+                )
+
+            static member SnakeCaseDecoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.optionalDateTime
+
+                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
+                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
+                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
+                      MRN           = "emr_id"    |> flip get.Required.Field Decode.string
+                      Sex           = "sex"       |> flip get.Required.Field Decode.string
+                      DateOfBirth   = "DoB"       |> flip get.Required.Field Decode.datetime
+                      Diagnosis     = "diagnosis" |> flip get.Required.Field Decode.string
+                      DiagnosisDate = diagnosisDate }
+                )
+
+            /// Deserializer for the 'patient' json object. The following object attributes can be camel-cased or snake-cased:
+            /// - emrId / emr_id
+            /// - dateOfBirth / DoB
+            static member Decoder : Decoder<Json> =
+                Decode.oneOf [Json.CamelCaseDecoder; Json.SnakeCaseDecoder]
+
     module ``Somatic Potentially Actionable Mutation`` =
         open Thoth.Json.Net
 
@@ -313,7 +361,7 @@ module Tempus =
             { Order: OrderJson
               Lab: LabJson
               Report: ReportJson
-              Patient: PatientJson
+              Patient: Patient.Json
               Samples: SampleJson list
               Results: Results.Json }
 
@@ -329,16 +377,6 @@ module Tempus =
             { ReportId: System.Guid
               SigningPathologist: string
               SignoutDate: System.DateTime }
-
-        and PatientJson =
-            { FirstName: string
-              LastName: string
-              TempusId: System.Guid
-              MRN: string
-              Sex: string
-              DateOfBirth: System.DateTime
-              Diagnosis: string
-              DiagnosisDate: string }
 
         and OrderJson =
             { Institution: string
@@ -464,44 +502,13 @@ module Tempus =
                 Decode.oneOf [LabJson.CamelCaseDecoder; LabJson.PascalCaseDecoder]
 
 
-        type PatientJson with
-            static member CamelCaseDecoder : Decoder<PatientJson> =
-                Decode.object (fun get ->
-                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
-                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
-                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
-                      MRN           = "emrId"     |> flip get.Required.Field Decode.string
-                      Sex           = "sex"       |> flip get.Required.Field Decode.string
-                      DateOfBirth   = "dateOfBirth"   |> flip get.Required.Field Decode.datetime
-                      Diagnosis     = "diagnosis"     |> flip get.Required.Field Decode.string
-                      DiagnosisDate = "diagnosisDate" |> flip get.Required.Field Decode.string }
-                )
-
-            static member SnakeCaseDecoder : Decoder<PatientJson> =
-                Decode.object (fun get ->
-                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
-                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
-                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
-                      MRN           = "emr_id"    |> flip get.Required.Field Decode.string
-                      Sex           = "sex"       |> flip get.Required.Field Decode.string
-                      DateOfBirth   = "DoB"       |> flip get.Required.Field Decode.datetime
-                      Diagnosis     = "diagnosis" |> flip get.Required.Field Decode.string
-                      DiagnosisDate = "diagnosisDate" |> flip get.Required.Field Decode.string }
-                )
-
-            /// Deserializer for the 'patient' json object. The following object attributes can be camel-cased or snake-cased:
-            /// - emrId / emr_id
-            /// - dateOfBirth / DoB
-            static member Decoder =
-                Decode.oneOf [PatientJson.CamelCaseDecoder; PatientJson.SnakeCaseDecoder]
-
         type TempusJson with
             /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
             static member Decoder : Decoder<TempusJson> =
                 Decode.object (fun get ->
                     { Lab     = "lab"       |> flip get.Required.Field LabJson.Decoder
                       Report  = "report"    |> flip get.Required.Field ReportJson.Decoder
-                      Patient = "patient"   |> flip get.Required.Field PatientJson.Decoder
+                      Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
                       Order   = "order"     |> flip get.Required.Field OrderJson.Decoder
                       Samples = "specimens" |> flip get.Required.Field (Decode.list SampleJson.Decoder)
                       Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
