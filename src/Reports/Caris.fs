@@ -7,14 +7,28 @@ module Caris =
         { MRN: MRN
           LastName: LastName
           FirstName: FirstName
-          DateOfBirth: System.DateTime
+          DateOfBirth: DateOfBirth
           Sex: Sex }
     and LastName = internal LastName of string
     and FirstName = internal FirstName of string
     and Sex = internal Male | Female
+    and DateOfBirth = internal DateOfBirth of System.DateTime
+
+    type Diagnosis =
+        { DiagnosisName: DiagnosisName
+          PathologicDiagnosis: PathologicDiagnosis
+          DiagnosisSite: DiagnosisSite
+          Lineage: Lineage
+          SubLineage: SubLineage }
+    and DiagnosisName = internal DiagnosisName of string
+    and PathologicDiagnosis = internal PathologicDiagnosis of string
+    and DiagnosisSite = internal DiagnosisSite of string
+    and Lineage = internal Lineage of string
+    and SubLineage = internal SubLineage of string
 
     type Specimen =
         { SpecimenId: SpecimenId
+          AccessionId: AccessionId
           SpecimenType: SpecimenType
           SpecimenSite: SpecimenSite
           CollectionDate: CollectionDate
@@ -28,6 +42,14 @@ module Caris =
     and SpecimenSite = SpecimenSite of string
     and CollectionDate = CollectionDate of System.DateTime
     and ReceivedDate = ReceivedDate of System.DateTime
+    and AccessionId = AccessionId of string
+
+    type Test =
+        { OrderedDate: OrderedDate
+          ReceivedDate: ReceivedDate
+          ReportId: ReportId }
+    and OrderedDate = internal OrderedDate of System.DateTime
+    and ReportId = ReportId of string
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -82,7 +104,58 @@ module Caris =
                          LastName = lastName
                          FirstName = firstName
                          Sex = sex
-                         DateOfBirth = input.DateOfBirth }
+                         DateOfBirth = DateOfBirth input.DateOfBirth }
+            }
+
+    module Test =
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
+        module OrderedDate =
+            type Input = Input of string
+
+            /// Validate the ordered date for a test
+            let validate (Input input) =
+                input
+                |> validateDateTime
+                |> Result.map OrderedDate
+                |> Result.mapError (fun e -> $"OrderedDate - {e}")
+
+        module ReceivedDate =
+            type Input = Input of string
+
+            /// Validate the received date for a test
+            let validate (Input input) =
+                input
+                |> validateDateTime
+                |> Result.map ReceivedDate
+                |> Result.mapError (fun e -> $"ReceivedDate - {e}")
+
+        module ReportId =
+            open System.Text.RegularExpressions
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                if Regex("^TN\d{2}-\d{6}$").Match(input).Success then
+                    Ok <| ReportId input
+                else Error $"ReportId - Invalid report id: {input}"
+
+        type Input =
+            { ReportIdInput: ReportId.Input
+              OrderedDate: OrderedDate.Input
+              ReceivedDate: ReceivedDate.Input }
+
+        /// Validate a test input
+        let validate input =
+            validation {
+                let! reportId = ReportId.validate input.ReportIdInput
+                and! orderedDate = OrderedDate.validate input.OrderedDate
+                and! receivedDate = ReceivedDate.validate input.ReceivedDate
+
+                return { ReportId = reportId
+                         OrderedDate = orderedDate
+                         ReceivedDate = receivedDate }
             }
 
 
@@ -93,7 +166,6 @@ module Caris =
     module Report =
         open FSharp.Data
         open System.IO
-        open Utilities
 
         [<Literal>]
         let CarisReportXsdPath = __SOURCE_DIRECTORY__ + "/data/carisReport.xsd"
@@ -130,16 +202,16 @@ module Caris =
                 this.ExpressionAlterations
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
 
-            // member this.GenomicAlterationInputs =
-            //     this.GenomicAlterations
-            //     |> Seq.map (fun genomicAlteration ->
-            //         genomicAlteration.
-            //     )
+            member _.PatientInput : Patient.Input =
+                { LastName = Patient.LastName.Input patientInfo.LastName
+                  FirstName = Patient.FirstName.Input patientInfo.FirstName
+                  DateOfBirth = patientInfo.Dob
+                  Sex = Patient.Sex.Input patientInfo.Gender
+                  MrnInput = MRN.Input patientInfo.Mrn }
 
-
-            member _.Patient =
-                {| LastName = patientInfo.LastName
-                   FirstName = patientInfo.FirstName
-                   DateOfBirth = patientInfo.Dob
-                   Gender = patientInfo.Gender
-                   MRN = patientInfo.Mrn |}
+            member _.Diagnosis =
+                { DiagnosisName = DiagnosisName patientInfo.Diagnosis
+                  PathologicDiagnosis = PathologicDiagnosis patientInfo.PathologicDiagnosis
+                  DiagnosisSite = DiagnosisSite patientInfo.PrimarySite
+                  Lineage = Lineage patientInfo.Lineage
+                  SubLineage = SubLineage patientInfo.SubLineage }
