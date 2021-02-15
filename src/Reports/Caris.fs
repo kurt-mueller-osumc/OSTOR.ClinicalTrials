@@ -55,7 +55,7 @@ module Caris =
 
     type GenomicAlterationResult =
         internal
-       | ``Indeterminate``
+       | Indeterminate
        | ``Likely Benign Variant``
        | ``Likely Pathogenic Variant``
        | ``Mutated - Other``
@@ -64,14 +64,14 @@ module Caris =
        | ``Mutated, Presumed Pathogenic``
        | ``Mutated, Variant of Unknown Significance``
        | ``Mutation Not Detected``
-       | ``Pathogenic``
+       | Pathogenic
        | ``Pathogenic Variant``
        | ``Presumed Benign``
        | ``Presumed Pathogenic``
        | ``Variant of Uncertain Significance``
        | ``Variant of Unknown Significance``
        | ``Wild Type``
-       | ``Variantnotdetected``
+       | Variantnotdetected
 
 
     module Patient =
