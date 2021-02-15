@@ -73,6 +73,11 @@ module Caris =
        | ``Wild Type``
        | Variantnotdetected
 
+    type GenomicAlterationResultGroup =
+        internal
+        | Mutated
+        | ``No Result``
+        | Normal
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -203,6 +208,12 @@ module Caris =
                 | ``Variant of Unknown Significance`` -> true
                 | _ -> false
 
+        module ResultGroup =
+            let isMutated resultGroup =
+                match resultGroup with
+                | Mutated -> true
+                | _ -> false
+
     type Report =
         { MRN: MRN option
           Specimen: Specimen }
@@ -257,7 +268,8 @@ module Caris =
                     {| BiomarkerName = ga.BiomarkerNames |> Seq.head
                        GeneName = ga.Genes |> Seq.head
                        Result = ga.Results |> Seq.head
-                       ResultGroup = ga.ResultGroups |> Seq.head |}
+                       ResultGroup = ga.ResultGroups |> Seq.head
+                       Interpreation = ga.Interpretations |> Seq.head  |}
                 )
     // module GenomicAlteration =
     //     type Input =
