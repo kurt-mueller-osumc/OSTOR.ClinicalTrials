@@ -53,6 +53,27 @@ module Caris =
     and OrderedDate = internal OrderedDate of System.DateTime
     and ReportId = ReportId of string
 
+    type GenomicAlterationResult =
+        internal
+       | ``Indeterminate``
+       | ``Likely Benign Variant``
+       | ``Likely Pathogenic Variant``
+       | ``Mutated - Other``
+       | ``Mutated, Pathogenic``
+       | ``Mutated, Presumed Benign``
+       | ``Mutated, Presumed Pathogenic``
+       | ``Mutated, Variant of Unknown Significance``
+       | ``Mutation Not Detected``
+       | ``Pathogenic``
+       | ``Pathogenic Variant``
+       | ``Presumed Benign``
+       | ``Presumed Pathogenic``
+       | ``Variant of Uncertain Significance``
+       | ``Variant of Unknown Significance``
+       | ``Wild Type``
+       | ``Variantnotdetected``
+
+
     module Patient =
         open FsToolkit.ErrorHandling
 
@@ -154,6 +175,15 @@ module Caris =
                          ReceivedDate = receivedDate }
             }
 
+    module GenomicAlteration =
+        type Input =
+            { BiomarkerName: string
+              GeneName: string
+              Result: string
+              ResultGroup: string
+              Interpretation: string
+              AlleleFrequency: string }
+
     type Report =
         { MRN: MRN option
           Specimen: Specimen }
@@ -196,6 +226,27 @@ module Caris =
             member this.PositiveExpressionAlterations =
                 this.ExpressionAlterations
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
+
+            member this.PathogenicGenomicAlterations =
+                this.GenomicAlterations
+                |> Seq.filter (fun genomicAlteration ->
+                    genomicAlteration.Results |> Array.toSeq |> Seq.contains "Pathogenic")
+
+            member this.GenomicAlterationInputs =
+                this.GenomicAlterations
+                |> Seq.map (fun ga ->
+                    {| BiomarkerName = ga.BiomarkerNames |> Seq.head
+                       GeneName = ga.Genes |> Seq.head
+                       Result = ga.Results |> Seq.head |}
+                )
+    // module GenomicAlteration =
+    //     type Input =
+    //         { BiomarkerName: string
+    //           GeneName: string
+    //           Result: string
+    //           ResultGroup: string
+    //           Interpretation: string
+    //           AlleleFrequency: string }
 
             member _.PatientInput : Patient.Input =
                 { LastName = LastName.Input patientInfo.LastName
