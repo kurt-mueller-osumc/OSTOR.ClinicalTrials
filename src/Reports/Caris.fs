@@ -53,31 +53,48 @@ module Caris =
     and OrderedDate = internal OrderedDate of System.DateTime
     and ReportId = ReportId of string
 
-    type GenomicAlterationResult =
-        internal
-       | Indeterminate
-       | ``Likely Benign Variant``
-       | ``Likely Pathogenic Variant``
-       | ``Mutated - Other``
-       | ``Mutated, Pathogenic``
-       | ``Mutated, Presumed Benign``
-       | ``Mutated, Presumed Pathogenic``
-       | ``Mutated, Variant of Unknown Significance``
-       | ``Mutation Not Detected``
-       | Pathogenic
-       | ``Pathogenic Variant``
-       | ``Presumed Benign``
-       | ``Presumed Pathogenic``
-       | ``Variant of Uncertain Significance``
-       | ``Variant of Unknown Significance``
-       | ``Wild Type``
-       | Variantnotdetected
+    type GenomicAlteration =
+        { ResultGroup: GenomicAlterationResultGroup }
 
-    type GenomicAlterationResultGroup =
+    /// Genomic alterations will be grouped as either:
+    /// - mutated
+    /// - no result
+    /// - normal
+    and GenomicAlterationResultGroup =
         internal
-        | Mutated
-        | ``No Result``
-        | Normal
+        | Mutated of MutatedResults
+        | NoResult of NoResults
+        | Normal of NormalResults option
+
+    /// Valid results for mutated genomic alterations
+    and MutatedResults =
+        internal
+        | ``Likely Pathogenic Variant``
+        | ``Mutated - Other``
+        | ``Mutated, Pathogenic``
+        | ``Mutated, Presumed Benign``
+        | ``Mutated, Presumed Pathogenic``
+        | ``Mutated, Variant of Unknown Significance``
+        | Pathogenic
+        | ``Pathogenic Variant``
+        | ``Presumed Benign``
+        | ``Presumed Pathogenic``
+        | ``Variant of Unknown Significance``
+
+    /// Valid results for genomic alteration that didn't have a result
+    and NoResults =
+        internal
+        | Indeterminate
+        | ``Likely Benign Variant``
+        | ``Variant of Uncertain Significance``
+        | ``Variant Not Detected``
+
+    /// Valid results for normal genomic alterations
+    and NormalResults =
+        internal
+        | ``Mutation Not Detected``
+        | ``Wild Type``
+
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -181,38 +198,66 @@ module Caris =
             }
 
     module GenomicAlteration =
-        type Input =
-            { BiomarkerName: string
-              GeneName: string
-              Result: string
-              ResultGroup: string
-              Interpretation: string
-              AlleleFrequency: string }
+        module BiomarkerName =
+            type Input = Input of string
 
-        module Result =
-            /// Determines if the genomic alteration is pathogenic
-            let isPathogenic gaResult =
-                match gaResult with
-                | ``Likely Pathogenic Variant``
-                | ``Mutated, Pathogenic``
-                | ``Mutated, Presumed Pathogenic``
-                | Pathogenic
-                | ``Presumed Pathogenic`` -> true
-                | _ -> false
-
-            /// Determines if the genomic alteration is a variant of unknown significance
-            let isVUS gaResult =
-                match gaResult with
-                | ``Mutated, Variant of Unknown Significance``
-                | ``Variant of Uncertain Significance``
-                | ``Variant of Unknown Significance`` -> true
-                | _ -> false
+        module GeneName =
+            type Input = Input of string
 
         module ResultGroup =
             let isMutated resultGroup =
                 match resultGroup with
-                | Mutated -> true
+                | Mutated _ -> true
                 | _ -> false
+
+            let isPathogenic resultGroup =
+                match resultGroup with
+                | Mutated ``Likely Pathogenic Variant``
+                | Mutated ``Mutated, Pathogenic``
+                | Mutated Pathogenic
+                | Mutated ``Pathogenic Variant``
+                | Mutated  ``Presumed Pathogenic`` -> true
+                | _ -> false
+
+            let isVariantOfUnknownSignificance resultGroup =
+                match resultGroup with
+                | Mutated ``Mutated, Variant of Unknown Significance`` -> true
+                | _ -> false
+
+            type Input =
+                { GroupInput: string
+                  ResultInput: string }
+
+            /// Validate that a result group 'mutated', 'no result', or 'normal' nad that the result names are valid.
+            let validate input =
+                match (input.GroupInput, input.ResultInput) with
+                | ("Mutated", "Likely Pathogenic Variant")    -> Ok <| Mutated ``Likely Pathogenic Variant``
+                | ("Mutated", "Mutated - Other")              -> Ok <| Mutated ``Mutated - Other``
+                | ("Mutated", "Mutated, Pathogenic")          -> Ok <| Mutated ``Mutated, Pathogenic``
+                | ("Mutated", "Mutated, Presumed Benign")     -> Ok <| Mutated ``Mutated, Presumed Benign``
+                | ("Mutated", "Mutated, Presumed Pathogenic") -> Ok <| Mutated ``Mutated, Presumed Pathogenic``
+                | ("Mutated", "Mutated, Variant of Unknown Significance") -> Ok <| Mutated ``Mutated, Variant of Unknown Significance``
+                | ("Mutated", "Pathogenic")          -> Ok <| Mutated Pathogenic
+                | ("Mutated", "Pathogenic Variant")  -> Ok <| Mutated ``Pathogenic Variant``
+                | ("Mutated", "Presumed Benign")     -> Ok <| Mutated ``Presumed Benign``
+                | ("Mutated", "Presumed Pathogenic") -> Ok <| Mutated ``Presumed Pathogenic``
+                | ("Mutated", "Variant of Unknown Significance") -> Ok <| Mutated ``Variant of Unknown Significance``
+                | ("No Result", "Indeterminate")         -> Ok <| NoResult Indeterminate
+                | ("No Result", "Likely Benign Variant") -> Ok <| NoResult ``Likely Benign Variant``
+                | ("No Result", "Variant of Uncertain Significance") -> Ok <| NoResult ``Variant of Uncertain Significance``
+                | ("No Result", "indeterminate")      -> Ok <| NoResult Indeterminate
+                | ("No Result", "variantnotdetected") -> Ok <| NoResult ``Variant Not Detected``
+                | ("Normal", "") -> Ok <| Normal None
+                | ("Normal", "Mutation Not Detected") -> Ok <| Normal (Some ``Mutation Not Detected``)
+                | ("Normal", "Wild Type")             -> Ok <| Normal (Some ``Wild Type``)
+                | _ -> Error $"Result - Invalid group and name: {input}"
+
+        type Input =
+            { BiomarkerName: BiomarkerName.Input
+              GeneName: GeneName.Input
+              ResultGroup: ResultGroup.Input
+              Interpretation: string
+              AlleleFrequency: string option }
 
     type Report =
         { MRN: MRN option
@@ -246,6 +291,13 @@ module Caris =
                 testResults
                 |> Seq.map (fun testResult -> testResult.GenomicAlteration)
                 |> Seq.choose id
+                |> Seq.map (fun ga ->
+                    {| BiomarkerName = ga.BiomarkerNames |> Seq.head
+                       GeneName = ga.Genes |> Seq.head
+                       Result = ga.Results |> Seq.head
+                       ResultGroup = ga.ResultGroups |> Seq.head
+                       Interpretation = ga.Interpretations |> Seq.head
+                       AlleleFrequency = ga.AlleleFrequencyInformations |> Seq.tryHead |> Option.map (fun afi -> afi.AlleleFrequency) |})
 
             member _.ExpressionAlterations =
                 testResults
@@ -257,28 +309,6 @@ module Caris =
                 this.ExpressionAlterations
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
 
-            member this.PathogenicGenomicAlterations =
-                this.GenomicAlterations
-                |> Seq.filter (fun genomicAlteration ->
-                    genomicAlteration.Results |> Array.toSeq |> Seq.contains "Pathogenic")
-
-            member this.GenomicAlterationInputs =
-                this.GenomicAlterations
-                |> Seq.map (fun ga ->
-                    {| BiomarkerName = ga.BiomarkerNames |> Seq.head
-                       GeneName = ga.Genes |> Seq.head
-                       Result = ga.Results |> Seq.head
-                       ResultGroup = ga.ResultGroups |> Seq.head
-                       Interpreation = ga.Interpretations |> Seq.head  |}
-                )
-    // module GenomicAlteration =
-    //     type Input =
-    //         { BiomarkerName: string
-    //           GeneName: string
-    //           Result: string
-    //           ResultGroup: string
-    //           Interpretation: string
-    //           AlleleFrequency: string }
 
             member _.PatientInput : Patient.Input =
                 { LastName = LastName.Input patientInfo.LastName
