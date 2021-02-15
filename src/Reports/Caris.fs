@@ -184,6 +184,25 @@ module Caris =
               Interpretation: string
               AlleleFrequency: string }
 
+        module Result =
+            /// Determines if the genomic alteration is pathogenic
+            let isPathogenic gaResult =
+                match gaResult with
+                | ``Likely Pathogenic Variant``
+                | ``Mutated, Pathogenic``
+                | ``Mutated, Presumed Pathogenic``
+                | Pathogenic
+                | ``Presumed Pathogenic`` -> true
+                | _ -> false
+
+            /// Determines if the genomic alteration is a variant of unknown significance
+            let isVUS gaResult =
+                match gaResult with
+                | ``Mutated, Variant of Unknown Significance``
+                | ``Variant of Uncertain Significance``
+                | ``Variant of Unknown Significance`` -> true
+                | _ -> false
+
     type Report =
         { MRN: MRN option
           Specimen: Specimen }
@@ -237,7 +256,8 @@ module Caris =
                 |> Seq.map (fun ga ->
                     {| BiomarkerName = ga.BiomarkerNames |> Seq.head
                        GeneName = ga.Genes |> Seq.head
-                       Result = ga.Results |> Seq.head |}
+                       Result = ga.Results |> Seq.head
+                       ResultGroup = ga.ResultGroups |> Seq.head |}
                 )
     // module GenomicAlteration =
     //     type Input =
