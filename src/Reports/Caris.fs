@@ -54,7 +54,9 @@ module Caris =
     and ReportId = ReportId of string
 
     type GenomicAlteration =
-        { ResultGroup: GenomicAlterationResultGroup }
+        { ResultGroup: GenomicAlterationResultGroup
+          Source: GenomicAlterationSource option }
+    and GenomicAlterationSource = Somatic
 
     /// Genomic alterations will be grouped as either:
     /// - mutated
@@ -94,7 +96,6 @@ module Caris =
         internal
         | ``Mutation Not Detected``
         | ``Wild Type``
-
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -145,6 +146,22 @@ module Caris =
 
                 return { OrderingMdName = name; NationalProviderId = npi }
             }
+    
+    /// Caris only contains a tumor specimen.
+    module TumorSample =
+        module AccessionId =
+            open System.Text.RegularExpressions
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                if Regex("^TN\d{2}-\d{6}-[A-Z]{1}$").Match(input).Success then 
+                    Ok input
+                else
+                    Error $"Invalid accession id: {input}"
+
+        open FsToolkit.ErrorHandling
+
 
     module Test =
         open FsToolkit.ErrorHandling
@@ -203,6 +220,17 @@ module Caris =
 
         module GeneName =
             type Input = Input of string
+        
+        module Source =
+            type Input = Input of string
+
+            let validate (input: Input option) =
+                input
+                |> Option.map (fun (Input str) ->
+                    match str with
+                    | "Somatic" -> Ok (Some Somatic)
+                    | _ -> Error $"Invalid genomic alteration source: {str}"
+                ) |> Option.defaultValue (Ok None)
 
         module ResultGroup =
             let isMutated resultGroup =
@@ -257,7 +285,8 @@ module Caris =
               GeneName: GeneName.Input
               ResultGroup: ResultGroup.Input
               Interpretation: string
-              AlleleFrequency: string option }
+              AlleleFrequency: string option
+              Source: string }
 
     type Report =
         { MRN: MRN option
@@ -296,6 +325,7 @@ module Caris =
                        GeneName = ga.Genes |> Seq.head
                        Result = ga.Results |> Seq.head
                        ResultGroup = ga.ResultGroups |> Seq.head
+                       Source = ga.GenomicSources |> Seq.tryHead
                        Interpretation = ga.Interpretations |> Seq.head
                        AlleleFrequency = ga.AlleleFrequencyInformations |> Seq.tryHead |> Option.map (fun afi -> afi.AlleleFrequency) |})
 
@@ -308,7 +338,6 @@ module Caris =
             member this.PositiveExpressionAlterations =
                 this.ExpressionAlterations
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
-
 
             member _.PatientInput : Patient.Input =
                 { LastName = LastName.Input patientInfo.LastName
@@ -323,3 +352,11 @@ module Caris =
                   DiagnosisSite = DiagnosisSite patientInfo.PrimarySite
                   Lineage = Lineage patientInfo.Lineage
                   SubLineage = SubLineage patientInfo.SubLineage }
+
+            member this.TumorSpecimenInput =
+                {| SpecimenIdInput = this.TumorSpecimenInfo.SpecimenId
+                   TypeInput = this.TumorSpecimenInfo.SpecimenType
+                   AccessionIdInput = this.TumorSpecimenInfo.SpecimenAccessionId
+                   Site = this.TumorSpecimenInfo.SpecimenSite
+                   CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate
+                   ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate |}
