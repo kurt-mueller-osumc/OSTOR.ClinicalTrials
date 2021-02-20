@@ -1,0 +1,1 @@
+dotnet restore && dotnet clean && dotnet build
