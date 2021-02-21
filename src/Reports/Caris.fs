@@ -454,10 +454,11 @@ module Caris =
                 testResults
                 |> Seq.choose (fun testResult -> testResult.CopyNumberAlteration)
                 |> Seq.map (fun cna ->
-                    {| GeneName = cna.Genes |> Seq.head
+                    {| BiomarkerName = cna.BiomarkerNames |> Seq.head
+                       GeneName = cna.Genes |> Seq.head
                        ResultName = cna.Results |> Seq.head
                        ResultGroup = cna.ResultGroups |> Seq.head
-                       CopyNumberType = cna.CopyNumberTypes |> Seq.head |}
+                       CopyNumberType = cna.CopyNumberTypes |> Seq.tryHead |}
                 )
 
 
