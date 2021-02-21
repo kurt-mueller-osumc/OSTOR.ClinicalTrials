@@ -4,7 +4,8 @@ module FoundationMedicine =
     [<Measure>] type mutation
     [<Measure>] type megabase
 
-    /// The sample for each FMI report
+    /// The sample for each FMI report.
+    /// FMI only reports tumor samples.
     type Sample =
         { SampleId: SampleId
           ReceivedDate: ReceivedDate
@@ -15,6 +16,7 @@ module FoundationMedicine =
     and BlockId = internal | BlockId of string
     and SampleFormat = internal | SlideDeck | Block | TubeSet
 
+    /// Patient medical information
     type PMI =
         { MRN: MRN option
           LastName: LastName
@@ -470,7 +472,7 @@ module FoundationMedicine =
         let VariantReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/variantReport.xsd"
 
         type ClinicalReportProvider = XmlProvider<Schema=ClinicalReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.clinicalReport.xsd">
-        type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource=" OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.variantReport.xsd">
+        type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.variantReport.xsd">
 
         type Xml(filePath: string) =
             let filePath = filePath
