@@ -430,8 +430,7 @@ module Caris =
 
             member _.GenomicAlterations =
                 testResults
-                |> Seq.map (fun testResult -> testResult.GenomicAlteration)
-                |> Seq.choose id
+                |> Seq.choose (fun testResult -> testResult.GenomicAlteration)
                 |> Seq.map (fun ga ->
                     {| BiomarkerName = ga.BiomarkerNames |> Seq.head
                        GeneName = ga.Genes |> Seq.head
@@ -450,6 +449,16 @@ module Caris =
             member this.PositiveExpressionAlterations =
                 this.ExpressionAlterations
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
+
+            member _.CopyNumberAlterations =
+                testResults
+                |> Seq.choose (fun testResult -> testResult.CopyNumberAlteration)
+                |> Seq.map (fun cna ->
+                    {| GeneName = cna.Genes |> Seq.head
+                       ResultName = cna.Results |> Seq.head
+                       ResultGroup = cna.ResultGroups |> Seq.head
+                       CopyNumberType = cna.CopyNumberTypes |> Seq.head |}
+                )
 
 
             (* Inputs to validate *)
@@ -475,3 +484,13 @@ module Caris =
                   SpecimenSite = this.TumorSpecimenInfo.SpecimenSite |> TumorSpecimen.SpecimenSite.Input
                   CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate |> CollectionDate
                   ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate |> ReceivedDate }
+
+            member this.GenomicAlterationInputs : GenomicAlteration.Input seq =
+                this.GenomicAlterations
+                |> Seq.map (fun ga ->
+                    { GeneNameInput = ga.GeneName |> GenomicAlteration.GeneName.Input
+                      ResultGroup = { GroupInput = ga.ResultGroup; ResultInput = ga.Result }
+                      Interpretation = ga.Interpretation |> GenomicAlteration.Interpretation.Input
+                      AlleleFrequency = ga.AlleleFrequency |> Option.map GenomicAlteration.AlleleFrequency.FrequencyInput
+                      Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
+                )
