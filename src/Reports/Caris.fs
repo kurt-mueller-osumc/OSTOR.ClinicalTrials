@@ -35,16 +35,16 @@ module Caris =
           SpecimenSite: SpecimenSite
           CollectionDate: CollectionDate
           ReceivedDate: ReceivedDate }
-    and SpecimenId = SpecimenId of string
+    and SpecimenId = internal SpecimenId of string
     and SpecimenType =
         internal
         | ``Tissue Biopsy Formalin Vial``
         | ``Tissue Biopsy Paraffin Blocks``
         | ``Tissue Biopsy Slide Unstained``
-    and SpecimenSite = SpecimenSite of string
-    and CollectionDate = CollectionDate of System.DateTime
-    and ReceivedDate = ReceivedDate of System.DateTime
-    and AccessionId = AccessionId of string
+    and SpecimenSite = internal SpecimenSite of string
+    and CollectionDate = internal CollectionDate of System.DateTime
+    and ReceivedDate = internal ReceivedDate of System.DateTime
+    and AccessionId = internal AccessionId of string
 
     type Test =
         { OrderedDate: OrderedDate
@@ -54,9 +54,16 @@ module Caris =
     and ReportId = ReportId of string
 
     type GenomicAlteration =
-        { ResultGroup: GenomicAlterationResultGroup
-          Source: GenomicAlterationSource option }
-    and GenomicAlterationSource = Somatic
+        { GeneName: GeneName
+          ResultGroup: GenomicAlterationResultGroup
+          Source: GenomicAlterationSource option
+          Interpretation: GenomicAlterationInterpretation
+          AlleleFrequency: AlleleFrequency option }
+
+    and GeneName = internal GeneName of string
+    and GenomicAlterationSource = internal | Somatic
+    and GenomicAlterationInterpretation = internal GenomicAlterationInterpretation of string
+    and AlleleFrequency = internal AlleleFrequency of uint
 
     /// Genomic alterations will be grouped as either:
     /// - mutated
@@ -150,13 +157,15 @@ module Caris =
     /// Caris only contains a tumor specimen.
     module TumorSpecimen =
         module SpecimenId =
+            open Utilities.StringValidations
+
             type Input = Input of string
 
             let validate (Input input) =
-                if input <> "" then
-                    Ok <| SpecimenId input
-                else
-                    Error "Sample id can't be blank"
+                input
+                |> validateNotBlank
+                |> Result.map SpecimenId
+                |> Result.mapError (fun e -> $"Sample id: {e}")
 
         module AccessionId =
             open System.Text.RegularExpressions
@@ -181,13 +190,15 @@ module Caris =
                 | _ -> Error $"Unknown specimen type: {input}"
 
         module SpecimenSite =
+            open Utilities.StringValidations
             type Input = Input of string
 
             /// Validate that a specimen site is not blank
             let validate (Input input) =
-                match input with
-                | "" -> Error "Specimen site cannot be blank"
-                | _ -> Ok <| SpecimenSite input
+                input
+                |> validateNotBlank
+                |> Result.map SpecimenSite
+                |> Result.mapError (fun e -> $"Specimen site: {e}")
 
         open FsToolkit.ErrorHandling
 
@@ -266,11 +277,27 @@ module Caris =
             }
 
     module GenomicAlteration =
-        module BiomarkerName =
+        module GeneName =
+            open Utilities.StringValidations
+
             type Input = Input of string
 
-        module GeneName =
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map GeneName
+                |> Result.mapError (fun e -> $"Gene name: {e}")
+
+        module Interpretation =
+            open Utilities.StringValidations
+
             type Input = Input of string
+
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map GenomicAlterationInterpretation
+                |> Result.mapError (fun e -> $"Genomic alteration interpretation: {e}")
 
         module Source =
             type Input = Input of string
@@ -331,13 +358,44 @@ module Caris =
                 | ("Normal", "Wild Type")             -> Ok <| Normal (Some ``Wild Type``)
                 | _ -> Error $"Result - Invalid group and name: {input}"
 
+        module AlleleFrequency =
+            open Utilities
+
+            type FrequencyInput = FrequencyInput of string
+
+            module Input =
+                let unwrap (FrequencyInput input) = input
+
+                let validate (input : FrequencyInput option) =
+                    input
+                    |> Option.bind (unwrap >> UnsignedInteger.tryParse)
+                    |> Option.map (Ok << (Some << AlleleFrequency))
+                    |> Option.defaultValue (Ok None)
+                    |> Result.mapError (fun e -> $"Allele Frequency Input: {e}")
+
+        open FsToolkit.ErrorHandling
+
         type Input =
-            { BiomarkerName: BiomarkerName.Input
-              GeneName: GeneName.Input
+            { GeneNameInput: GeneName.Input
               ResultGroup: ResultGroup.Input
-              Interpretation: string
-              AlleleFrequency: string option
-              Source: string }
+              Interpretation: Interpretation.Input
+              AlleleFrequency: AlleleFrequency.FrequencyInput option
+              Source: Source.Input option }
+
+        let validate input =
+            validation {
+                let! geneName = input.GeneNameInput |> GeneName.validate
+                and! resultGroup = input.ResultGroup |> ResultGroup.validate
+                and! interpretation = input.Interpretation |> Interpretation.validate
+                and! source = input.Source |> Source.validate
+                and! alleleFrequency = input.AlleleFrequency |> AlleleFrequency.Input.validate
+
+                return { GeneName = geneName
+                         ResultGroup = resultGroup
+                         Interpretation = interpretation
+                         AlleleFrequency = alleleFrequency
+                         Source = source }
+            }
 
     type Report =
         { MRN: MRN option
