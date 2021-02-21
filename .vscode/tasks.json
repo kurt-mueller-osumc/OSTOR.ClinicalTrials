@@ -4,7 +4,20 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build",
+      "label": "dotnet clean",
+      "command": "dotnet",
+      "type": "shell",
+      "args": [
+        "clean"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet build",
       "command": "dotnet",
       "type": "shell",
       "args": [
