@@ -146,22 +146,73 @@ module Caris =
 
                 return { OrderingMdName = name; NationalProviderId = npi }
             }
-    
+
     /// Caris only contains a tumor specimen.
-    module TumorSample =
+    module TumorSpecimen =
+        module SpecimenId =
+            type Input = Input of string
+
+            let validate (Input input) =
+                if input <> "" then
+                    Ok <| SpecimenId input
+                else
+                    Error "Sample id can't be blank"
+
         module AccessionId =
             open System.Text.RegularExpressions
 
             type Input = Input of string
 
             let validate (Input input) =
-                if Regex("^TN\d{2}-\d{6}-[A-Z]{1}$").Match(input).Success then 
-                    Ok input
+                if Regex("^TN\d{2}-\d{6}-[A-Z]{1}$").Match(input).Success then
+                    Ok <| AccessionId input
                 else
                     Error $"Invalid accession id: {input}"
 
+        module SpecimenType =
+            type Input = Input of string
+
+            /// Validate that a sample type's tissue biopsy is from a vial, blocks, or a slide.
+            let validate (Input input) =
+                match input with
+                | "Tissue Biopsy Formalin Vial" -> Ok ``Tissue Biopsy Formalin Vial``
+                | "Tissue Biopsy Paraffin Blocks" -> Ok ``Tissue Biopsy Paraffin Blocks``
+                | "Tissue Biopsy Slide Unstained" -> Ok ``Tissue Biopsy Slide Unstained``
+                | _ -> Error $"Unknown specimen type: {input}"
+
+        module SpecimenSite =
+            type Input = Input of string
+
+            /// Validate that a specimen site is not blank
+            let validate (Input input) =
+                match input with
+                | "" -> Error "Specimen site cannot be blank"
+                | _ -> Ok <| SpecimenSite input
+
         open FsToolkit.ErrorHandling
 
+        type Input =
+            { SpecimenIdInput: SpecimenId.Input
+              AccessionIdInput: AccessionId.Input
+              SpecimenType: SpecimenType.Input
+              SpecimenSite: SpecimenSite.Input
+              CollectionDate: CollectionDate
+              ReceivedDate: ReceivedDate }
+
+        let validate input =
+            validation {
+                let! specimenId = SpecimenId.validate input.SpecimenIdInput
+                and! accessionId = AccessionId.validate input.AccessionIdInput
+                and! specimenType = SpecimenType.validate input.SpecimenType
+                and! specimenSite = SpecimenSite.validate input.SpecimenSite
+
+                return { SpecimenId = specimenId
+                         AccessionId = accessionId
+                         SpecimenType = specimenType
+                         SpecimenSite = specimenSite
+                         CollectionDate = input.CollectionDate
+                         ReceivedDate = input.ReceivedDate }
+            }
 
     module Test =
         open FsToolkit.ErrorHandling
@@ -220,7 +271,7 @@ module Caris =
 
         module GeneName =
             type Input = Input of string
-        
+
         module Source =
             type Input = Input of string
 
@@ -311,6 +362,9 @@ module Caris =
             let tests = report.Tests
             let testResults = tests |> Seq.collect (fun test -> test.TestResults)
 
+
+            (* Convenience methods for grabbing relevant parts of the xml document *)
+
             member _.TumorSpecimenInfo = report.SpecimenInformation.TumorSpecimenInformation
             member _.OrderedDate = testDetails.OrderedDate
             member _.ReceivedDate = testDetails.ReceivedDate
@@ -339,6 +393,9 @@ module Caris =
                 this.ExpressionAlterations
                 |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
 
+
+            (* Inputs to validate *)
+
             member _.PatientInput : Patient.Input =
                 { LastName = LastName.Input patientInfo.LastName
                   FirstName = FirstName.Input patientInfo.FirstName
@@ -353,10 +410,10 @@ module Caris =
                   Lineage = Lineage patientInfo.Lineage
                   SubLineage = SubLineage patientInfo.SubLineage }
 
-            member this.TumorSpecimenInput =
-                {| SpecimenIdInput = this.TumorSpecimenInfo.SpecimenId
-                   TypeInput = this.TumorSpecimenInfo.SpecimenType
-                   AccessionIdInput = this.TumorSpecimenInfo.SpecimenAccessionId
-                   Site = this.TumorSpecimenInfo.SpecimenSite
-                   CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate
-                   ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate |}
+            member this.TumorSpecimenInput : TumorSpecimen.Input =
+                { SpecimenIdInput = this.TumorSpecimenInfo.SpecimenId |> TumorSpecimen.SpecimenId.Input
+                  AccessionIdInput = this.TumorSpecimenInfo.SpecimenAccessionId |> TumorSpecimen.AccessionId.Input
+                  SpecimenType = this.TumorSpecimenInfo.SpecimenType |> TumorSpecimen.SpecimenType.Input
+                  SpecimenSite = this.TumorSpecimenInfo.SpecimenSite |> TumorSpecimen.SpecimenSite.Input
+                  CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate |> CollectionDate
+                  ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate |> ReceivedDate }
