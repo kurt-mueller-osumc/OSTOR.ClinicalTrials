@@ -117,7 +117,15 @@ module Tempus =
     module FusionGene =
         open FsToolkit.ErrorHandling
 
-        type Json = { Gene5Json: Gene.Json; Gene3Json: Gene.Json }
+        type Json =
+            { Gene5Json: Gene.Json
+              Gene3Json: Gene.Json }
+
+            static member Decoder : Decoder<Json> =
+                Decode.object (fun get ->
+                    { Gene5Json = get.Required.Raw Gene.Json.Gene5Decoder
+                      Gene3Json = get.Required.Raw Gene.Json.Gene3Decoder }
+                )
 
         let validate (json: Json) =
             validation {
@@ -236,7 +244,6 @@ module Tempus =
                       SignoutDate        = signoutDateDecoder |> get.Required.Raw }
                 )
 
-
     module Sample =
         open System
 
@@ -344,25 +351,21 @@ module Tempus =
     module ``Somatic Biologically Relevant Variant`` =
         /// Represents a json object found in results.somaticBiologicallyRelevantVariants
         type Json =
-            { GeneJson: Gene.Json /// either gene or gene 5/ gene 3 will exist
-              Gene5Json: Gene.Json
-              Gene3Json: Gene.Json
+            { GeneJson: Gene.Json
+              FusionGene: FusionGene.Json
               HgvsJson: HGVS.Json
               NucleotideAlteration: string
               AllelicFraction: string }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
-                    { GeneJson  = Gene.Json.Decoder      |> get.Required.Raw
-                      Gene5Json = Gene.Json.Gene5Decoder |> get.Required.Raw
-                      Gene3Json = Gene.Json.Gene3Decoder |> get.Required.Raw
-                      HgvsJson  = HGVS.Json.Decoder      |> get.Required.Raw
+                    { GeneJson  =  Gene.Json.Decoder       |> get.Required.Raw
+                      FusionGene = FusionGene.Json.Decoder |> get.Required.Raw
+                      HgvsJson  =  HGVS.Json.Decoder       |> get.Required.Raw
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
                 )
 
-        // FusionGene
-        // { ``5' Gene``: Gene; ``3' Gene``: Gene }
         let validateFusionGene json =
           json
 
