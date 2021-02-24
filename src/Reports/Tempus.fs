@@ -114,6 +114,20 @@ module Tempus =
                 | (NotBlank, NotBlank, NotBlank) -> Ok { GeneName = GeneName json.GeneId; HgncId = HgncId json.HgncId; EntrezId = EntrezId json.EntrezId }
                 | _ -> Error $"Gene missing name, hgnc id, or entrez id: {json}"
 
+    module FusionGene =
+        open FsToolkit.ErrorHandling
+
+        type Json = { Gene5Json: Gene.Json; Gene3Json: Gene.Json }
+
+        let validate (json: Json) =
+            validation {
+                let! gene5 = json.Gene5Json |> Gene.Json.validate
+                let! gene3 = json.Gene3Json |> Gene.Json.validate
+
+                return { ``5' Gene`` = gene5
+                         ``3' Gene`` = gene3 }
+            }
+
     module HGVS =
         // mutation effect equals either be p or c
         // p will sometimes not be there
@@ -326,9 +340,11 @@ module Tempus =
                       VariantType = "variantType" |> flip get.Required.Field Decode.string }
                 )
 
+
     module ``Somatic Biologically Relevant Variant`` =
+        /// Represents a json object found in results.somaticBiologicallyRelevantVariants
         type Json =
-            { GeneJson: Gene.Json
+            { GeneJson: Gene.Json /// either gene or gene 5/ gene 3 will exist
               Gene5Json: Gene.Json
               Gene3Json: Gene.Json
               HgvsJson: HGVS.Json
@@ -344,6 +360,11 @@ module Tempus =
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
                 )
+
+        // FusionGene
+        // { ``5' Gene``: Gene; ``3' Gene``: Gene }
+        let validateFusionGene json =
+          json
 
     module ``Somatic Variant of Unknown Significance`` =
         type Json =
