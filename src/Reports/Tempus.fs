@@ -52,6 +52,7 @@ module Tempus =
     and EntrezId = internal EntrezId of string
 
     and ``Somatic Biologically Relevant Gene`` =
+        internal
         | Gene of Gene
         | FusionGene of FusionGene
 
@@ -59,20 +60,22 @@ module Tempus =
         { ``5' Gene``: Gene; ``3' Gene``: Gene }
 
     and HGVS =
-        { ReferenceSequence: ReferenceSequence // also known as the transcript
-          ``HGVS protein``: ``HGVS protein`` option
-          ``HGVS change``: ``HGVS change`` }
+        { ``Protein Sequence Change``: ``HGVS Protein Sequence Change`` option
+          ``Coding DNA Sequence Change``: ``HGVS Coding DNA Sequence Change``
+          ReferenceSequence: ReferenceSequence }
+
+    and ``HGVS Protein Sequence Change`` =
+        { AbbreviatedChange: ``Abbreviated Protein Sequence Change``
+          FullChange: ``Full Protein Sequence Change`` }
+    and ``Abbreviated Protein Sequence Change`` = ``Abbreviated Protein Sequence Change`` of string
+    and ``Full Protein Sequence Change`` = ``Full Protein Sequence Change`` of string
+    and ``HGVS Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` of string
     and ReferenceSequence = ReferenceSequence of string
+
+
+
     and VariantDescription = VariantDescription of string
     and VariantType = VariantType of string
-    and MutationEffect = MutationEffect of string
-    and ``HGVS protein`` =
-        { // HGVS.pFull
-          FullDescription: string
-          // HGVS.p
-          NormalDescription: string }
-
-    and ``HGVS change`` = ``HGVS change`` of string
     and NucleotideAlteration = NucleotideAlteration of string
     and AllelicFraction = AllelicFraction of float
 
@@ -137,13 +140,12 @@ module Tempus =
             }
 
     module HGVS =
-        // mutation effect equals either be p or c
-        // p will sometimes not be there
+        /// Represents HGVS reference sequences for proteins and coding DNA
         type Json =
-            { ``HGVS.p``: string
-              ``HGVS.pFull``: string
-              ``HGVS.c``: string
-              Transcript: string // the reference sequence
+            { ``HGVS.p``: string // abbreviated protein sequence change
+              ``HGVS.pFull``: string // full protein sequence change
+              ``HGVS.c``: string // coding DNA sequence change
+              Transcript: string // the reference sequence (eg NM_012345.1)
               MutationEffect: string // will either equal 'HGVS.p' or 'HGVS.c'
             }
 
@@ -156,6 +158,41 @@ module Tempus =
                       Transcript     = "transcript"     |> flip get.Required.Field Decode.string
                       MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
+
+        let mutationEffect hgvs =
+            match hgvs.``Protein Sequence Change`` with
+            | Some proteinSequenceChange ->
+                let (``Abbreviated Protein Sequence Change`` sc) = proteinSequenceChange.AbbreviatedChange
+                sc
+            | _ ->
+                let (``HGVS Coding DNA Sequence Change`` sc) = hgvs.``Coding DNA Sequence Change``
+                sc
+
+
+        open Utilities.StringValidations
+
+        /// Validate a HGVS reference sequence:
+        /// 1. all hgvs fields are blank OR
+        /// 2. if hgvs.c is present and hgvs.p is blank, mutationEffect == hgvs.c OR
+        /// 3. if hgvs.p is present
+        ///    - hgvs.pFull (vice versa) is present
+        ///    - hgvs.p == mutation effect
+        let validate json =
+            match (json.``HGVS.p``, json.``HGVS.pFull``, json.``HGVS.c``, json.MutationEffect, json.Transcript) with
+            /// No HGVS present
+            | (BlankString, BlankString, BlankString, BlankString, BlankString) -> Ok None
+            /// No HGVS protein sequence change present; only a coding DNA sequence is present
+            | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when json.``HGVS.c`` = json.MutationEffect ->
+                Ok <| Some { ``Protein Sequence Change`` = None
+                             ``Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` json.``HGVS.c``
+                             ReferenceSequence = ReferenceSequence json.Transcript }
+            /// Both HGVS protein sequence change and coding DNA sequence change are present
+            | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when json.``HGVS.p`` = json.MutationEffect ->
+                Ok <| Some { ``Protein Sequence Change`` = Some { AbbreviatedChange = ``Abbreviated Protein Sequence Change`` json.``HGVS.p``
+                                                                  FullChange = ``Full Protein Sequence Change`` json.``HGVS.pFull`` }
+                             ``Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` json.``HGVS.c``
+                             ReferenceSequence = ReferenceSequence json.Transcript }
+            | _ -> Error $"Invalid HGVS: {json}"
 
     module Order =
         type Json =
@@ -349,6 +386,14 @@ module Tempus =
 
 
     module ``Somatic Biologically Relevant Variant`` =
+        module Gene =
+            let validate geneJson fusionGeneJson =
+              match Gene.Json.validate geneJson, FusionGene.validate fusionGeneJson with
+              | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
+              | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
+              | (Ok gene, _) -> Ok <| Gene gene
+              | (_, Ok fusionGene) -> Ok <| FusionGene fusionGene
+
         /// Represents a json object found in results.somaticBiologicallyRelevantVariants
         type Json =
             { GeneJson: Gene.Json
@@ -365,14 +410,6 @@ module Tempus =
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
                 )
-
-        module Gene =
-            let validate geneJson fusionGeneJson =
-              match Gene.Json.validate geneJson, FusionGene.validate fusionGeneJson with
-              | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
-              | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
-              | (Ok gene, _) -> Ok <| Gene gene
-              | (_, Ok fusionGene) -> Ok <| FusionGene fusionGene
 
         let validate json =
             json
