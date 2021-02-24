@@ -400,13 +400,19 @@ module Tempus =
               FusionGene: FusionGene.Json
               HgvsJson: HGVS.Json
               NucleotideAlteration: string
-              AllelicFraction: string }
+              AllelicFraction: string
+              VariantType: string
+              VariantDescription: string
+              StructuralVariant: string }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
-                    { GeneJson  =  Gene.Json.Decoder       |> get.Required.Raw
+                    { GeneJson   = Gene.Json.Decoder       |> get.Required.Raw
                       FusionGene = FusionGene.Json.Decoder |> get.Required.Raw
-                      HgvsJson  =  HGVS.Json.Decoder       |> get.Required.Raw
+                      HgvsJson   = HGVS.Json.Decoder       |> get.Required.Raw
+                      VariantType          = "variantType" |> flip get.Required.Field Decode.string
+                      VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
+                      StructuralVariant    = "structuralVariant"    |> flip get.Required.Field Decode.string
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
                 )
