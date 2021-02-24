@@ -366,8 +366,16 @@ module Tempus =
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
                 )
 
-        let validateFusionGene json =
-          json
+        module Gene =
+            let validate geneJson fusionGeneJson =
+              match Gene.Json.validate geneJson, FusionGene.validate fusionGeneJson with
+              | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
+              | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
+              | (Ok gene, _) -> Ok <| Gene gene
+              | (_, Ok fusionGene) -> Ok <| FusionGene fusionGene
+
+        let validate json =
+            json
 
     module ``Somatic Variant of Unknown Significance`` =
         type Json =
