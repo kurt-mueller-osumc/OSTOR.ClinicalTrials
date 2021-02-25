@@ -140,6 +140,9 @@ module Utilities =
     module String =
         open System.IO
 
+        let isBlank str =
+            str = ""
+
         let split char (string: string) =
             string.Split([| char |]) |> Array.toList
 
