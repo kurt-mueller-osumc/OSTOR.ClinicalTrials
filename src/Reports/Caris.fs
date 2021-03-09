@@ -302,6 +302,7 @@ module Caris =
         module Source =
             type Input = Input of string
 
+            /// Validate that the source of the genomic alteration, if it exists, is somatic.
             let validate (input: Input option) =
                 input
                 |> Option.map (fun (Input str) ->
@@ -334,7 +335,7 @@ module Caris =
                 { GroupInput: string
                   ResultInput: string }
 
-            /// Validate that a result group 'mutated', 'no result', or 'normal' nad that the result names are valid.
+            /// Validate that a result group is 'mutated', 'no result', or 'normal' and that the result names are valid.
             let validate input =
                 match (input.GroupInput, input.ResultInput) with
                 | ("Mutated", "Likely Pathogenic Variant")    -> Ok <| Mutated ``Likely Pathogenic Variant``
@@ -366,6 +367,7 @@ module Caris =
             module Input =
                 let unwrap (FrequencyInput input) = input
 
+                /// Validate that an allele frequency, if it exists, is a positive integer.
                 let validate (input : FrequencyInput option) =
                     input
                     |> Option.bind (unwrap >> UnsignedInteger.tryParse)
@@ -397,9 +399,21 @@ module Caris =
                          Source = source }
             }
 
+    module GenomicAlterations =
+        open Utilities
+
+        let validate (inputs: GenomicAlteration.Input seq) =
+            inputs
+            |> Seq.map GenomicAlteration.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
+
     type Report =
-        { MRN: MRN option
-          Specimen: Specimen }
+        { Specimen: Specimen
+          GenomicAlterations: GenomicAlteration seq
+          Patient: Patient
+          Diagnosis: Diagnosis }
 
     module Report =
         open FSharp.Data
@@ -410,6 +424,7 @@ module Caris =
 
         type ReportProvider = XmlProvider<Schema=CarisReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.carisReport.xsd">
 
+        /// A Caris Report XML file
         type Xml(filePath: string) =
             let filePath = filePath
             let text = File.ReadAllText(filePath)
@@ -495,3 +510,23 @@ module Caris =
                       AlleleFrequency = ga.AlleleFrequency |> Option.map GenomicAlteration.AlleleFrequency.FrequencyInput
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
                 )
+
+        type Input =
+            { PatientInput: Patient.Input
+              Diagnosis: Diagnosis
+              GenomicAlterationInputs: GenomicAlteration.Input seq
+              SpecimenInput: TumorSpecimen.Input }
+
+        open FsToolkit.ErrorHandling
+
+        let validate input =
+            validation {
+                let! patient = Patient.validate input.PatientInput
+                and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
+                and! specimen = TumorSpecimen.validate input.SpecimenInput
+
+                return { Patient = patient
+                         GenomicAlterations = genomicAlterations
+                         Specimen = specimen
+                         Diagnosis = input.Diagnosis }
+            }
