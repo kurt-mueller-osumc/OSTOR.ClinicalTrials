@@ -442,7 +442,7 @@ module FoundationMedicine =
     module Genes =
         open Utilities
 
-        /// Validate a list of gene inputs. Combine all gene input validations into either a lost of:
+        /// Validate a list of gene inputs. Combine all gene input validations into either a list of:
         /// - valid genes OR
         /// - validation errors
         let validate =
@@ -474,6 +474,7 @@ module FoundationMedicine =
         type ClinicalReportProvider = XmlProvider<Schema=ClinicalReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.clinicalReport.xsd">
         type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.variantReport.xsd">
 
+        /// A Foundation Report XML
         type Xml(filePath: string) =
             let filePath = filePath
             let xmlText = File.ReadAllText(filePath)
