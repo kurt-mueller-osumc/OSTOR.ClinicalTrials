@@ -75,8 +75,6 @@ module Tempus =
     and ``HGVS Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` of string
     and ReferenceSequence = ReferenceSequence of string
 
-
-
     and VariantDescription = VariantDescription of string
     and VariantType = VariantType of string
     and NucleotideAlteration = NucleotideAlteration of string
