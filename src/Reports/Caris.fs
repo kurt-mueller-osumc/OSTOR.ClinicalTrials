@@ -402,12 +402,11 @@ module Caris =
     module GenomicAlterations =
         open Utilities
 
-        let validate (inputs: GenomicAlteration.Input seq) =
-            inputs
-            |> Seq.map GenomicAlteration.validate
-            |> Seq.toList
-            |> Result.combine
-            |> Result.mapError List.flatten
+        let validate =
+            Seq.map GenomicAlteration.validate
+            >> Seq.toList
+            >> Result.combine
+            >> Result.mapError List.flatten
 
     type Report =
         { Specimen: Specimen
