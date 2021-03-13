@@ -417,6 +417,8 @@ module Caris =
     module Report =
         open FSharp.Data
         open System.IO
+        open System.Text.RegularExpressions
+        open Utilities
 
         [<Literal>]
         let CarisReportXsdPath = __SOURCE_DIRECTORY__ + "/data/carisReport.xsd"
@@ -459,11 +461,6 @@ module Caris =
                 |> Seq.map (fun testResult -> testResult.ExpressionAlteration)
                 |> Seq.choose id
 
-            /// Expression alterations where the test result is 'Positive'
-            member this.PositiveExpressionAlterations =
-                this.ExpressionAlterations
-                |> Seq.filter (fun expressionAlteration -> expressionAlteration.Result = "Positive")
-
             member _.CopyNumberAlterations =
                 testResults
                 |> Seq.choose (fun testResult -> testResult.CopyNumberAlteration)
@@ -475,6 +472,20 @@ module Caris =
                        CopyNumberType = cna.CopyNumberTypes |> Seq.tryHead |}
                 )
 
+            member _.FusionTranslocations =
+                testResults
+                |> Seq.choose (fun tr -> tr.Translocation)
+                |> Seq.filter (fun tl -> tl.Results |> Seq.head |> String.matches(Regex("(Pathogenic Fusion|Fusion Detected)")))
+                |> Seq.map (fun tl ->
+                    {| Result = tl.Results |> Seq.head
+                       ResultGroup = tl.ResultGroups |> Seq.head
+                       Interpreation = tl.Interpretations |> Seq.head
+                       FusionIsoForm = tl.FusionIsoForms |> Seq.head
+                       Gene1 = tl.Gene1s |> Seq.head
+                       Exon1 = tl.Exon1s |> Seq.head
+                       Gene2 = tl.Gene2s |> Seq.head
+                       Exon2 = tl.Exon2s |> Seq.head |}
+                )
 
             (* Inputs to validate *)
 
