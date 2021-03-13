@@ -51,6 +51,14 @@ module FoundationMedicine =
     and GeneName = internal GeneName of string
     and VariantName = internal VariantName of string
 
+    type Fusion =
+        { TargetedGene: GeneName
+          OtherGene: GeneName
+          Description: FusionDescription
+          Type: FusionType }
+    and FusionDescription = FusionDescription of string
+    and FusionType = FusionType of string
+
     type Gene =
         { GeneName: GeneName
           GeneAlterations: GeneAlteration list }
@@ -82,7 +90,8 @@ module FoundationMedicine =
           TumorMutationBurden: TumorMutationBurden option
           Lab: Lab
           Genes: Gene list
-          Variants: Variant list }
+          Variants: Variant list
+          Fusions: Fusion list }
     and ReportId = internal ReportId of string
     and IssuedDate = IssuedDate of System.DateTime
 
@@ -301,13 +310,13 @@ module FoundationMedicine =
                 | ValidGeneName _, _, _ -> Error $"Invalid variant names: {variantInput.VariantName}"
                 | _ -> Error $"Invalid variant: {variantInput}"
 
-    type Fusion =
-        { TargetedGene: GeneName
-          OtherGene: GeneName
-          Description: FusionDescription
-          Type: FusionType }
-    and FusionDescription = FusionDescription of string
-    and FusionType = FusionType of string
+    module Variants =
+        open Utilities
+
+        /// Validate a list of variant inputs
+        let validate =
+            List.map Variant.Input.validate
+            >> Result.combine
 
     module Fusion =
         module OtherGene =
@@ -355,13 +364,29 @@ module FoundationMedicine =
               DescriptionInput: Description.Input
               TypeInput: FusionType.Input }
 
-    module Variants =
+        open FsToolkit.ErrorHandling
+
+        let validate (input: Input) =
+            validation {
+                let! targetedGene = input.TargetedGeneInput |> TargetedGene.validate
+                and! otherGene = input.OtherGeneInput |> OtherGene.validate
+                and! description = input.DescriptionInput |> Description.validate
+                and! fusionType = input.TypeInput |> FusionType.validate
+
+                return { TargetedGene = targetedGene
+                         OtherGene = otherGene
+                         Description = description
+                         Type = fusionType }
+            }
+
+    module Fusions =
         open Utilities
 
         /// Validate a list of variant inputs
         let validate =
-            List.map Variant.Input.validate
+            List.map Fusion.validate
             >> Result.combine
+            >> Result.mapError List.flatten
 
     module MicrosatelliteStatus =
         type MsInput = MsInput of string
@@ -518,7 +543,8 @@ module FoundationMedicine =
               MsStatusInput: MicrosatelliteStatus.MsInput option
               TmbInput: TumorMutationBurden.Input option
               GeneInputs: Gene.Input list
-              VariantsInput: Variant.Input list }
+              VariantsInput: Variant.Input list
+              FusionsInput: Fusion.Input list }
 
         [<Literal>]
         let ClinicalReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/clinicalReport.xsd"
@@ -656,7 +682,8 @@ module FoundationMedicine =
                   MsStatusInput = this.MicrosatelliteStatusInput
                   TmbInput = this.TmbInput
                   GeneInputs = this.GeneInputs
-                  VariantsInput = this.VariantInputs |> Seq.toList }
+                  VariantsInput = this.VariantInputs |> Seq.toList
+                  FusionsInput = this.FusionInputs |> Seq.toList }
 
 
         open FsToolkit.ErrorHandling
@@ -672,6 +699,7 @@ module FoundationMedicine =
                 and! variants = Variants.validate input.VariantsInput
                 and! issuedDate = IssuedDate.validate input.IssuedDateInput
                 and! genes = Genes.validate input.GeneInputs
+                and! fusions = Fusions.validate input.FusionsInput
 
                 return { ReportId = reportId
                          Sample = sample
@@ -681,5 +709,6 @@ module FoundationMedicine =
                          TumorMutationBurden = tmb
                          Lab = lab
                          Genes = genes
-                         Variants = variants }
+                         Variants = variants
+                         Fusions = fusions }
             }
