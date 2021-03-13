@@ -301,6 +301,60 @@ module FoundationMedicine =
                 | ValidGeneName _, _, _ -> Error $"Invalid variant names: {variantInput.VariantName}"
                 | _ -> Error $"Invalid variant: {variantInput}"
 
+    type Fusion =
+        { TargetedGene: GeneName
+          OtherGene: GeneName
+          Description: FusionDescription
+          Type: FusionType }
+    and FusionDescription = FusionDescription of string
+    and FusionType = FusionType of string
+
+    module Fusion =
+        module OtherGene =
+            type Input = Input of string
+
+            let validate (Input input) =
+                match input with
+                | "N/A" | "" -> Error $"Invalid other gene for fusion: {input}"
+                | _ -> Ok (GeneName input)
+
+        module TargetedGene =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map GeneName
+                |> Result.mapError (fun _ -> $"Invalid fusion targeted gene: {input}")
+
+        module Description =
+            type Input = Input of string
+
+            let validate (Input input) =
+                if input.Contains("fusion") then
+                    Ok (FusionDescription input)
+                else
+                    Error $"Fusion description is invalid: {input}"
+
+        module FusionType =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map FusionType
+                |> Result.mapError (fun _ -> $"Fusion type cannot be blank")
+
+        type Input =
+            { TargetedGeneInput: TargetedGene.Input
+              OtherGeneInput: OtherGene.Input
+              DescriptionInput: Description.Input
+              TypeInput: FusionType.Input }
+
     module Variants =
         open Utilities
 
@@ -519,6 +573,11 @@ module FoundationMedicine =
                 this.Biomarkers.TumorMutationBurden
                 |> Option.map (fun tmb -> (tmb.Score, tmb.Status))
 
+            member this.FusionRearrangements =
+                this.VariantReport.Rearrangements
+                |> Seq.filter (fun rearrangement ->
+                    rearrangement.Description.Contains("fusion")
+                )
 
             (* Read in XML to report input *)
 
@@ -560,6 +619,15 @@ module FoundationMedicine =
                     { GeneName = GeneName variantProperty.GeneName
                       IsVus = Variant.IsVus variantProperty.IsVus
                       VariantName = VariantName variantProperty.VariantName })
+
+            member this.FusionInputs : Fusion.Input seq =
+                this.FusionRearrangements
+                |> Seq.map (fun r ->
+                    { TargetedGeneInput = (Fusion.TargetedGene.Input r.TargetedGene)
+                      OtherGeneInput = (Fusion.OtherGene.Input r.OtherGene)
+                      DescriptionInput = (Fusion.Description.Input r.Description)
+                      TypeInput = (Fusion.FusionType.Input r.Type) }
+                )
 
             member this.MicrosatelliteStatusInput =
                 this.MicrosatelliteStatus
