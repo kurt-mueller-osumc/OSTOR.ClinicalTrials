@@ -33,7 +33,7 @@ module Utilities =
         open System
         open Thoth.Json.Net
 
-        let optionalDateTime :Decoder<DateTime option> =
+        let optionalDateTime : Decoder<DateTime option> =
             Decode.map DateTime.tryParse Decode.string
 
         /// Deserialize json field into an optional float from a value that can be one of:
@@ -138,10 +138,17 @@ module Utilities =
             | _ -> None
 
     module String =
+        open System.Text.RegularExpressions
         open System.IO
+
+        let contains (char: string) (str: string) =
+            str.Contains(char)
 
         let isBlank str =
             str = ""
+
+        let matches (regex: Regex) (str: string) =
+            regex.Match(str).Success
 
         let split char (string: string) =
             string.Split([| char |]) |> Array.toList
