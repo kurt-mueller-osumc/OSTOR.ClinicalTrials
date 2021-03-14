@@ -18,8 +18,14 @@ module Utilities =
             | _ -> None
 
     module Integer =
-        let tryParse(input: string) =
+        let tryParse (input: string) =
             match System.Int32.TryParse(input) with
+            | (true, num) -> Some num
+            | _ -> None
+
+    module Integer64 =
+        let tryParse (input: string) =
+            match System.Int64.TryParse(input) with
             | (true, num) -> Some num
             | _ -> None
 
