@@ -2,7 +2,7 @@ namespace OSTOR.ClinicalTrials.Reports
 
 [<AutoOpen>]
 module Common =
-    type MRN = internal MRN of uint
+    type MRN = internal MRN of int64
     type NationalProviderId = internal NationalProviderId of string
 
     type Address =
@@ -25,13 +25,12 @@ module Common =
 
     module MRN =
         open Utilities
-        open System.Text.RegularExpressions
 
         type Input = Input of string
 
         /// Validate that a medical record # consists of at least one digit or one alphabet letter
         let validate (Input input) =
-            match UnsignedInteger.tryParse input with
+            match Integer64.tryParse input with
             | Some mrn -> Ok (MRN mrn)
             | _ -> Error $"MRN - Invalid MRN: ({input})"
 
@@ -43,6 +42,8 @@ module Common =
                 (Input input)
                 |> validate
                 |> Result.map Some
+
+        let toInteger (MRN mrn) = mrn
 
     module LastName =
         open Utilities.StringValidations
