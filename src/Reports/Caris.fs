@@ -546,6 +546,7 @@ module Caris =
         let toPatientRow (patient: Patient) =
             let row = context.Public.Patients.Create()
 
+            row.Mrn <- patient.MRN |> MRN.toInteger
             row.FirstName   <- patient.FirstName |> FirstName.toString
             row.LastName    <- patient.LastName |> LastName.toString
             row.DateOfBirth <- patient.DateOfBirth |> DateOfBirth.unwrap
