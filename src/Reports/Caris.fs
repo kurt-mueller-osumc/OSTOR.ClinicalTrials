@@ -10,7 +10,6 @@ module Caris =
           DateOfBirth: DateOfBirth
           Sex: Sex }
     and Sex = internal Male | Female
-    and DateOfBirth = internal DateOfBirth of System.DateTime
 
     type Diagnosis =
         { DiagnosisName: DiagnosisName
@@ -540,3 +539,16 @@ module Caris =
                          Specimen = specimen
                          Diagnosis = input.Diagnosis }
             }
+
+    module Database =
+        open Database
+
+        let toPatientRow (patient: Patient) =
+            let row = context.Public.Patients.Create()
+
+            row.FirstName   <- patient.FirstName |> FirstName.toString
+            row.LastName    <- patient.LastName |> LastName.toString
+            row.DateOfBirth <- patient.DateOfBirth |> DateOfBirth.unwrap
+
+            row
+
