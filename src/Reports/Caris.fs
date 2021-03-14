@@ -46,11 +46,13 @@ module Caris =
     and AccessionId = internal AccessionId of string
 
     type Test =
-        { OrderedDate: OrderedDate
+        { LabName: LabName
+          OrderedDate: OrderedDate
           ReceivedDate: ReceivedDate
           ReportId: ReportId }
+    and LabName = internal LabName of string
     and OrderedDate = internal OrderedDate of System.DateTime
-    and ReportId = ReportId of string
+    and ReportId = internal ReportId of string
 
     type GenomicAlteration =
         { GeneName: GeneName
@@ -58,7 +60,6 @@ module Caris =
           Source: GenomicAlterationSource option
           Interpretation: GenomicAlterationInterpretation
           AlleleFrequency: AlleleFrequency option }
-
     and GeneName = internal GeneName of string
     and GenomicAlterationSource = internal | Somatic
     and GenomicAlterationInterpretation = internal GenomicAlterationInterpretation of string
@@ -228,6 +229,15 @@ module Caris =
         open FsToolkit.ErrorHandling
         open Utilities.StringValidations
 
+        module LabName =
+            type Input = Input of string
+
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map LabName
+                |> Result.mapError (fun _ -> "Lab name can't be blank")
+
         module OrderedDate =
             type Input = Input of string
 
@@ -259,7 +269,8 @@ module Caris =
                 else Error $"ReportId - Invalid report id: {input}"
 
         type Input =
-            { ReportIdInput: ReportId.Input
+            { LabNameInput: LabName.Input
+              ReportIdInput: ReportId.Input
               OrderedDate: OrderedDate.Input
               ReceivedDate: ReceivedDate.Input }
 
@@ -269,8 +280,10 @@ module Caris =
                 let! reportId = ReportId.validate input.ReportIdInput
                 and! orderedDate = OrderedDate.validate input.OrderedDate
                 and! receivedDate = ReceivedDate.validate input.ReceivedDate
+                and! labName = LabName.validate input.LabNameInput
 
                 return { ReportId = reportId
+                         LabName = labName
                          OrderedDate = orderedDate
                          ReceivedDate = receivedDate }
             }
@@ -408,7 +421,8 @@ module Caris =
             >> Result.mapError List.flatten
 
     type Report =
-        { Specimen: Specimen
+        { Test: Test
+          Specimen: Specimen
           GenomicAlterations: GenomicAlteration seq
           Patient: Patient
           Diagnosis: Diagnosis }
@@ -418,6 +432,13 @@ module Caris =
         open System.IO
         open System.Text.RegularExpressions
         open Utilities
+
+        type Input =
+            { TestInput: Test.Input
+              PatientInput: Patient.Input
+              Diagnosis: Diagnosis
+              GenomicAlterationInputs: GenomicAlteration.Input seq
+              SpecimenInput: TumorSpecimen.Input }
 
         [<Literal>]
         let CarisReportXsdPath = __SOURCE_DIRECTORY__ + "/data/carisReport.xsd"
@@ -488,6 +509,12 @@ module Caris =
 
             (* Inputs to validate *)
 
+            member _.TestInput : Test.Input =
+                { LabNameInput = testDetails.LabName |> Test.LabName.Input
+                  ReportIdInput = testDetails.LabReportId |> Test.ReportId.Input
+                  OrderedDate = testDetails.OrderedDate |> Test.OrderedDate.Input
+                  ReceivedDate = testDetails.ReceivedDate |> Test.ReceivedDate.Input }
+
             member _.PatientInput : Patient.Input =
                 { LastName = LastName.Input patientInfo.LastName
                   FirstName = FirstName.Input patientInfo.FirstName
@@ -520,12 +547,6 @@ module Caris =
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
                 )
 
-        type Input =
-            { PatientInput: Patient.Input
-              Diagnosis: Diagnosis
-              GenomicAlterationInputs: GenomicAlteration.Input seq
-              SpecimenInput: TumorSpecimen.Input }
-
         open FsToolkit.ErrorHandling
 
         let validate input =
@@ -533,8 +554,10 @@ module Caris =
                 let! patient = Patient.validate input.PatientInput
                 and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
+                and! test = Test.validate input.TestInput
 
-                return { Patient = patient
+                return { Test = test
+                         Patient = patient
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
                          Diagnosis = input.Diagnosis }
@@ -552,4 +575,3 @@ module Caris =
             row.DateOfBirth <- patient.DateOfBirth |> DateOfBirth.unwrap
 
             row
-
