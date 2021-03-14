@@ -203,6 +203,11 @@ module FoundationMedicine =
                 | "female" | "Female" -> Ok Female
                 | _ -> Error $"Invalid gender: {input}"
 
+            let toString (gender: Gender) =
+                match gender with
+                | Male -> "male"
+                | Female -> "female"
+
         open Utilities.StringValidations
 
         module LastName =
@@ -273,6 +278,23 @@ module FoundationMedicine =
                          OrderingMd = pmiInput.OrderingMd
                          Pathologist = pathologist }
             }
+
+        // module DB =
+        //     open Database
+
+        //     let toRow (pmi: PMI) =
+        //         let row = context.Public.Patients.Create()
+
+        //         let (DateOfBirth dob) = pmi.DateOfBirth
+        //         let (FirstName firstName) = pmi.FirstName
+        //         let (LastName lastName) = pmi.LastName
+
+        //         row.FirstName <- firstName
+        //         row.LastName <- lastName
+        //         row.DateOfBirth <- dob
+        //         row.Sex <- pmi.Gender |> Gender.toString
+
+        //         row
 
     module Variant =
         /// A variant in an FMI report only has the gene name, whether or not it's a variant of unknown significance, and the variant name.
