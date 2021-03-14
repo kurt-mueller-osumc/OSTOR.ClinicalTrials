@@ -21,6 +21,8 @@ module Common =
     and LastName = internal LastName of string
     and FirstName = internal FirstName of string
 
+    type DateOfBirth = DateOfBirth of System.DateTime
+
     module MRN =
         open System.Text.RegularExpressions
 
@@ -54,6 +56,8 @@ module Common =
             |> Result.map LastName
             |> Result.mapError (fun e -> $"LastName: {e}")
 
+        let toString (LastName lastName) = lastName
+
     module FirstName =
         open Utilities.StringValidations
 
@@ -65,6 +69,8 @@ module Common =
             |> validateNotBlank
             |> Result.map FirstName
             |> Result.mapError (fun e -> $"FirstName: {e}")
+
+        let toString (FirstName firstName) = firstName
 
     module FullName =
         open FsToolkit.ErrorHandling
@@ -92,3 +98,6 @@ module Common =
             if Regex("^\d{10}$").Match(input).Success then
                 Ok <| NationalProviderId input
             else Error $"NationalProviderId - Invalid id: {input}"
+
+    module DateOfBirth =
+        let unwrap (DateOfBirth dob) = dob
