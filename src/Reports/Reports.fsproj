@@ -5,11 +5,13 @@
   <ItemGroup>
     <Compile Include="Utilities.fs" />
     <Compile Include="Common.fs" />
+    <Compile Include="Database.fs" />
     <Compile Include="Caris.fs" />
     <Compile Include="FoundationMedicine.fs" />
     <Compile Include="Tempus.fs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="data/.pgpass" />
     <EmbeddedResource Include="data/FMI/clinicalReport.xsd" />
     <EmbeddedResource Include="data/FMI/resultsReport.xsd" />
     <EmbeddedResource Include="data/FMI/variantReport.xsd" />
@@ -18,6 +20,8 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
     <PackageReference Include="FsToolkit.ErrorHandling" Version="2.0.0" />
+    <PackageReference Include="Npgsql" Version="5.0.3" />
+    <PackageReference Include="SQLProvider" Version="1.2.0" />
     <PackageReference Include="Thoth.Json" Version="5.1.0" />
     <PackageReference Include="Thoth.Json.Net" Version="5.0.0" />
   </ItemGroup>
