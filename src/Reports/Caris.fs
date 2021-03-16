@@ -560,6 +560,16 @@ module Caris =
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
                 )
 
+            /// The overall report input that encapsulates all the other inputs
+            member this.ReportInput =
+                { TestInput = this.TestInput
+                  PatientInput = this.PatientInput
+                  OrderingMdInput = this.OrderingMdInput
+                  Diagnosis = this.Diagnosis
+                  GenomicAlterationInputs = this.GenomicAlterationInputs
+                  SpecimenInput = this.TumorSpecimenInput }
+
+
         open FsToolkit.ErrorHandling
 
         let validate input =
@@ -605,7 +615,7 @@ module Caris =
 
             row
 
-        let toReportRow (test: Test) (patient: Patient) =
+        let toReportRow (test: Test) (patient: Patient) (orderingMd: OrderingMd) =
             let row = context.Public.Reports.Create()
             let (ReportId reportId) = test.ReportId
             let (MRN mrn) = patient.MRN
