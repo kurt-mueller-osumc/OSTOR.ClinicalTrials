@@ -2,8 +2,19 @@ namespace OSTOR.ClinicalTrials.Reports
 
 [<AutoOpen>]
 module Common =
-    type MRN = internal MRN of int64
-    type NationalProviderId = internal NationalProviderId of int64
+    type MRN =
+        internal | MRN of int64
+
+        member this.Value =
+            let (MRN mrn) = this
+            mrn
+
+    type NationalProviderId =
+        internal | NationalProviderId of int64
+
+        member this.Value =
+            let (NationalProviderId npi) = this
+            npi
 
     type Address =
         { StreetAddress: StreetAddress
@@ -22,6 +33,13 @@ module Common =
     and FirstName = internal FirstName of string
 
     type DateOfBirth = DateOfBirth of System.DateTime
+
+    type IcdCode =
+        internal | IcdCode of string
+
+        member this.Value =
+            let (IcdCode icdCode) = this
+            icdCode
 
     module MRN =
         open Utilities
@@ -110,3 +128,20 @@ module Common =
 
     module DateOfBirth =
         let unwrap (DateOfBirth dob) = dob
+
+    module IcdCode =
+        open System.Text.RegularExpressions
+
+        type Input = Input of string
+
+        /// Validate that an icd code is in the following format where 'A' is any letter and 'd' is a digit: `Add.d` or `Add.dd`
+        ///
+        ///     validate (Input "C34.31") = Ok (IcdCode "C34.31")
+        ///     validate (Input "C11.1") = Ok (IcdCode "C11.1")
+        ///     validate (Input "foobar") = Error "Icd Code is invalid: foobar"
+        let validate (Input input) =
+            if Regex("^[A-Z]\d{2}\.\d{1,2}$").Match(input).Success then
+                Ok (IcdCode input)
+            else
+                Error $"Icd Code is invalid: {input}"
+
