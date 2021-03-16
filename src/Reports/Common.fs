@@ -98,7 +98,7 @@ module Common =
         let validate (Input input) =
             if Regex("^\d{10}$").Match(input).Success then
                 Ok <| NationalProviderId input
-            else Error $"NationalProviderId - Invalid id: {input}"
+            else Error $"NationalProviderId is invalid: {input}"
 
     module DateOfBirth =
         let unwrap (DateOfBirth dob) = dob
