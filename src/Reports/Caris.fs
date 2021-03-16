@@ -111,6 +111,13 @@ module Caris =
         | ``Mutation Not Detected``
         | ``Wild Type``
 
+    type TumorMutationBurden =
+        | IndeterminateTmb
+        | LowTmb of TumorMutationBurdenScore
+        | IntermediateTmb of TumorMutationBurdenScore
+        | HighTmb of TumorMutationBurdenScore
+    and TumorMutationBurdenScore = TumorMutationBurdenScore of int<mutation/megabase>
+
     module Patient =
         open FsToolkit.ErrorHandling
 
@@ -144,7 +151,6 @@ module Caris =
                          Sex = sex
                          DateOfBirth = DateOfBirth input.DateOfBirth }
             }
-
 
     module Diagnosis =
         module Name =
@@ -516,6 +522,31 @@ module Caris =
             >> Result.combine
             >> Result.mapError List.flatten
 
+    module TumorMutationBurden =
+        module Score =
+            open System.Text.RegularExpressions
+
+            type Input = Input of string
+
+            /// Attempt to convert a score input to a valid tmb score
+            let (|ValidScore|_|) (Input input) =
+                let m = Regex("^(?<score>\d{1,}) per Mb$").Match(input)
+
+                if m.Success
+                then Some (m.Groups.[1].Value |> int |> ((*) 1<mutation/megabase>))
+                else None
+
+            let validate input =
+                match input with
+                | (Input "") -> Ok None
+                | (ValidScore tmbScore) -> Ok <| Some (TumorMutationBurdenScore tmbScore)
+                | _ -> Error $"Tmb Score invalid: {input}"
+
+            // let validate (Input input) =
+
+        type Input =
+            { ScoreInput: Score.Input }
+
     type Report =
         { Test: Test
           Specimen: Specimen
@@ -657,7 +688,7 @@ module Caris =
                     {| BiomarkerName = tmb.BiomarkerName
                        ResultGroup = tmb.ResultGroup
                        BurdenCall = tmb.MutationBurdenCall
-                       BurdenScore = tmb.MutationBurdenCall
+                       BurdenScore = tmb.MutationBurdenScore
                        BurdenUnit = tmb.MutationBurdenUnit
                        GenomicSource = tmb.GenomicSource
                        Interpretation = tmb.Interpretation
