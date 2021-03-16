@@ -41,6 +41,10 @@ module Common =
             let (IcdCode icdCode) = this
             icdCode
 
+    // tumor mutation burden units of measure
+    [<Measure>] type mutation
+    [<Measure>] type megabase
+
     module MRN =
         open Utilities
 
