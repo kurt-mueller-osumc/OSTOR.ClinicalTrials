@@ -3,7 +3,7 @@ namespace OSTOR.ClinicalTrials.Reports
 [<AutoOpen>]
 module Common =
     type MRN = internal MRN of int64
-    type NationalProviderId = internal NationalProviderId of string
+    type NationalProviderId = internal NationalProviderId of int64
 
     type Address =
         { StreetAddress: StreetAddress
@@ -90,15 +90,23 @@ module Common =
                          FirstName = firstName }
             }
 
+        let toString fullName =
+            let lastName = fullName.LastName |> LastName.toString
+            let firstName = fullName.FirstName |> FirstName.toString
+
+            $"{lastName}, {firstName}"
+
     module NationalProviderId =
-        open System.Text.RegularExpressions
+        open Utilities
 
         type Input = Input of string
 
+        /// Validate that an inputed national provider id is a 10 digit number.
         let validate (Input input) =
-            if Regex("^\d{10}$").Match(input).Success then
-                Ok <| NationalProviderId input
-            else Error $"NationalProviderId is invalid: {input}"
+            match (String.length input, Integer64.tryParse input) with
+            | 10, Some npi -> Ok (NationalProviderId npi)
+            | _, Some npi -> Error $"NPI must be a 10 digit number: {npi}"
+            | _ -> Error $"NPI is invalid {input}"
 
     module DateOfBirth =
         let unwrap (DateOfBirth dob) = dob
