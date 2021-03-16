@@ -563,6 +563,10 @@ module Caris =
             member _.ReportId = testDetails.LabReportId
             member _.PhysicianInformation = report.PhysicianInformation
 
+            member _.TumorMutationBurden =
+                testResults
+                |> Seq.tryPick (fun testResult -> testResult.TumorMutationBurden)
+
             member _.GenomicAlterations =
                 testResults
                 |> Seq.choose (fun testResult -> testResult.GenomicAlteration)
@@ -647,6 +651,19 @@ module Caris =
                   CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate |> CollectionDate
                   ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate |> ReceivedDate }
 
+            member this.TmbInput =
+                this.TumorMutationBurden
+                |> Option.map (fun tmb ->
+                    {| BiomarkerName = tmb.BiomarkerName
+                       ResultGroup = tmb.ResultGroup
+                       BurdenCall = tmb.MutationBurdenCall
+                       BurdenScore = tmb.MutationBurdenCall
+                       BurdenUnit = tmb.MutationBurdenUnit
+                       GenomicSource = tmb.GenomicSource
+                       Interpretation = tmb.Interpretation
+                    |}
+                )
+
             member this.GenomicAlterationInputs : GenomicAlteration.Input seq =
                 this.GenomicAlterations
                 |> Seq.map (fun ga ->
@@ -720,10 +737,11 @@ module Caris =
             let (ReportId reportId) = test.ReportId
 
             row.ReportId   <- reportId
-            // row.IssuedDate <- test.ReceivedDate
             row.PatientMrn <- patient.MRN.Value
 
             row.OrderingPhysician       <- orderingMd.OrderingMdName |> FullName.toString |> Some
             row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
+
+            // row.TumorMutationalBurden <- report.T
 
             row
