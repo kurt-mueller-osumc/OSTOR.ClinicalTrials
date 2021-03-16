@@ -179,6 +179,13 @@ module Utilities =
             |> DateTime.tryParse
             |> Option.toResult $"Invalid DateTime: {str}"
 
+        open System.Text.RegularExpressions
+
+        let validateRegex regex str =
+            if Regex(regex).Match(str).Success then
+                Ok str
+            else
+                Error $"{regex} does not match {str}"
 
     module Xml =
         open System.IO
