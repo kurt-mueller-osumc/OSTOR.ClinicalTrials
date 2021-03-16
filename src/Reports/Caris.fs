@@ -425,6 +425,7 @@ module Caris =
           Specimen: Specimen
           GenomicAlterations: GenomicAlteration seq
           Patient: Patient
+          OrderingMd: OrderingMd
           Diagnosis: Diagnosis }
 
     module Report =
@@ -436,6 +437,7 @@ module Caris =
         type Input =
             { TestInput: Test.Input
               PatientInput: Patient.Input
+              OrderingMdInput: OrderingMd.Input
               Diagnosis: Diagnosis
               GenomicAlterationInputs: GenomicAlteration.Input seq
               SpecimenInput: TumorSpecimen.Input }
@@ -463,6 +465,7 @@ module Caris =
             member _.OrderedDate = testDetails.OrderedDate
             member _.ReceivedDate = testDetails.ReceivedDate
             member _.ReportId = testDetails.LabReportId
+            member _.PhysicianInformation = report.PhysicianInformation
 
             member _.GenomicAlterations =
                 testResults
@@ -522,6 +525,16 @@ module Caris =
                   Sex = Patient.Sex.Input patientInfo.Gender
                   MrnInput = MRN.Input patientInfo.Mrn }
 
+            member this.OrderingMdInput : OrderingMd.Input =
+                let fullNameInput : FullName.Input =
+                    { LastNameInput  = (LastName.Input this.PhysicianInformation.LastName)
+                      FirstNameInput = (FirstName.Input this.PhysicianInformation.FirstName) }
+
+                let npiInput = (NationalProviderId.Input this.PhysicianInformation.Npi)
+
+                { NameInput = fullNameInput
+                  NationalProviderIdInput = npiInput }
+
             member _.Diagnosis =
                 { DiagnosisName = DiagnosisName patientInfo.Diagnosis
                   PathologicDiagnosis = PathologicDiagnosis patientInfo.PathologicDiagnosis
@@ -552,12 +565,14 @@ module Caris =
         let validate input =
             validation {
                 let! patient = Patient.validate input.PatientInput
+                and! orderingMd = OrderingMd.validate input.OrderingMdInput
                 and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
                 and! test = Test.validate input.TestInput
 
                 return { Test = test
                          Patient = patient
+                         OrderingMd = orderingMd
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
                          Diagnosis = input.Diagnosis }
@@ -566,12 +581,36 @@ module Caris =
     module Database =
         open Database
 
+        /// Extract the patient from the report & prepare it as a database row.
         let toPatientRow (patient: Patient) =
             let row = context.Public.Patients.Create()
 
             row.Mrn <- patient.MRN |> MRN.toInteger
-            row.FirstName   <- patient.FirstName |> FirstName.toString
-            row.LastName    <- patient.LastName |> LastName.toString
+            row.FirstName   <- patient.FirstName   |> FirstName.toString
+            row.LastName    <- patient.LastName    |> LastName.toString
             row.DateOfBirth <- patient.DateOfBirth |> DateOfBirth.unwrap
+
+            row
+
+        let toVendorRow =
+            let row = context.Public.Vendors.Create()
+
+            // source: https://npiprofile.com/npi/1013973866
+            row.Name <- "Caris Life Sciences"
+            row.CliaNumber <- "03D1019490"
+            row.StreetAddress <- "4610 SOUTH 44TH PLACE"
+            row.City <- "Phoenix"
+            row.State <- "Arizona"
+            row.ZipCode <- "85040"
+
+            row
+
+        let toReportRow (test: Test) (patient: Patient) =
+            let row = context.Public.Reports.Create()
+            let (ReportId reportId) = test.ReportId
+            let (MRN mrn) = patient.MRN
+
+            row.PatientMrn <- mrn
+            row.ReportId <- reportId
 
             row
