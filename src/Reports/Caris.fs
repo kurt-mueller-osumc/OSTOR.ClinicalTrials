@@ -13,6 +13,7 @@ module Caris =
 
     type Diagnosis =
         { DiagnosisName: DiagnosisName
+          DiagnosisCode: IcdCode
           PathologicDiagnosis: PathologicDiagnosis
           DiagnosisSite: DiagnosisSite
           Lineage: Lineage
@@ -22,6 +23,8 @@ module Caris =
     and DiagnosisSite = internal DiagnosisSite of string
     and Lineage = internal Lineage of string
     and SubLineage = internal SubLineage of string
+
+    type DiagnosisName with member this.Value = this |> fun (DiagnosisName diagnosisName) -> diagnosisName
 
     type OrderingMd =
         { OrderingMdName: FullName
@@ -50,9 +53,13 @@ module Caris =
           OrderedDate: OrderedDate
           ReceivedDate: ReceivedDate
           ReportId: ReportId }
-    and LabName = internal LabName of string
+    and LabName     = internal LabName of string
     and OrderedDate = internal OrderedDate of System.DateTime
-    and ReportId = internal ReportId of string
+    and ReportId    = internal ReportId of string
+
+    type LabName     with member this.Value = this |> fun (LabName labName)         -> labName
+    type OrderedDate with member this.Value = this |> fun (OrderedDate orderedDate) -> orderedDate
+    type ReportId    with member this.Value = this |> fun (ReportId reportId)       -> reportId
 
     type GenomicAlteration =
         { GeneName: GeneName
@@ -136,6 +143,95 @@ module Caris =
                          FirstName = firstName
                          Sex = sex
                          DateOfBirth = DateOfBirth input.DateOfBirth }
+            }
+
+
+    module Diagnosis =
+        module Name =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            /// Validate that diagnosis name is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map DiagnosisName
+                |> Result.mapError (fun _ -> "Diagnosis name can't be blank")
+
+        module Site =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            /// Validate that diagnosis site is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map DiagnosisSite
+                |> Result.mapError (fun _ -> "Diagnosis site can't be blank")
+
+        module PathologicDiagnosis =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            /// Validate that diagnosis site is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map PathologicDiagnosis
+                |> Result.mapError (fun _ -> "Pathologic diagnosis site can't be blank")
+
+        module Lineage =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            /// Validate that lineage is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map Lineage
+                |> Result.mapError (fun _ -> "Lineage can't be blank")
+
+        module SubLineage =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            /// Validate that sublineage is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map SubLineage
+                |> Result.mapError (fun _ -> "SubLineage can't be blank")
+
+        type Input =
+            { DiagnosisCodeInput: IcdCode.Input
+              DiagnosisNameInput: Name.Input
+              DiagnosisSiteInput: Site.Input
+              PathologicDiagnosisInput: PathologicDiagnosis.Input
+              LineageInput: Lineage.Input
+              SubLineageInput: SubLineage.Input }
+
+        open FsToolkit.ErrorHandling
+
+        let validate (input: Input) =
+            validation {
+                let! icdCode = input.DiagnosisCodeInput |> IcdCode.validate
+                and! diagnosisName = input.DiagnosisNameInput |> Name.validate
+                and! diagnosisSite = input.DiagnosisSiteInput |> Site.validate
+                and! pathologicDiagnosis = input.PathologicDiagnosisInput |> PathologicDiagnosis.validate
+                and! lineage = input.LineageInput |> Lineage.validate
+                and! sublineage = input.SubLineageInput |> SubLineage.validate
+
+                return { DiagnosisCode = icdCode
+                         DiagnosisName = diagnosisName
+                         DiagnosisSite = diagnosisSite
+                         PathologicDiagnosis = pathologicDiagnosis
+                         Lineage = lineage
+                         SubLineage = sublineage }
             }
 
     module OrderingMd =
@@ -438,7 +534,7 @@ module Caris =
             { TestInput: Test.Input
               PatientInput: Patient.Input
               OrderingMdInput: OrderingMd.Input
-              Diagnosis: Diagnosis
+              DiagnosisInput: Diagnosis.Input
               GenomicAlterationInputs: GenomicAlteration.Input seq
               SpecimenInput: TumorSpecimen.Input }
 
@@ -535,12 +631,13 @@ module Caris =
                 { NameInput = fullNameInput
                   NationalProviderIdInput = npiInput }
 
-            member _.Diagnosis =
-                { DiagnosisName = DiagnosisName patientInfo.Diagnosis
-                  PathologicDiagnosis = PathologicDiagnosis patientInfo.PathologicDiagnosis
-                  DiagnosisSite = DiagnosisSite patientInfo.PrimarySite
-                  Lineage = Lineage patientInfo.Lineage
-                  SubLineage = SubLineage patientInfo.SubLineage }
+            member _.DiagnosisInput : Diagnosis.Input =
+                { DiagnosisNameInput = Diagnosis.Name.Input patientInfo.Diagnosis
+                  DiagnosisCodeInput = IcdCode.Input patientInfo.IcdCode
+                  PathologicDiagnosisInput = Diagnosis.PathologicDiagnosis.Input patientInfo.PathologicDiagnosis
+                  DiagnosisSiteInput = Diagnosis.Site.Input patientInfo.PrimarySite
+                  LineageInput = Diagnosis.Lineage.Input patientInfo.Lineage
+                  SubLineageInput = Diagnosis.SubLineage.Input patientInfo.SubLineage }
 
             member this.TumorSpecimenInput : TumorSpecimen.Input =
                 { SpecimenIdInput = this.TumorSpecimenInfo.SpecimenId |> TumorSpecimen.SpecimenId.Input
@@ -565,10 +662,9 @@ module Caris =
                 { TestInput = this.TestInput
                   PatientInput = this.PatientInput
                   OrderingMdInput = this.OrderingMdInput
-                  Diagnosis = this.Diagnosis
+                  DiagnosisInput = this.DiagnosisInput
                   GenomicAlterationInputs = this.GenomicAlterationInputs
                   SpecimenInput = this.TumorSpecimenInput }
-
 
         open FsToolkit.ErrorHandling
 
@@ -579,20 +675,22 @@ module Caris =
                 and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
                 and! test = Test.validate input.TestInput
+                and! diagnosis = Diagnosis.validate input.DiagnosisInput
 
                 return { Test = test
                          Patient = patient
                          OrderingMd = orderingMd
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
-                         Diagnosis = input.Diagnosis }
+                         Diagnosis = diagnosis }
             }
 
     module Database =
         open Database
 
         /// Extract the patient from the report & prepare it as a database row.
-        let toPatientRow (patient: Patient) =
+        let toPatientRow (report: Report) =
+            let patient = report.Patient
             let row = context.Public.Patients.Create()
 
             row.Mrn <- patient.MRN |> MRN.toInteger
@@ -615,12 +713,17 @@ module Caris =
 
             row
 
-        let toReportRow (test: Test) (patient: Patient) (orderingMd: OrderingMd) =
+        let toReportRow (report: Report) =
+            let { Patient = patient; Test = test; OrderingMd = orderingMd } = report
+
             let row = context.Public.Reports.Create()
             let (ReportId reportId) = test.ReportId
-            let (MRN mrn) = patient.MRN
 
-            row.PatientMrn <- mrn
-            row.ReportId <- reportId
+            row.ReportId   <- reportId
+            // row.IssuedDate <- test.ReceivedDate
+            row.PatientMrn <- patient.MRN.Value
+
+            row.OrderingPhysician       <- orderingMd.OrderingMdName |> FullName.toString |> Some
+            row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
 
             row
