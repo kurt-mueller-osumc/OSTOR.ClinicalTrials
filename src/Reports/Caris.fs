@@ -569,7 +569,8 @@ module Caris =
           GenomicAlterations: GenomicAlteration seq
           Patient: Patient
           OrderingMd: OrderingMd
-          Diagnosis: Diagnosis }
+          Diagnosis: Diagnosis
+          TumorMutationBurden: TumorMutationBurden option }
 
     module Report =
         open FSharp.Data
@@ -583,7 +584,8 @@ module Caris =
               OrderingMdInput: OrderingMd.Input
               DiagnosisInput: Diagnosis.Input
               GenomicAlterationInputs: GenomicAlteration.Input seq
-              SpecimenInput: TumorSpecimen.Input }
+              SpecimenInput: TumorSpecimen.Input
+              TumorMutationBurdenInput: TumorMutationBurden.Input option }
 
         [<Literal>]
         let CarisReportXsdPath = __SOURCE_DIRECTORY__ + "/data/carisReport.xsd"
@@ -702,17 +704,12 @@ module Caris =
                   CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate |> CollectionDate
                   ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate |> ReceivedDate }
 
-            member this.TmbInput =
+            member this.TmbInput : TumorMutationBurden.Input option =
                 this.TumorMutationBurden
                 |> Option.map (fun tmb ->
-                    {| BiomarkerName = tmb.BiomarkerName
-                       ResultGroup = tmb.ResultGroup
-                       BurdenCall = tmb.MutationBurdenCall
-                       BurdenScore = tmb.MutationBurdenScore
-                       BurdenUnit = tmb.MutationBurdenUnit
-                       GenomicSource = tmb.GenomicSource
-                       Interpretation = tmb.Interpretation
-                    |}
+                    { CallInput = tmb.MutationBurdenCall |> TumorMutationBurden.Call.Input
+                      ScoreInput = tmb.MutationBurdenScore |> TumorMutationBurden.Score.Input
+                    }
                 )
 
             member this.GenomicAlterationInputs : GenomicAlteration.Input seq =
@@ -732,7 +729,8 @@ module Caris =
                   OrderingMdInput = this.OrderingMdInput
                   DiagnosisInput = this.DiagnosisInput
                   GenomicAlterationInputs = this.GenomicAlterationInputs
-                  SpecimenInput = this.TumorSpecimenInput }
+                  SpecimenInput = this.TumorSpecimenInput
+                  TumorMutationBurdenInput = this.TmbInput }
 
         open FsToolkit.ErrorHandling
 
@@ -745,13 +743,15 @@ module Caris =
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
                 and! test = Test.validate input.TestInput
                 and! diagnosis = Diagnosis.validate input.DiagnosisInput
+                and! tmb = TumorMutationBurden.validateOptional input.TumorMutationBurdenInput
 
                 return { Test = test
                          Patient = patient
                          OrderingMd = orderingMd
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
-                         Diagnosis = diagnosis }
+                         Diagnosis = diagnosis
+                         TumorMutationBurden = tmb }
             }
 
     module Database =
