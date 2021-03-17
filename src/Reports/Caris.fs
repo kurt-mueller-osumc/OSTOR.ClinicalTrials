@@ -113,10 +113,9 @@ module Caris =
 
     type TumorMutationBurden =
         | IndeterminateTmb
-        | LowTmb of TumorMutationBurdenScore
-        | IntermediateTmb of TumorMutationBurdenScore
-        | HighTmb of TumorMutationBurdenScore
-    and TumorMutationBurdenScore = TumorMutationBurdenScore of int<mutation/megabase>
+        | LowTmb of int<mutation/megabase>
+        | IntermediateTmb of int<mutation/megabase>
+        | HighTmb of int<mutation/megabase>
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -528,7 +527,10 @@ module Caris =
 
             type Input = Input of string
 
-            /// Attempt to convert a score input to a valid tmb score
+            /// Attempt to convert a score input to a valid tmb score. If the regex is valid, convert it to an integer
+            /// with the unit of measure: mutation/megabase.
+            ///
+            ///     (|ValidScore|_) (Input "3 per Mb") = Some (3 <mutation/megabase>)
             let (|ValidScore|_|) (Input input) =
                 let m = Regex("^(?<score>\d{1,}) per Mb$").Match(input)
 
@@ -536,16 +538,30 @@ module Caris =
                 then Some (m.Groups.[1].Value |> int |> ((*) 1<mutation/megabase>))
                 else None
 
-            let validate input =
-                match input with
-                | (Input "") -> Ok None
-                | (ValidScore tmbScore) -> Ok <| Some (TumorMutationBurdenScore tmbScore)
-                | _ -> Error $"Tmb Score invalid: {input}"
-
-            // let validate (Input input) =
+        module Call =
+            type Input = Input of string
 
         type Input =
-            { ScoreInput: Score.Input }
+            { ScoreInput: Score.Input
+              CallInput: Call.Input }
+
+        let validate input =
+            match input.CallInput, input.ScoreInput with
+            | (Call.Input "Indeterminate", Score.Input "") -> Ok IndeterminateTmb
+            | (Call.Input "Low", Score.ValidScore tmbScore) -> Ok <| LowTmb tmbScore
+            | (Call.Input "Intermediate", Score.ValidScore tmbScore) -> Ok <| IntermediateTmb tmbScore
+            | (Call.Input "High", Score.ValidScore tmbScore) -> Ok <| HighTmb tmbScore
+            | _ -> Error $"Tmb Score invalid: {input}"
+
+        /// Validate an optional Tumor Mutation Burden input. If no input exists, it's valid.
+        /// If an input exists, run validation checks on it.
+        let validateOptional (input: Input option) =
+            match input with
+            | None -> Ok None
+            | Some i ->
+                match validate i with
+                | Ok tmb -> Ok (Some tmb)
+                | Error e -> Error e
 
     type Report =
         { Test: Test
@@ -597,6 +613,10 @@ module Caris =
             member _.TumorMutationBurden =
                 testResults
                 |> Seq.tryPick (fun testResult -> testResult.TumorMutationBurden)
+
+            member _.MicrosatelliteInstability =
+                testResults
+                |> Seq.tryPick (fun testResult -> testResult.MicrosatelliteInstability)
 
             member _.GenomicAlterations =
                 testResults
@@ -716,6 +736,7 @@ module Caris =
 
         open FsToolkit.ErrorHandling
 
+        /// Validate the report and its inputs. This either returns a report or a list of errors.
         let validate input =
             validation {
                 let! patient = Patient.validate input.PatientInput
