@@ -112,10 +112,18 @@ module Caris =
         | ``Wild Type``
 
     type TumorMutationBurden =
+        internal
         | IndeterminateTmb
         | LowTmb of int<mutation/megabase>
         | IntermediateTmb of int<mutation/megabase>
         | HighTmb of int<mutation/megabase>
+
+    type MicrosatelliteInstability =
+        internal
+        | LowMSI
+        | StableMSI
+        | HighMSI
+        | IndeterminateMSI
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -563,6 +571,32 @@ module Caris =
                 | Ok tmb -> Ok (Some tmb)
                 | Error e -> Error e
 
+    module MicrosatelliteInstability =
+        module Call =
+            type Input = Input of string
+
+        module ResultGroup =
+            type Input = Input of string
+
+        type Input =
+            { CallInput: Call.Input
+              ResultGroupInput: ResultGroup.Input }
+
+        let validate input =
+            match input.CallInput, input.ResultGroupInput with
+            | Call.Input "Stable", ResultGroup.Input "Normal" -> Ok StableMSI
+            | Call.Input "High", ResultGroup.Input "High" -> Ok HighMSI
+            | Call.Input "Indeterminate", ResultGroup.Input "No Result" -> Ok IndeterminateMSI
+            | _ -> Error $"MSI input is invalid: {input}"
+
+        let validateOptional (input: Input option) =
+            match input with
+            | None -> Ok None
+            | Some i ->
+                match validate i with
+                | Ok msi -> Ok (Some msi)
+                | Error e -> Error  e
+
     type Report =
         { Test: Test
           Specimen: Specimen
@@ -570,7 +604,8 @@ module Caris =
           Patient: Patient
           OrderingMd: OrderingMd
           Diagnosis: Diagnosis
-          TumorMutationBurden: TumorMutationBurden option }
+          TumorMutationBurden: TumorMutationBurden option
+          MicrosatelliteInstability: MicrosatelliteInstability option }
 
     module Report =
         open FSharp.Data
@@ -585,7 +620,8 @@ module Caris =
               DiagnosisInput: Diagnosis.Input
               GenomicAlterationInputs: GenomicAlteration.Input seq
               SpecimenInput: TumorSpecimen.Input
-              TumorMutationBurdenInput: TumorMutationBurden.Input option }
+              TumorMutationBurdenInput: TumorMutationBurden.Input option
+              MicrosatelliteInstabilityInput: MicrosatelliteInstability.Input option }
 
         [<Literal>]
         let CarisReportXsdPath = __SOURCE_DIRECTORY__ + "/data/carisReport.xsd"
@@ -712,6 +748,13 @@ module Caris =
                     }
                 )
 
+            member this.MsiInput : MicrosatelliteInstability.Input option =
+                this.MicrosatelliteInstability
+                |> Option.map (fun msi ->
+                    { CallInput = msi.MsiCall |> MicrosatelliteInstability.Call.Input
+                      ResultGroupInput = msi.ResultGroup |> MicrosatelliteInstability.ResultGroup.Input }
+                )
+
             member this.GenomicAlterationInputs : GenomicAlteration.Input seq =
                 this.GenomicAlterations
                 |> Seq.map (fun ga ->
@@ -730,7 +773,8 @@ module Caris =
                   DiagnosisInput = this.DiagnosisInput
                   GenomicAlterationInputs = this.GenomicAlterationInputs
                   SpecimenInput = this.TumorSpecimenInput
-                  TumorMutationBurdenInput = this.TmbInput }
+                  TumorMutationBurdenInput = this.TmbInput
+                  MicrosatelliteInstabilityInput = this.MsiInput }
 
         open FsToolkit.ErrorHandling
 
@@ -744,6 +788,7 @@ module Caris =
                 and! test = Test.validate input.TestInput
                 and! diagnosis = Diagnosis.validate input.DiagnosisInput
                 and! tmb = TumorMutationBurden.validateOptional input.TumorMutationBurdenInput
+                and! msi = MicrosatelliteInstability.validateOptional input.MicrosatelliteInstabilityInput
 
                 return { Test = test
                          Patient = patient
@@ -751,7 +796,8 @@ module Caris =
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
                          Diagnosis = diagnosis
-                         TumorMutationBurden = tmb }
+                         TumorMutationBurden = tmb
+                         MicrosatelliteInstability = msi }
             }
 
     module Database =
