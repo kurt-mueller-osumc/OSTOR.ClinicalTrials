@@ -13,7 +13,7 @@ module Caris =
 
     type Diagnosis =
         { DiagnosisName: DiagnosisName
-          DiagnosisCode: IcdCode
+          DiagnosisCodes: IcdCode list
           PathologicDiagnosis: PathologicDiagnosis
           DiagnosisSite: DiagnosisSite
           Lineage: Lineage
@@ -160,6 +160,17 @@ module Caris =
             }
 
     module Diagnosis =
+        module Codes =
+            open Utilities
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                input
+                |> String.split ','
+                |> List.map (IcdCode.Input >> IcdCode.validate)
+                |> Result.combine
+
         module Name =
             open Utilities.StringValidations
 
@@ -221,7 +232,7 @@ module Caris =
                 |> Result.mapError (fun _ -> "SubLineage can't be blank")
 
         type Input =
-            { DiagnosisCodeInput: IcdCode.Input
+            { DiagnosisCodesInput: Codes.Input
               DiagnosisNameInput: Name.Input
               DiagnosisSiteInput: Site.Input
               PathologicDiagnosisInput: PathologicDiagnosis.Input
@@ -232,14 +243,14 @@ module Caris =
 
         let validate (input: Input) =
             validation {
-                let! icdCode = input.DiagnosisCodeInput |> IcdCode.validate
+                let! icdCodes = input.DiagnosisCodesInput |> Codes.validate
                 and! diagnosisName = input.DiagnosisNameInput |> Name.validate
                 and! diagnosisSite = input.DiagnosisSiteInput |> Site.validate
                 and! pathologicDiagnosis = input.PathologicDiagnosisInput |> PathologicDiagnosis.validate
                 and! lineage = input.LineageInput |> Lineage.validate
                 and! sublineage = input.SubLineageInput |> SubLineage.validate
 
-                return { DiagnosisCode = icdCode
+                return { DiagnosisCodes = icdCodes
                          DiagnosisName = diagnosisName
                          DiagnosisSite = diagnosisSite
                          PathologicDiagnosis = pathologicDiagnosis
@@ -726,7 +737,7 @@ module Caris =
 
             member _.DiagnosisInput : Diagnosis.Input =
                 { DiagnosisNameInput = Diagnosis.Name.Input patientInfo.Diagnosis
-                  DiagnosisCodeInput = IcdCode.Input patientInfo.IcdCode
+                  DiagnosisCodesInput = Diagnosis.Codes.Input patientInfo.IcdCode
                   PathologicDiagnosisInput = Diagnosis.PathologicDiagnosis.Input patientInfo.PathologicDiagnosis
                   DiagnosisSiteInput = Diagnosis.Site.Input patientInfo.PrimarySite
                   LineageInput = Diagnosis.Lineage.Input patientInfo.Lineage
@@ -829,16 +840,26 @@ module Caris =
             row
 
         let toReportRow (report: Report) =
-            let { Patient = patient; Test = test; OrderingMd = orderingMd } = report
+            let { Patient = patient
+                  Diagnosis = diagnosis
+                  Test = test
+                  OrderingMd = orderingMd } = report
 
             let row = context.Public.Reports.Create()
             let (ReportId reportId) = test.ReportId
 
+            // overall report info
+            row.VendorCliaNumber <- "03D1019490"
             row.ReportId   <- reportId
             row.PatientMrn <- patient.MRN.Value
 
+            // ordering physician
             row.OrderingPhysician       <- orderingMd.OrderingMdName |> FullName.toString |> Some
             row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
+
+            // diagnosis
+            // row.DiagnosisName <- diagnosis.DiagnosisName
+
 
             // row.TumorMutationalBurden <- report.T
 
