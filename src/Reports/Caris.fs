@@ -670,6 +670,14 @@ module Caris =
             member _.ReportId = testDetails.LabReportId
             member _.PhysicianInformation = report.PhysicianInformation
 
+            member _.PathologistInformation =
+                let pi = report.PathologistInformation
+
+                {| NPI = pi.Npi.XElement.Value
+                   LastName = pi.LastName.XElement.Value
+                   FirstName = pi.FirstName.XElement.Value
+                   Organization = pi.Organization |}
+
             member _.TumorMutationBurden =
                 testResults
                 |> Seq.tryPick (fun testResult -> testResult.TumorMutationBurden)
