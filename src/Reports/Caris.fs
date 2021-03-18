@@ -133,6 +133,16 @@ module Caris =
             | HighMSI -> "high"
             | IndeterminateMSI -> "indeterminate"
 
+    type PathologistInformation =
+        { Organization: PathologistOrganization }
+    and PathologistOrganization =
+        internal
+        | PathologistOrganization of string
+
+        member this.Value =
+            let (PathologistOrganization org) = this
+            org
+
     module Patient =
         open FsToolkit.ErrorHandling
 
@@ -281,6 +291,22 @@ module Caris =
 
                 return { OrderingMdName = name; NationalProviderId = npi }
             }
+
+    module PathologistInformation =
+        module Organization =
+            type Input = Input of string
+
+        type Input =
+            { OrganizationInput: Organization.Input }
+
+        /// Validate pathologist information. Caris Reports will only have the pathologist organization listed, if present.
+        /// If the organization is not present, a blank string exists, which is still valid.
+        let validate (input: Input) =
+            let (Organization.Input orgInput) = input.OrganizationInput
+
+            match orgInput with
+            | "" -> Ok None
+            | _ -> Ok <| Some { Organization = (PathologistOrganization orgInput) }
 
     /// Caris only contains a tumor specimen.
     module TumorSpecimen =
@@ -622,6 +648,7 @@ module Caris =
           GenomicAlterations: GenomicAlteration seq
           Patient: Patient
           OrderingMd: OrderingMd
+          PathologistInformation: PathologistInformation option
           Diagnosis: Diagnosis
           TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstability: MicrosatelliteInstability option }
@@ -636,6 +663,7 @@ module Caris =
             { TestInput: Test.Input
               PatientInput: Patient.Input
               OrderingMdInput: OrderingMd.Input
+              PathologistInput: PathologistInformation.Input
               DiagnosisInput: Diagnosis.Input
               GenomicAlterationInputs: GenomicAlteration.Input seq
               SpecimenInput: TumorSpecimen.Input
@@ -750,6 +778,9 @@ module Caris =
                 { NameInput = fullNameInput
                   NationalProviderIdInput = npiInput }
 
+            member this.PathologistInput : PathologistInformation.Input =
+                { OrganizationInput = (PathologistInformation.Organization.Input this.PathologistInformation.Organization) }
+
             member _.DiagnosisInput : Diagnosis.Input =
                 { DiagnosisNameInput = Diagnosis.Name.Input patientInfo.Diagnosis
                   DiagnosisCodesInput = Diagnosis.Codes.Input patientInfo.IcdCode
@@ -796,6 +827,7 @@ module Caris =
                 { TestInput = this.TestInput
                   PatientInput = this.PatientInput
                   OrderingMdInput = this.OrderingMdInput
+                  PathologistInput = this.PathologistInput
                   DiagnosisInput = this.DiagnosisInput
                   GenomicAlterationInputs = this.GenomicAlterationInputs
                   SpecimenInput = this.TumorSpecimenInput
@@ -809,6 +841,7 @@ module Caris =
             validation {
                 let! patient = Patient.validate input.PatientInput
                 and! orderingMd = OrderingMd.validate input.OrderingMdInput
+                and! pathologistInfo = PathologistInformation.validate input.PathologistInput
                 and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
                 and! test = Test.validate input.TestInput
@@ -819,6 +852,7 @@ module Caris =
                 return { Test = test
                          Patient = patient
                          OrderingMd = orderingMd
+                         PathologistInformation = pathologistInfo
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
                          Diagnosis = diagnosis
