@@ -57,9 +57,6 @@ module Caris =
     and OrderedDate = internal OrderedDate of System.DateTime
     and ReportId    = internal ReportId of string
 
-    type LabName     with member this.Value = this |> fun (LabName labName)         -> labName
-    type OrderedDate with member this.Value = this |> fun (OrderedDate orderedDate) -> orderedDate
-    type ReportId    with member this.Value = this |> fun (ReportId reportId)       -> reportId
     type LabName      with member this.Value = this |> fun (LabName labName)           -> labName
     type OrderedDate  with member this.Value = this |> fun (OrderedDate orderedDate)   -> orderedDate
     type ReceivedDate with member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
