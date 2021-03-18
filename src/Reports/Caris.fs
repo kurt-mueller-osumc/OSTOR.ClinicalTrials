@@ -60,6 +60,10 @@ module Caris =
     type LabName     with member this.Value = this |> fun (LabName labName)         -> labName
     type OrderedDate with member this.Value = this |> fun (OrderedDate orderedDate) -> orderedDate
     type ReportId    with member this.Value = this |> fun (ReportId reportId)       -> reportId
+    type LabName      with member this.Value = this |> fun (LabName labName)           -> labName
+    type OrderedDate  with member this.Value = this |> fun (OrderedDate orderedDate)   -> orderedDate
+    type ReceivedDate with member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
+    type ReportId     with member this.Value = this |> fun (ReportId reportId)         -> reportId
 
     type GenomicAlteration =
         { GeneName: GeneName
