@@ -149,6 +149,7 @@ module Caris =
         module Sex =
             type Input = Input of string
 
+            /// Validate that the input for a patient's sex is is either (M|m)ale or (F|f)emale
             let validate (Input input) =
                 match input with
                 | "Male" | "male" -> Ok Male
