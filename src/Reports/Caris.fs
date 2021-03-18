@@ -133,8 +133,8 @@ module Caris =
             | HighMSI -> "high"
             | IndeterminateMSI -> "indeterminate"
 
-    type PathologistInformation =
-        { Organization: PathologistOrganization }
+    type Pathologist =
+        { Organization: PathologistOrganization option }
     and PathologistOrganization =
         internal
         | PathologistOrganization of string
@@ -293,7 +293,7 @@ module Caris =
                 return { OrderingMdName = name; NationalProviderId = npi }
             }
 
-    module PathologistInformation =
+    module Pathologist =
         module Organization =
             type Input = Input of string
 
@@ -306,8 +306,8 @@ module Caris =
             let (Organization.Input orgInput) = input.OrganizationInput
 
             match orgInput with
-            | "" -> Ok None
-            | _ -> Ok <| Some { Organization = (PathologistOrganization orgInput) }
+            | "" -> Ok { Organization = None }
+            | _ -> Ok <| { Organization = Some (PathologistOrganization orgInput) }
 
     /// Caris only contains a tumor specimen.
     module TumorSpecimen =
@@ -649,7 +649,7 @@ module Caris =
           GenomicAlterations: GenomicAlteration seq
           Patient: Patient
           OrderingMd: OrderingMd
-          PathologistInformation: PathologistInformation option
+          Pathologist: Pathologist
           Diagnosis: Diagnosis
           TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstability: MicrosatelliteInstability option }
@@ -664,7 +664,7 @@ module Caris =
             { TestInput: Test.Input
               PatientInput: Patient.Input
               OrderingMdInput: OrderingMd.Input
-              PathologistInput: PathologistInformation.Input
+              PathologistInput: Pathologist.Input
               DiagnosisInput: Diagnosis.Input
               GenomicAlterationInputs: GenomicAlteration.Input seq
               SpecimenInput: TumorSpecimen.Input
@@ -780,8 +780,8 @@ module Caris =
                 { NameInput = fullNameInput
                   NationalProviderIdInput = npiInput }
 
-            member this.PathologistInput : PathologistInformation.Input =
-                { OrganizationInput = (PathologistInformation.Organization.Input this.PathologistInformation.Organization) }
+            member this.PathologistInput : Pathologist.Input =
+                { OrganizationInput = (Pathologist.Organization.Input this.PathologistInformation.Organization) }
 
             member _.DiagnosisInput : Diagnosis.Input =
                 { DiagnosisNameInput = Diagnosis.Name.Input patientInfo.Diagnosis
@@ -843,7 +843,7 @@ module Caris =
             validation {
                 let! patient = Patient.validate input.PatientInput
                 and! orderingMd = OrderingMd.validate input.OrderingMdInput
-                and! pathologistInfo = PathologistInformation.validate input.PathologistInput
+                and! pathologistInfo = Pathologist.validate input.PathologistInput
                 and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
                 and! test = Test.validate input.TestInput
@@ -854,7 +854,7 @@ module Caris =
                 return { Test = test
                          Patient = patient
                          OrderingMd = orderingMd
-                         PathologistInformation = pathologistInfo
+                         Pathologist = pathologistInfo
                          GenomicAlterations = genomicAlterations
                          Specimen = specimen
                          Diagnosis = diagnosis
@@ -894,7 +894,8 @@ module Caris =
             let { Patient = patient
                   Diagnosis = diagnosis
                   Test = test
-                  OrderingMd = orderingMd } = report
+                  OrderingMd = orderingMd
+                  Pathologist = pathologist } = report
 
             let row = context.Public.Reports.Create()
             let (ReportId reportId) = test.ReportId
@@ -910,6 +911,9 @@ module Caris =
             // ordering physician
             row.OrderingPhysician       <- orderingMd.OrderingMdName |> FullName.toString |> Some
             row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
+
+            // pathologist - only organizations get listed in caris reports
+            row.Pathologist <- pathologist.Organization |> Option.map (fun org -> org.Value)
 
             // diagnosis
             row.DiagnosisName       <- diagnosis.DiagnosisName.Value
