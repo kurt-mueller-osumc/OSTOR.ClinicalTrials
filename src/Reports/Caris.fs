@@ -125,6 +125,13 @@ module Caris =
         | HighMSI
         | IndeterminateMSI
 
+        member this.Value =
+            match this with
+            | LowMSI -> "low"
+            | StableMSI -> "stable"
+            | HighMSI -> "high"
+            | IndeterminateMSI -> "indeterminate"
+
     module Patient =
         open FsToolkit.ErrorHandling
 
