@@ -880,10 +880,6 @@ module Caris =
             row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
 
             // diagnosis
-            // row.DiagnosisName <- diagnosis.DiagnosisName
-
-
-            // row.TumorMutationalBurden <- report.T
             row.DiagnosisName       <- diagnosis.DiagnosisName.Value
             row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes |> List.map IcdCode.toString |> List.toArray |> Some
 
