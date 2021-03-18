@@ -871,6 +871,9 @@ module Caris =
             row.VendorCliaNumber <- "03D1019490"
             row.ReportId   <- reportId
             row.PatientMrn <- patient.MRN.Value
+            row.IssuedDate <- test.ReceivedDate.Value
+
+            row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
 
             // ordering physician
             row.OrderingPhysician       <- orderingMd.OrderingMdName |> FullName.toString |> Some
