@@ -279,23 +279,6 @@ module FoundationMedicine =
                          Pathologist = pathologist }
             }
 
-        // module DB =
-        //     open Database
-
-        //     let toRow (pmi: PMI) =
-        //         let row = context.Public.Patients.Create()
-
-        //         let (DateOfBirth dob) = pmi.DateOfBirth
-        //         let (FirstName firstName) = pmi.FirstName
-        //         let (LastName lastName) = pmi.LastName
-
-        //         row.FirstName <- firstName
-        //         row.LastName <- lastName
-        //         row.DateOfBirth <- dob
-        //         row.Sex <- pmi.Gender |> Gender.toString
-
-        //         row
-
     module Variant =
         /// A variant in an FMI report only has the gene name, whether or not it's a variant of unknown significance, and the variant name.
         type Input =
