@@ -149,3 +149,4 @@ module Common =
             else
                 Error $"Icd Code is invalid: {input}"
 
+        let toString (icdCode: IcdCode) = icdCode.Value
