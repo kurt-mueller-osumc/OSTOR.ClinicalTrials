@@ -153,7 +153,7 @@ module Caris =
                 match input with
                 | "Male" | "male" -> Ok Male
                 | "Female" | "female" -> Ok Female
-                | _ -> Error $"Sex: Not a valid sex ({input})"
+                | _ -> Error $"Sex is invalid: {input}"
 
         type Input =
             { MrnInput: MRN.Input
