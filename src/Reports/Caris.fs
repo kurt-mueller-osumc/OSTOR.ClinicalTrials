@@ -119,6 +119,13 @@ module Caris =
         | IntermediateTmb of int<mutation/megabase>
         | HighTmb of int<mutation/megabase>
 
+        member this.Value =
+            match this with
+            | IndeterminateTmb -> None
+            | LowTmb tmb -> Some (int tmb)
+            | IntermediateTmb tmb -> Some (int tmb)
+            | HighTmb tmb -> Some (int tmb)
+
     type MicrosatelliteInstability =
         internal
         | LowMSI
@@ -906,8 +913,6 @@ module Caris =
             row.PatientMrn <- patient.MRN.Value
             row.IssuedDate <- test.ReceivedDate.Value
 
-            row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
-
             // ordering physician
             row.OrderingPhysician       <- orderingMd.OrderingMdName |> FullName.toString |> Some
             row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
@@ -918,5 +923,8 @@ module Caris =
             // diagnosis
             row.DiagnosisName       <- diagnosis.DiagnosisName.Value
             row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes |> List.map IcdCode.toString |> List.toArray |> Some
+
+            row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.Value)
+            row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
 
             row
