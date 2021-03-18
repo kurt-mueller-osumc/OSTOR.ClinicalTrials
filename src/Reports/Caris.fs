@@ -726,8 +726,7 @@ module Caris =
                        Gene1 = tl.Gene1s |> Seq.head
                        Exon1 = tl.Exon1s |> Seq.head
                        Gene2 = tl.Gene2s |> Seq.head
-                       Exon2 = tl.Exon2s |> Seq.head |}
-                )
+                       Exon2 = tl.Exon2s |> Seq.head |})
 
             (* Inputs to validate *)
 
