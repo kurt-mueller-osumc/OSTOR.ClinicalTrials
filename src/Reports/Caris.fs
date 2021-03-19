@@ -76,11 +76,10 @@ module Caris =
         { GeneName: GeneName
           ResultGroup: GenomicAlterationResultGroup
           Source: GenomicAlterationSource option
-          Interpretation: GenomicAlterationInterpretation
+          Interpretation: GeneInterpretation
           AlleleFrequency: AlleleFrequency option }
-    and GeneName = internal GeneName of string
+    and GeneInterpretation = internal GeneInterpretation of string
     and GenomicAlterationSource = internal | Somatic
-    and GenomicAlterationInterpretation = internal GenomicAlterationInterpretation of string
     and AlleleFrequency = internal AlleleFrequency of uint
 
     /// Genomic alterations will be grouped as either:
@@ -460,18 +459,7 @@ module Caris =
                          ReceivedDate = receivedDate }
             }
 
-    module GenomicAlteration =
-        module GeneName =
-            open Utilities.StringValidations
-
-            type Input = Input of string
-
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map GeneName
-                |> Result.mapError (fun e -> $"Gene name: {e}")
-
+    module Gene =
         module Interpretation =
             open Utilities.StringValidations
 
@@ -480,9 +468,10 @@ module Caris =
             let validate (Input input) =
                 input
                 |> validateNotBlank
-                |> Result.map GenomicAlterationInterpretation
-                |> Result.mapError (fun e -> $"Genomic alteration interpretation: {e}")
+                |> Result.map GeneInterpretation
+                |> Result.mapError (fun _ -> $"Gene interpretation can't be blank")
 
+    module GenomicAlteration =
         module Source =
             type Input = Input of string
 
@@ -562,17 +551,17 @@ module Caris =
         open FsToolkit.ErrorHandling
 
         type Input =
-            { GeneNameInput: GeneName.Input
+            { GeneNameInput: Gene.Name.Input
+              Interpretation: Gene.Interpretation.Input
               ResultGroup: ResultGroup.Input
-              Interpretation: Interpretation.Input
               AlleleFrequency: AlleleFrequency.FrequencyInput option
               Source: Source.Input option }
 
         let validate input =
             validation {
-                let! geneName = input.GeneNameInput |> GeneName.validate
+                let! geneName = input.GeneNameInput |> Gene.Name.validate
                 and! resultGroup = input.ResultGroup |> ResultGroup.validate
-                and! interpretation = input.Interpretation |> Interpretation.validate
+                and! interpretation = input.Interpretation |> Gene.Interpretation.validate
                 and! source = input.Source |> Source.validate
                 and! alleleFrequency = input.AlleleFrequency |> AlleleFrequency.Input.validate
 
@@ -834,9 +823,9 @@ module Caris =
             member this.GenomicAlterationInputs : GenomicAlteration.Input seq =
                 this.GenomicAlterations
                 |> Seq.map (fun ga ->
-                    { GeneNameInput = ga.GeneName |> GenomicAlteration.GeneName.Input
+                    { GeneNameInput = ga.GeneName |> Gene.Name.Input
                       ResultGroup = { GroupInput = ga.ResultGroup; ResultInput = ga.Result }
-                      Interpretation = ga.Interpretation |> GenomicAlteration.Interpretation.Input
+                      Interpretation = ga.Interpretation |> Gene.Interpretation.Input
                       AlleleFrequency = ga.AlleleFrequency |> Option.map GenomicAlteration.AlleleFrequency.FrequencyInput
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
                 )
