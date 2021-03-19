@@ -19,11 +19,12 @@
 
     // Add the IDs of extensions you want installed when the container is created.
     "extensions": [
-        "Ionide.Ionide-fsharp",
-        "ms-dotnettools.csharp",
-        "ms-dotnettools.dotnet-interactive-vscode",
-        "shardulm94.trailing-spaces"
-    ],
+		"Ionide.Ionide-fsharp",
+		"ms-dotnettools.csharp",
+		"ms-dotnettools.dotnet-interactive-vscode",
+		"shardulm94.trailing-spaces",
+		"tomoki1207.pdf"
+	],
 
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": [],
