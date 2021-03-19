@@ -38,15 +38,26 @@ module Caris =
           CollectionDate: CollectionDate
           ReceivedDate: ReceivedDate }
     and SpecimenId = internal SpecimenId of string
+    and SpecimenSite = internal SpecimenSite of string
+    and CollectionDate = internal CollectionDate of System.DateTime
+    and ReceivedDate = internal ReceivedDate of System.DateTime
+    and AccessionId = internal AccessionId of string
     and SpecimenType =
         internal
         | ``Tissue Biopsy Formalin Vial``
         | ``Tissue Biopsy Paraffin Blocks``
         | ``Tissue Biopsy Slide Unstained``
-    and SpecimenSite = internal SpecimenSite of string
-    and CollectionDate = internal CollectionDate of System.DateTime
-    and ReceivedDate = internal ReceivedDate of System.DateTime
-    and AccessionId = internal AccessionId of string
+
+        member this.Value =
+            match this with
+            | ``Tissue Biopsy Formalin Vial`` -> "Tissue Biopsy Formalin Vial"
+            | ``Tissue Biopsy Paraffin Blocks`` -> "Tissue Biopsy Paraffin Blocks"
+            | ``Tissue Biopsy Slide Unstained`` -> "Tissue Biopsy Slide Unstained"
+
+    type SpecimenId with member this.Value = this |> fun (SpecimenId specimenId) -> specimenId
+    type SpecimenSite with member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
+    type CollectionDate with member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
+
 
     type Test =
         { LabName: LabName
@@ -920,11 +931,24 @@ module Caris =
             // pathologist - only organizations get listed in caris reports
             row.Pathologist <- pathologist.Organization |> Option.map (fun org -> org.Value)
 
-            // diagnosis
+            // diagnosis - caris doesn't report diagnosis dates
             row.DiagnosisName       <- diagnosis.DiagnosisName.Value
             row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes |> List.map IcdCode.toString |> List.toArray |> Some
 
+            // biomarkers
             row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.Value)
             row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
 
             row
+
+        let toSampleRow (report: Report) =
+            let specimen = report.Specimen
+            let row = context.Public.Samples.Create()
+
+            row.SampleId       <- specimen.SpecimenId.Value
+            row.SampleType     <- specimen.SpecimenType.Value
+            row.Category       <- "tumor"
+            row.BiopsySite     <- specimen.SpecimenSite.Value
+            row.CollectionDate <- specimen.CollectionDate.Value
+
+            report
