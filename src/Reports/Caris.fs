@@ -132,6 +132,8 @@ module Caris =
     and FusionInterpretation = internal FusionInterpretation of string
     and FusionResult = internal ``Fusion Detected`` | ``Pathogenic Fusion``
 
+    type FusionInterpretation with member this.Value = this |> fun (FusionInterpretation fusionInterpretation) -> fusionInterpretation
+
     type TumorMutationBurden =
         internal
         | IndeterminateTmb
@@ -1049,3 +1051,31 @@ module Caris =
             row.ReportId       <- test.ReportId.Value
 
             row
+
+        let toFusionGeneRows (report: Report) =
+            report.Fusions
+            |> Seq.collect (fun fusion ->
+                let gene1Row = context.Public.Genes.Create()
+                let gene2Row = context.Public.Genes.Create()
+
+                gene1Row.Name <- fusion.Gene1Name.Value
+                gene2Row.Name <- fusion.Gene2Name.Value
+
+                [gene1Row; gene2Row]
+            )
+
+        let toFusionRows (report: Report) =
+            let reportId = report.Test.ReportId.Value
+
+            report.Fusions
+            |> Seq.map (fun fusion ->
+                let row = context.Public.Fusions.Create()
+
+                row.ReportId <- reportId
+                row.FirstGeneName  <- fusion.Gene1Name.Value
+                row.SecondGeneName <- fusion.Gene2Name.Value
+                row.Description    <- fusion.Interpretation.Value
+                row.FusionType <- "mutation"
+
+                row
+            )
