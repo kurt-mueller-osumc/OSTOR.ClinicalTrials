@@ -121,6 +121,17 @@ module Caris =
         | ``Mutation Not Detected``
         | ``Wild Type``
 
+    type Fusion =
+        { Gene1Name: GeneName
+          Gene2Name: GeneName
+          Exon1: FusionExon
+          Exon2: FusionExon
+          Interpretation: FusionInterpretation
+          FusionResult: FusionResult }
+    and FusionExon = internal FusionExon of uint
+    and FusionInterpretation = internal FusionInterpretation of string
+    and FusionResult = internal ``Fusion Detected`` | ``Pathogenic Fusion``
+
     type TumorMutationBurden =
         internal
         | IndeterminateTmb
@@ -581,6 +592,76 @@ module Caris =
             >> Result.combine
             >> Result.mapError List.flatten
 
+    module Fusion =
+        module Exon =
+            open Utilities
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                match UnsignedInteger.tryParse input with
+                | Some exon -> Ok <| FusionExon exon
+                | _ -> Error $"Fusion exon not an unsigned integer: {input}"
+
+        module Interpretation =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map FusionInterpretation
+                |> Result.mapError (fun _ -> "Fusion interpretation can't be blank")
+
+        module Result =
+            type Input = Input of string
+            type GroupInput = GroupInput of string
+
+            let validate (Input input) (GroupInput groupInput) =
+                match input, groupInput with
+                | "Pathogenic Fusion", "Mutated" ->  Ok ``Pathogenic Fusion``
+                | "Fusion Detected", "Mutated" -> Ok ``Fusion Detected``
+                | _ -> Error $"Invalid fusion result: {(input, groupInput)}"
+
+        type Input =
+            { Gene1NameInput: Gene.Name.Input
+              Gene2NameInput: Gene.Name.Input
+              Exon1Input: Exon.Input
+              Exon2Input: Exon.Input
+              InterpretationInput: Interpretation.Input
+              ResultInput: Result.Input
+              GroupInput: Result.GroupInput }
+
+        open FsToolkit.ErrorHandling
+
+        let validate input =
+            validation {
+                let! gene1Name = input.Gene1NameInput |> Gene.Name.validate
+                and! gene2Name = input.Gene2NameInput |> Gene.Name.validate
+                and! exon1 = input.Exon1Input |> Exon.validate
+                and! exon2 = input.Exon2Input |> Exon.validate
+                and! interpretation = input.InterpretationInput |> Interpretation.validate
+                and! fusionResult = (input.ResultInput, input.GroupInput) ||> Result.validate
+
+                return { Gene1Name = gene1Name
+                         Gene2Name = gene2Name
+                         Exon1 = exon1
+                         Exon2 = exon2
+                         Interpretation = interpretation
+                         FusionResult = fusionResult }
+            }
+
+    module Fusions =
+        open Utilities
+
+        let validate (fusionInputs: Fusion.Input seq) =
+            fusionInputs
+            |> Seq.map Fusion.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
+
     module TumorMutationBurden =
         module Score =
             open System.Text.RegularExpressions
@@ -653,6 +734,7 @@ module Caris =
         { Test: Test
           Specimen: Specimen
           GenomicAlterations: GenomicAlteration seq
+          Fusions: Fusion seq
           Patient: Patient
           OrderingMd: OrderingMd
           Pathologist: Pathologist
@@ -673,6 +755,7 @@ module Caris =
               PathologistInput: Pathologist.Input
               DiagnosisInput: Diagnosis.Input
               GenomicAlterationInputs: GenomicAlteration.Input seq
+              FusionInputs: Fusion.Input seq
               SpecimenInput: TumorSpecimen.Input
               TumorMutationBurdenInput: TumorMutationBurden.Input option
               MicrosatelliteInstabilityInput: MicrosatelliteInstability.Input option }
@@ -753,7 +836,7 @@ module Caris =
                 |> Seq.map (fun tl ->
                     {| Result = tl.Results |> Seq.head
                        ResultGroup = tl.ResultGroups |> Seq.head
-                       Interpreation = tl.Interpretations |> Seq.head
+                       Interpretation = tl.Interpretations |> Seq.head
                        FusionIsoForm = tl.FusionIsoForms |> Seq.head
                        Gene1 = tl.Gene1s |> Seq.head
                        Exon1 = tl.Exon1s |> Seq.head
@@ -830,6 +913,18 @@ module Caris =
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
                 )
 
+            member this.FusionInputs : Fusion.Input seq =
+                this.FusionTranslocations
+                |> Seq.map (fun ft ->
+                    { Gene1NameInput = ft.Gene1 |> Gene.Name.Input
+                      Gene2NameInput = ft.Gene2 |> Gene.Name.Input
+                      Exon1Input = ft.Exon1 |> Fusion.Exon.Input
+                      Exon2Input = ft.Exon2 |> Fusion.Exon.Input
+                      InterpretationInput = ft.Interpretation |> Fusion.Interpretation.Input
+                      ResultInput = ft.Result |> Fusion.Result.Input
+                      GroupInput = ft.ResultGroup |> Fusion.Result.GroupInput }
+                )
+
             /// The overall report input that encapsulates all the other inputs
             member this.ReportInput =
                 { TestInput = this.TestInput
@@ -838,6 +933,7 @@ module Caris =
                   PathologistInput = this.PathologistInput
                   DiagnosisInput = this.DiagnosisInput
                   GenomicAlterationInputs = this.GenomicAlterationInputs
+                  FusionInputs = this.FusionInputs
                   SpecimenInput = this.TumorSpecimenInput
                   TumorMutationBurdenInput = this.TmbInput
                   MicrosatelliteInstabilityInput = this.MsiInput }
@@ -851,6 +947,7 @@ module Caris =
                 and! orderingMd = OrderingMd.validate input.OrderingMdInput
                 and! pathologistInfo = Pathologist.validate input.PathologistInput
                 and! genomicAlterations = GenomicAlterations.validate input.GenomicAlterationInputs
+                and! fusions = Fusions.validate input.FusionInputs
                 and! specimen = TumorSpecimen.validate input.SpecimenInput
                 and! test = Test.validate input.TestInput
                 and! diagnosis = Diagnosis.validate input.DiagnosisInput
@@ -862,6 +959,7 @@ module Caris =
                          OrderingMd = orderingMd
                          Pathologist = pathologistInfo
                          GenomicAlterations = genomicAlterations
+                         Fusions = fusions
                          Specimen = specimen
                          Diagnosis = diagnosis
                          TumorMutationBurden = tmb
