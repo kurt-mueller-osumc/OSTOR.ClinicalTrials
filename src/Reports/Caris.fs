@@ -54,8 +54,8 @@ module Caris =
             | ``Tissue Biopsy Paraffin Blocks`` -> "Tissue Biopsy Paraffin Blocks"
             | ``Tissue Biopsy Slide Unstained`` -> "Tissue Biopsy Slide Unstained"
 
-    type SpecimenId with member this.Value = this |> fun (SpecimenId specimenId) -> specimenId
-    type SpecimenSite with member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
+    type SpecimenId     with member this.Value = this |> fun (SpecimenId specimenId) -> specimenId
+    type SpecimenSite   with member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
     type CollectionDate with member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
 
 
