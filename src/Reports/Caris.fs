@@ -58,7 +58,6 @@ module Caris =
     type SpecimenSite   with member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
     type CollectionDate with member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
 
-
     type Test =
         { LabName: LabName
           OrderedDate: OrderedDate
