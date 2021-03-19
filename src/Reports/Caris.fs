@@ -1037,4 +1037,15 @@ module Caris =
             row.BiopsySite     <- specimen.SpecimenSite.Value
             row.CollectionDate <- specimen.CollectionDate.Value
 
-            report
+            row
+
+        let toSampleReportRow (report: Report) =
+            let specimen = report.Specimen
+            let test = report.Test
+            let row = context.Public.SampleReports.Create()
+
+            row.CollectionDate <- specimen.CollectionDate.Value
+            row.ReceiptDate    <- specimen.ReceivedDate.Value
+            row.ReportId       <- test.ReportId.Value
+
+            row
