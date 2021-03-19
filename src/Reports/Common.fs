@@ -41,6 +41,13 @@ module Common =
             let (IcdCode icdCode) = this
             icdCode
 
+    type Gene =
+        { Name: GeneName }
+    and GeneName =
+        internal | GeneName of string
+
+        member this.Value = this |> fun (GeneName geneName) -> geneName
+
     // tumor mutation burden units of measure
     [<Measure>] type mutation
     [<Measure>] type megabase
@@ -150,3 +157,20 @@ module Common =
                 Error $"Icd Code is invalid: {input}"
 
         let toString (icdCode: IcdCode) = icdCode.Value
+
+    module Gene =
+        module Name =
+            open Utilities.StringValidations
+
+            type Input = Input of string
+
+            let (|ValidGeneName|_|) (Input input) =
+                if input <> "" then Some (GeneName input)
+                else None
+
+            /// Validate that a gene name is not blank.
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map GeneName
+                |> Result.mapError (fun _ -> $"Gene name can't be blank")
