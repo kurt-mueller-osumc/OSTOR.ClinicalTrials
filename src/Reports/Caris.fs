@@ -820,9 +820,19 @@ module Caris =
                        Exon = ga.Exons |> Seq.tryHead
                        Source = ga.GenomicSources |> Seq.tryHead
                        Interpretation = ga.Interpretations |> Seq.head
-                       MolecularConsequence = ga.MolecularConsequences |> Seq.tryHead
                        AlleleFrequency = ga.AlleleFrequencyInformations |> Seq.tryHead |> Option.map (fun afi -> afi.AlleleFrequency)
-                       TranscriptAlterationDetail = ga.AlterationDetails |> Seq.tryHead |> Option.map (fun ad -> ad.TranscriptAlterationDetails)
+                       MolecularConsequence = ga.MolecularConsequences |> Seq.tryHead
+                       TranscriptAlterationDetail = ga.AlterationDetails
+                                                    |> Seq.tryHead
+                                                    |> Option.map (fun ad ->
+                                                        let tad = ad.TranscriptAlterationDetails
+                                                        {| ReferenceNucleotide = tad.ReferenceNucleotide
+                                                           ObservedNucleotide = tad.ObservedNucleotide
+                                                           TranscriptStartPosition = tad.TranscriptStartPosition
+                                                           TranscriptStopPosition = tad.TranscriptStopPosition
+                                                           TranscriptId = tad.TranscriptId
+                                                           TranscriptIdSource = tad.TranscriptIdSource
+                                                        |})
                     |})
 
             member _.ExpressionAlterations =
