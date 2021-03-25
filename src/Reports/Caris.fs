@@ -514,6 +514,19 @@ module Caris =
                 |> Result.map GeneInterpretation
                 |> Result.mapError (fun _ -> $"Gene interpretation can't be blank")
 
+    module Nucleotide =
+        open System.Text.RegularExpressions
+
+        type Input = Input of string
+
+        // Validate that a nucleotide is either blank string, or is composed of only A, G, C, or T
+        let validate (Input input) =
+            if Regex("^(A|G|C|T)*$").Match(input).Success then
+                Ok <| Nucleotide input
+            else
+                Error <| $"Invalid nucleotide(s): {input}"
+
+
     module GenomicAlteration =
         module Source =
             type Input = Input of string
