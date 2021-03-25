@@ -77,7 +77,8 @@ module Caris =
           ResultGroup: GenomicAlterationResultGroup
           Source: GenomicAlterationSource option
           Interpretation: GeneInterpretation
-          AlleleFrequency: AlleleFrequency option }
+          AlleleFrequency: AlleleFrequency option
+          TranscriptAlterationDetails: TranscriptAlterationDetails option }
     and GeneInterpretation = internal GeneInterpretation of string
     and GenomicAlterationSource = internal | Somatic
     and AlleleFrequency = internal AlleleFrequency of uint
@@ -135,7 +136,7 @@ module Caris =
         // special case where molecular consequence attribute is present with no value
         | BlankConsequence
 
-    and TranscriptAlterationDetail =
+    and TranscriptAlterationDetails =
         { ObservedNucleotide: Nucleotide
           ReferenceNucleotide: Nucleotide
           TranscriptId: TranscriptId
@@ -627,7 +628,7 @@ module Caris =
                 | "Promoter" -> Ok Promoter
                 | _ -> Error $"Invalid molecular consequence: {input}"
 
-        module TranscriptAlterationDetail =
+        module TranscriptAlterationDetails =
             module StartPosition =
                 open Utilities
 
@@ -701,6 +702,7 @@ module Caris =
             { GeneNameInput: Gene.Name.Input
               Interpretation: Gene.Interpretation.Input
               ResultGroup: ResultGroup.Input
+              TranscriptAlterationDetailsInput: TranscriptAlterationDetails.Input option
               AlleleFrequency: AlleleFrequency.FrequencyInput option
               Source: Source.Input option }
 
@@ -711,11 +713,13 @@ module Caris =
                 and! interpretation = input.Interpretation |> Gene.Interpretation.validate
                 and! source = input.Source |> Source.validate
                 and! alleleFrequency = input.AlleleFrequency |> AlleleFrequency.Input.validate
+                and! transcriptAlterationDetails = input.TranscriptAlterationDetailsInput |> TranscriptAlterationDetails.validateOptional
 
                 return { GeneName = geneName
                          ResultGroup = resultGroup
                          Interpretation = interpretation
                          AlleleFrequency = alleleFrequency
+                         TranscriptAlterationDetails = transcriptAlterationDetails
                          Source = source }
             }
 
@@ -1064,8 +1068,15 @@ module Caris =
                       ResultGroup = { GroupInput = ga.ResultGroup; ResultInput = ga.Result }
                       Interpretation = ga.Interpretation |> Gene.Interpretation.Input
                       AlleleFrequency = ga.AlleleFrequency |> Option.map GenomicAlteration.AlleleFrequency.FrequencyInput
-                      Source = ga.Source |> Option.map GenomicAlteration.Source.Input }
-                )
+                      Source = ga.Source |> Option.map GenomicAlteration.Source.Input
+                      TranscriptAlterationDetailsInput = ga.TranscriptAlterationDetail |> Option.map (fun tad ->
+                           { StartPositionInput = tad.TranscriptStartPosition |> GenomicAlteration.TranscriptAlterationDetails.StartPosition.Input
+                             StopPositionInput  = tad.TranscriptStopPosition |> GenomicAlteration.TranscriptAlterationDetails.StopPosition.Input
+                             TranscriptIdInput  = tad.TranscriptId |> GenomicAlteration.TranscriptAlterationDetails.TranscriptId.Input
+                             ObservedNucleotideInput  = tad.ObservedNucleotide |> Nucleotide.Input
+                             ReferenceNucelotideInput = tad.ReferenceNucleotide |> Nucleotide.Input
+                           })
+                    })
 
             member this.FusionInputs : Fusion.Input seq =
                 this.FusionTranslocations
