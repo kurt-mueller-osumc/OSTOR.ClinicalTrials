@@ -121,6 +121,8 @@ module Caris =
         | ``Mutation Not Detected``
         | ``Wild Type``
 
+    type AlleleFrequency with member this.Value = this |> fun (AlleleFrequency af) -> af
+
     type Fusion =
         { Gene1Name: GeneName
           Gene2Name: GeneName
@@ -345,6 +347,7 @@ module Caris =
 
             type Input = Input of string
 
+            /// Validate that the specimen id is not blank
             let validate (Input input) =
                 input
                 |> validateNotBlank
@@ -811,9 +814,16 @@ module Caris =
                        GeneName = ga.Genes |> Seq.head
                        Result = ga.Results |> Seq.head
                        ResultGroup = ga.ResultGroups |> Seq.head
+                       HgvsCodingChange = ga.HgvsCodingChanges |> Seq.tryHead
+                       HgvsProteinChange = ga.HgvsProteinChanges |> Seq.tryHead
+                       Chromosome = ga.Chromosomes |> Seq.tryHead
+                       Exon = ga.Exons |> Seq.tryHead
                        Source = ga.GenomicSources |> Seq.tryHead
                        Interpretation = ga.Interpretations |> Seq.head
-                       AlleleFrequency = ga.AlleleFrequencyInformations |> Seq.tryHead |> Option.map (fun afi -> afi.AlleleFrequency) |})
+                       MolecularConsequence = ga.MolecularConsequences |> Seq.tryHead
+                       AlleleFrequency = ga.AlleleFrequencyInformations |> Seq.tryHead |> Option.map (fun afi -> afi.AlleleFrequency)
+                       TranscriptAlterationDetail = ga.AlterationDetails |> Seq.tryHead |> Option.map (fun ad -> ad.TranscriptAlterationDetails)
+                    |})
 
             member _.ExpressionAlterations =
                 testResults
@@ -907,6 +917,7 @@ module Caris =
 
             member this.GenomicAlterationInputs : GenomicAlteration.Input seq =
                 this.GenomicAlterations
+                |> Seq.filter (fun ga -> ga.Result <> "variantnotdetected")
                 |> Seq.map (fun ga ->
                     { GeneNameInput = ga.GeneName |> Gene.Name.Input
                       ResultGroup = { GroupInput = ga.ResultGroup; ResultInput = ga.Result }
@@ -1051,6 +1062,29 @@ module Caris =
             row.ReportId       <- test.ReportId.Value
 
             row
+
+        let toGeneRows (report: Report) =
+            report.GenomicAlterations
+            |> Seq.map (fun ga ->
+                let row = context.Public.Genes.Create()
+
+                row.Name <- ga.GeneName.Value
+
+                row
+            )
+
+        let toVariantRows (report: Report) =
+            report.GenomicAlterations
+            |> Seq.map (fun ga ->
+                let row = context.Public.Variants.Create()
+
+                row.GeneName <- ga.GeneName.Value
+                row.AllelicFraction <- ga.AlleleFrequency |> Option.map (fun af -> float af.Value)
+                row.Category <- "somatic"
+
+
+                row
+            )
 
         let toFusionGeneRows (report: Report) =
             report.Fusions
