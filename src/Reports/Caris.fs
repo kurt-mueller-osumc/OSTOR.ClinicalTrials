@@ -669,6 +669,7 @@ module Caris =
 
             open FsToolkit.ErrorHandling
 
+            /// Validate input for transcript alteration detail
             let validate input =
                 validation {
                     let! startPosition = input.StartPositionInput |> StartPosition.validate
@@ -684,6 +685,15 @@ module Caris =
                              TranscriptId = transcriptId
                              TranscriptIdSource = TranscriptIdSource "RefSeq" }
                 }
+
+            /// Validate optional input for transcript alteration detail
+            let validateOptional (input: Input option) =
+                match input with
+                | None -> Ok None
+                | Some input ->
+                    match validate input with
+                    | Ok tad -> Ok <| Some tad
+                    | Error e -> Error e
 
         open FsToolkit.ErrorHandling
 
