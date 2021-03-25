@@ -35,6 +35,12 @@ module Utilities =
             | (true, num) -> Some num
             | _ -> None
 
+    module UnsignedInteger64 =
+        let tryParse(input: string) : uint64 option =
+            match System.UInt64.TryParse(input) with
+            | (true, num) -> Some num
+            | _ -> None
+
     module Decoder =
         open System
         open Thoth.Json.Net
