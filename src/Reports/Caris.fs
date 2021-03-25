@@ -121,6 +121,33 @@ module Caris =
         | ``Mutation Not Detected``
         | ``Wild Type``
 
+    and MolecularConsequence =
+        internal
+        | Missense
+        | Nonsense
+        | Frameshift
+        | Splicing
+        | Noncoding
+        | ``Codon Deletion``
+        | ``Codon Insertion``
+        | UTR
+        | Promoter
+        // special case where molecular consequence attribute is present with no value
+        | BlankConsequence
+
+    and TranscriptAlterationDetail =
+        { ObservedNucleotide: Nucleotide
+          ReferenceNucleotide: Nucleotide
+          TranscriptId: TranscriptId
+          TranscriptIdSource: TranscriptIdSource
+          StartPosition: TranscriptStartPosition
+          StopPosition: TranscriptStopPosition }
+    and Nucleotide = internal Nucleotide of string
+    and TranscriptId = internal TranscriptId of string
+    and TranscriptIdSource = internal TranscriptIdSource of string
+    and TranscriptStartPosition = internal TranscriptStartPosition of string
+    and TranscriptStopPosition = internal TranscriptStopPosition of string
+
     type AlleleFrequency with member this.Value = this |> fun (AlleleFrequency af) -> af
 
     type Fusion =
@@ -563,6 +590,29 @@ module Caris =
                     |> Option.map (Ok << (Some << AlleleFrequency))
                     |> Option.defaultValue (Ok None)
                     |> Result.mapError (fun e -> $"Allele Frequency Input: {e}")
+
+        module MolecularConsequence =
+            type Input = Input of string
+
+            /// Validate that the input for a molecular consequence is one of the following:
+            /// 1. Blank
+            /// 2. Missense
+            /// 3. Nonsense
+            /// 4. Frameshift
+            /// 5. Noncoding
+            /// 6. Codon deletion / insertion
+            /// 7. Promoter
+            let validate (Input input) =
+                match input with
+                | "" -> Ok BlankConsequence
+                | "Missense" -> Ok Missense
+                | "Nonsense" -> Ok Nonsense
+                | "Frameshift" -> Ok Frameshift
+                | "Noncoding" -> Ok Noncoding
+                | "CODON_DELETION" -> Ok ``Codon Deletion``
+                | "CODON_INSERTION" -> Ok ``Codon Insertion``
+                | "Promoter" -> Ok Promoter
+                | _ -> Error $"Invalid molecular consequence: {input}"
 
         open FsToolkit.ErrorHandling
 
