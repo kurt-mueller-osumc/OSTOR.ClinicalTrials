@@ -145,8 +145,8 @@ module Caris =
     and Nucleotide = internal Nucleotide of string
     and TranscriptId = internal TranscriptId of string
     and TranscriptIdSource = internal TranscriptIdSource of string
-    and TranscriptStartPosition = internal TranscriptStartPosition of string
-    and TranscriptStopPosition = internal TranscriptStopPosition of string
+    and TranscriptStartPosition = internal TranscriptStartPosition of position: uint64
+    and TranscriptStopPosition  = internal TranscriptStopPosition  of position: uint64
 
     type AlleleFrequency with member this.Value = this |> fun (AlleleFrequency af) -> af
 
@@ -626,6 +626,64 @@ module Caris =
                 | "CODON_INSERTION" -> Ok ``Codon Insertion``
                 | "Promoter" -> Ok Promoter
                 | _ -> Error $"Invalid molecular consequence: {input}"
+
+        module TranscriptAlterationDetail =
+            module StartPosition =
+                open Utilities
+
+                type Input = Input of string
+
+                let validate (Input input) =
+                    match UnsignedInteger64.tryParse input with
+                    | Some position -> Ok <| TranscriptStartPosition position
+                    | None -> Error $"Invalid start position: {input}"
+
+            module StopPosition =
+                open Utilities
+
+                type Input = Input of string
+
+                let validate (Input input) =
+                    match UnsignedInteger64.tryParse input with
+                    | Some position -> Ok <| TranscriptStopPosition position
+                    | None -> Error $"Invalid start position: {input}"
+
+            module TranscriptId =
+                open System.Text.RegularExpressions
+
+                type Input = Input of string
+
+                /// Validate that a transcript id is either blank or starts with "NM_" followed by at least one digit.
+                let validate (Input input) =
+                    if Regex("^(NM_\d{1,})*$").Match(input).Success then
+                        Ok <| TranscriptId input
+                    else
+                        Error $"Invalid transcript id: {input}"
+
+            type Input =
+                { StartPositionInput: StartPosition.Input
+                  StopPositionInput: StopPosition.Input
+                  TranscriptIdInput: TranscriptId.Input
+                  ObservedNucleotideInput: Nucleotide.Input
+                  ReferenceNucelotideInput: Nucleotide.Input  }
+
+            open FsToolkit.ErrorHandling
+
+            let validate input =
+                validation {
+                    let! startPosition = input.StartPositionInput |> StartPosition.validate
+                    and! stopPosition = input.StopPositionInput |> StopPosition.validate
+                    and! transcriptId = input.TranscriptIdInput |> TranscriptId.validate
+                    and! observedNucleotide = input.ObservedNucleotideInput |> Nucleotide.validate
+                    and! referenceNucleotide = input.ReferenceNucelotideInput |> Nucleotide.validate
+
+                    return { ObservedNucleotide = observedNucleotide
+                             ReferenceNucleotide = referenceNucleotide
+                             StartPosition = startPosition
+                             StopPosition = stopPosition
+                             TranscriptId = transcriptId
+                             TranscriptIdSource = TranscriptIdSource "RefSeq" }
+                }
 
         open FsToolkit.ErrorHandling
 
