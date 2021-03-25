@@ -2,6 +2,7 @@ namespace OSTOR.ClinicalTrials.Reports
 
 [<AutoOpen>]
 module Common =
+    /// The patient's medical record number
     type MRN =
         internal | MRN of int64
 
@@ -34,8 +35,9 @@ module Common =
 
     type DateOfBirth = DateOfBirth of System.DateTime
 
+    /// An International Classification of Diseases code
     type IcdCode =
-        internal | IcdCode of string
+        internal | IcdCode of code: string
 
         member this.Value =
             let (IcdCode icdCode) = this
@@ -57,7 +59,7 @@ module Common =
 
         type Input = Input of string
 
-        /// Validate that a medical record # consists of at least one digit or one alphabet letter
+        /// Validate that a medical record # consists of at least one digit
         let validate (Input input) =
             match Integer64.tryParse input with
             | Some mrn -> Ok (MRN mrn)
@@ -72,7 +74,7 @@ module Common =
                 |> validate
                 |> Result.map Some
 
-        let toInteger (MRN mrn) = mrn
+        let toInteger (mrn: MRN) = mrn.Value
 
     module LastName =
         open Utilities.StringValidations
