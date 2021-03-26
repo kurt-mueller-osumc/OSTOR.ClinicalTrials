@@ -7,11 +7,11 @@ module Tempus =
     type Diagnosis =
         { DiagnosisName: DiagnosisName
           DiagnosisDate: DiagnosisDate option }
-    and DiagnosisName = DiagnosisName of string
-    and DiagnosisDate = DiagnosisDate of System.DateTime
+    and DiagnosisName = internal DiagnosisName of string
+    and DiagnosisDate = internal DiagnosisDate of System.DateTime
 
-    type TumorCategory = TumorCategory
-    type GermlineCategory = GermlineCategory
+    type TumorCategory = internal | TumorCategory
+    type GermlineCategory = internal | GermlineCategory
 
     type Sample<'Category> =
         { SampleId: SampleId
@@ -21,13 +21,13 @@ module Tempus =
           ReceivedDate: ReceivedDate
           BlockId: BlockId
           TumorPercentage: TumorPercentage }
-    and SampleId = SampleId of System.Guid
-    and SampleSite = SampleSite of string
-    and SampleType = SampleType of string
-    and CollectionDate = CollectionDate of System.DateTime
-    and ReceivedDate = ReceivedDate of System.DateTime
-    and BlockId = BlockId of string
-    and TumorPercentage = TumorPercentage of uint
+    and SampleId = internal SampleId of System.Guid
+    and SampleSite = internal SampleSite of string
+    and SampleType = internal SampleType of string
+    and CollectionDate = internal CollectionDate of System.DateTime
+    and ReceivedDate = internal ReceivedDate of System.DateTime
+    and BlockId = internal BlockId of string
+    and TumorPercentage = internal TumorPercentage of uint
 
     type Report =
         { Diagnosis: Diagnosis
@@ -35,6 +35,7 @@ module Tempus =
           TumorSample: Sample<TumorCategory> }
 
     type Variant =
+        internal
         | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
 
     and ``Somatic Biologically Relevant Variant`` =
@@ -47,7 +48,6 @@ module Tempus =
         { GeneName: GeneName
           HgncId: HgncId
           EntrezId: EntrezId }
-    and GeneName = internal GeneName of string
     and HgncId = internal HgncId of string
     and EntrezId = internal EntrezId of string
 
@@ -60,7 +60,7 @@ module Tempus =
         { ``5' Gene``: Gene
           ``3' Gene``: Gene
           FusionType: FusionType }
-    and FusionType = FusionType of string
+    and FusionType = internal FusionType of string
 
     and HGVS =
         { ``Protein Sequence Change``: ``HGVS Protein Sequence Change`` option
@@ -70,15 +70,15 @@ module Tempus =
     and ``HGVS Protein Sequence Change`` =
         { AbbreviatedChange: ``Abbreviated Protein Sequence Change``
           FullChange: ``Full Protein Sequence Change`` }
-    and ``Abbreviated Protein Sequence Change`` = ``Abbreviated Protein Sequence Change`` of string
-    and ``Full Protein Sequence Change`` = ``Full Protein Sequence Change`` of string
-    and ``HGVS Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` of string
-    and ReferenceSequence = ReferenceSequence of string
+    and ``Abbreviated Protein Sequence Change`` = internal ``Abbreviated Protein Sequence Change`` of string
+    and ``Full Protein Sequence Change`` = internal ``Full Protein Sequence Change`` of string
+    and ``HGVS Coding DNA Sequence Change`` = internal ``HGVS Coding DNA Sequence Change`` of string
+    and ReferenceSequence = internal ReferenceSequence of string
 
-    and VariantDescription = VariantDescription of string
-    and VariantType = VariantType of string
-    and NucleotideAlteration = NucleotideAlteration of string
-    and AllelicFraction = AllelicFraction of float
+    and VariantDescription = internal VariantDescription of string
+    and VariantType = internal VariantType of string
+    and NucleotideAlteration = internal NucleotideAlteration of string
+    and AllelicFraction = internal AllelicFraction of float
 
     module Gene =
         /// Json object attributes that identifies genes
