@@ -78,6 +78,7 @@ module Caris =
           Source: GenomicAlterationSource option
           Interpretation: GeneInterpretation
           AlleleFrequency: AlleleFrequency option
+          HGVS: HGVS
           TranscriptAlterationDetails: TranscriptAlterationDetails option }
     and GeneInterpretation = internal GeneInterpretation of string
     and GenomicAlterationSource = internal | Somatic
@@ -148,6 +149,14 @@ module Caris =
     and TranscriptIdSource = internal TranscriptIdSource of string
     and TranscriptStartPosition = internal TranscriptStartPosition of position: uint64
     and TranscriptStopPosition  = internal TranscriptStopPosition  of position: uint64
+
+    and HGVS =
+        internal
+        | HGVS of {| CodingChange: HgvsCodingChange
+                     ProteinChange: HgvsProteinChange |}
+        | BlankHGVS
+    and HgvsCodingChange = internal HgvsCodingChange of codingChange: string
+    and HgvsProteinChange = internal HgvsProteinChange of proteinChange: string
 
     type AlleleFrequency with member this.Value = this |> fun (AlleleFrequency af) -> af
 
@@ -527,6 +536,19 @@ module Caris =
             else
                 Error <| $"Invalid nucleotide(s): {input}"
 
+    module HGVS =
+        module CodingChange =
+            type Input = Input of string
+
+        module ProteinChange =
+            type Input = Input of string
+
+        /// Validate that HGVS coding and protein change are both empty or are both present.
+        let validate (codingChangeInput: CodingChange.Input option) (proteinChangeInput: ProteinChange.Input option) =
+            match codingChangeInput, proteinChangeInput with
+            | None, None -> Ok BlankHGVS
+            | Some (CodingChange.Input codingChange), Some (ProteinChange.Input proteinChange) -> Ok <| HGVS {| CodingChange = HgvsCodingChange codingChange; ProteinChange = HgvsProteinChange proteinChange |}
+            | _ -> Error $"HGVS change error: {(codingChangeInput, proteinChangeInput)}"
 
     module GenomicAlteration =
         module Source =
@@ -703,6 +725,8 @@ module Caris =
               Interpretation: Gene.Interpretation.Input
               ResultGroup: ResultGroup.Input
               TranscriptAlterationDetailsInput: TranscriptAlterationDetails.Input option
+              HgvsCodingChangeInput: HGVS.CodingChange.Input option
+              HgvsProteinChangeInput: HGVS.ProteinChange.Input option
               AlleleFrequency: AlleleFrequency.FrequencyInput option
               Source: Source.Input option }
 
@@ -714,11 +738,13 @@ module Caris =
                 and! source = input.Source |> Source.validate
                 and! alleleFrequency = input.AlleleFrequency |> AlleleFrequency.Input.validate
                 and! transcriptAlterationDetails = input.TranscriptAlterationDetailsInput |> TranscriptAlterationDetails.validateOptional
+                and! hgvsChange = (input.HgvsCodingChangeInput, input.HgvsProteinChangeInput) ||> HGVS.validate
 
                 return { GeneName = geneName
                          ResultGroup = resultGroup
                          Interpretation = interpretation
                          AlleleFrequency = alleleFrequency
+                         HGVS = hgvsChange
                          TranscriptAlterationDetails = transcriptAlterationDetails
                          Source = source }
             }
@@ -1069,6 +1095,8 @@ module Caris =
                       Interpretation = ga.Interpretation |> Gene.Interpretation.Input
                       AlleleFrequency = ga.AlleleFrequency |> Option.map GenomicAlteration.AlleleFrequency.FrequencyInput
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input
+                      HgvsCodingChangeInput = ga.HgvsCodingChange |> Option.map HGVS.CodingChange.Input
+                      HgvsProteinChangeInput = ga.HgvsProteinChange |> Option.map HGVS.ProteinChange.Input
                       TranscriptAlterationDetailsInput = ga.TranscriptAlterationDetail |> Option.map (fun tad ->
                            { StartPositionInput = tad.TranscriptStartPosition |> GenomicAlteration.TranscriptAlterationDetails.StartPosition.Input
                              StopPositionInput  = tad.TranscriptStopPosition |> GenomicAlteration.TranscriptAlterationDetails.StopPosition.Input
