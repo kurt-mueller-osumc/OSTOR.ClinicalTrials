@@ -76,10 +76,17 @@ module Caris =
         { GeneName: GeneName
           ResultGroup: GenomicAlterationResultGroup
           Source: GenomicAlterationSource option
+          MolecularConsequence: MolecularConsequence option
           Interpretation: GeneInterpretation
           AlleleFrequency: AlleleFrequency option
           HGVS: HGVS
           TranscriptAlterationDetails: TranscriptAlterationDetails option }
+
+        member this.IsSomatic =
+            match this.Source with
+            | Some Somatic -> true
+            | _ -> false
+
     and GeneInterpretation = internal GeneInterpretation of string
     and GenomicAlterationSource = internal | Somatic
     and AlleleFrequency = internal AlleleFrequency of uint
@@ -551,6 +558,7 @@ module Caris =
             | _ -> Error $"HGVS change error: {(codingChangeInput, proteinChangeInput)}"
 
     module GenomicAlteration =
+        let isSomatic (genomicAlteration: GenomicAlteration) = genomicAlteration.IsSomatic
         module Source =
             type Input = Input of string
 
@@ -650,12 +658,22 @@ module Caris =
                 | "Promoter" -> Ok Promoter
                 | _ -> Error $"Invalid molecular consequence: {input}"
 
+            /// Validate an optional input if it exists
+            let validateOptional (input: Input option) =
+                match input with
+                | None -> Ok None
+                | Some i ->
+                    match validate i with
+                    | Ok molecularConsequence -> Ok <| Some molecularConsequence
+                    | Error e -> Error e
+
         module TranscriptAlterationDetails =
             module StartPosition =
                 open Utilities
 
                 type Input = Input of string
 
+                /// Validate that a start position is a valid unsigned integer
                 let validate (Input input) =
                     match UnsignedInteger64.tryParse input with
                     | Some position -> Ok <| TranscriptStartPosition position
@@ -666,6 +684,7 @@ module Caris =
 
                 type Input = Input of string
 
+                /// Validate that a stop position is a valid unsigned integer
                 let validate (Input input) =
                     match UnsignedInteger64.tryParse input with
                     | Some position -> Ok <| TranscriptStopPosition position
@@ -724,18 +743,21 @@ module Caris =
             { GeneNameInput: Gene.Name.Input
               Interpretation: Gene.Interpretation.Input
               ResultGroup: ResultGroup.Input
+              MolecularConsequenceInput: MolecularConsequence.Input option
               TranscriptAlterationDetailsInput: TranscriptAlterationDetails.Input option
               HgvsCodingChangeInput: HGVS.CodingChange.Input option
               HgvsProteinChangeInput: HGVS.ProteinChange.Input option
               AlleleFrequency: AlleleFrequency.FrequencyInput option
               Source: Source.Input option }
 
+        /// Validate that genomic alteration input is valid
         let validate input =
             validation {
                 let! geneName = input.GeneNameInput |> Gene.Name.validate
                 and! resultGroup = input.ResultGroup |> ResultGroup.validate
                 and! interpretation = input.Interpretation |> Gene.Interpretation.validate
                 and! source = input.Source |> Source.validate
+                and! molecularConsequence = input.MolecularConsequenceInput |> MolecularConsequence.validateOptional
                 and! alleleFrequency = input.AlleleFrequency |> AlleleFrequency.Input.validate
                 and! transcriptAlterationDetails = input.TranscriptAlterationDetailsInput |> TranscriptAlterationDetails.validateOptional
                 and! hgvsChange = (input.HgvsCodingChangeInput, input.HgvsProteinChangeInput) ||> HGVS.validate
@@ -746,17 +768,23 @@ module Caris =
                          AlleleFrequency = alleleFrequency
                          HGVS = hgvsChange
                          TranscriptAlterationDetails = transcriptAlterationDetails
+                         MolecularConsequence = molecularConsequence
                          Source = source }
             }
 
     module GenomicAlterations =
         open Utilities
 
+        /// Validate genomic alteration inputs
         let validate =
             Seq.map GenomicAlteration.validate
             >> Seq.toList
             >> Result.combine
             >> Result.mapError List.flatten
+
+        /// Filter for only somatic genomic alterations
+        let somatic (genomicAlterations: GenomicAlteration seq) =
+            genomicAlterations |> Seq.filter GenomicAlteration.isSomatic
 
     module Fusion =
         module Exon =
@@ -907,6 +935,9 @@ module Caris =
           Diagnosis: Diagnosis
           TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstability: MicrosatelliteInstability option }
+
+        member this.SomaticGenomicAlterations =
+            this.GenomicAlterations |> GenomicAlterations.somatic
 
     module Report =
         open FSharp.Data
@@ -1095,6 +1126,7 @@ module Caris =
                       Interpretation = ga.Interpretation |> Gene.Interpretation.Input
                       AlleleFrequency = ga.AlleleFrequency |> Option.map GenomicAlteration.AlleleFrequency.FrequencyInput
                       Source = ga.Source |> Option.map GenomicAlteration.Source.Input
+                      MolecularConsequenceInput = ga.MolecularConsequence |> Option.map GenomicAlteration.MolecularConsequence.Input
                       HgvsCodingChangeInput = ga.HgvsCodingChange |> Option.map HGVS.CodingChange.Input
                       HgvsProteinChangeInput = ga.HgvsProteinChange |> Option.map HGVS.ProteinChange.Input
                       TranscriptAlterationDetailsInput = ga.TranscriptAlterationDetail |> Option.map (fun tad ->
