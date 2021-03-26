@@ -87,6 +87,9 @@ module Caris =
             | Some Somatic -> true
             | _ -> false
 
+        member this.HasMolecularConsequence =
+            this.MolecularConsequence.IsSome
+
     and GeneInterpretation = internal GeneInterpretation of string
     and GenomicAlterationSource = internal | Somatic
     and AlleleFrequency = internal AlleleFrequency of uint
@@ -162,10 +165,57 @@ module Caris =
         | HGVS of {| CodingChange: HgvsCodingChange
                      ProteinChange: HgvsProteinChange |}
         | BlankHGVS
-    and HgvsCodingChange = internal HgvsCodingChange of codingChange: string
-    and HgvsProteinChange = internal HgvsProteinChange of proteinChange: string
+
+        /// Convert any coding change value into a string
+        member this.CodingChangeValue =
+            match this with
+            | HGVS hgvs -> hgvs.CodingChange.Value
+            | BlankHGVS -> ""
+
+        /// Convert any protein change value into a string
+        member this.ProteinChangeValue =
+            match this with
+            | HGVS hgvs -> hgvs.ProteinChange.Value
+            | BlankHGVS -> ""
+
+    and HgvsCodingChange =
+        internal
+        | HgvsCodingChange of codingChange: string
+
+        member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
+
+    and HgvsProteinChange =
+        internal
+        | HgvsProteinChange of proteinChange: string
+
+        member this.Value = this |> fun (HgvsProteinChange proteinChange) -> proteinChange
+
+    (* Genomic Alteration Type Extensions *)
+    type MolecularConsequence with
+        member this.Value =
+            match this with
+            | Missense -> "missense"
+            | Nonsense -> "nonsense"
+            | Frameshift -> "frameshift"
+            | Splicing -> "splicing"
+            | Noncoding -> "noncoding"
+            | ``Codon Deletion`` -> "codon deletion"
+            | ``Codon Insertion`` -> "codon insertion"
+            | UTR -> "utr"
+            | Promoter -> "promoter"
+            // special case where molecular consequence attribute is present with no value
+            | BlankConsequence -> ""
 
     type AlleleFrequency with member this.Value = this |> fun (AlleleFrequency af) -> af
+
+    type GenomicAlterationSource with
+        member this.Value =
+            match this with
+            | Somatic -> "somatic"
+
+    type GenomicAlteration with
+        member this.MolecularConsequenceValue = this.MolecularConsequence |> Option.map (fun mc -> mc.Value) |> Option.defaultValue ""
+        member this.SourceValue = this.Source |> Option.map (fun src -> src.Value) |> Option.defaultValue ""
 
     type Fusion =
         { Gene1Name: GeneName
@@ -559,6 +609,8 @@ module Caris =
 
     module GenomicAlteration =
         let isSomatic (genomicAlteration: GenomicAlteration) = genomicAlteration.IsSomatic
+        let hasMolecularConsequence (genomicAlteration: GenomicAlteration) = genomicAlteration.HasMolecularConsequence
+
         module Source =
             type Input = Input of string
 
@@ -786,6 +838,9 @@ module Caris =
         let somatic (genomicAlterations: GenomicAlteration seq) =
             genomicAlterations |> Seq.filter GenomicAlteration.isSomatic
 
+        let withMolecularConsequence (genomicAlterations: GenomicAlteration seq) =
+            genomicAlterations |> Seq.filter GenomicAlteration.hasMolecularConsequence
+
     module Fusion =
         module Exon =
             open Utilities
@@ -938,6 +993,9 @@ module Caris =
 
         member this.SomaticGenomicAlterations =
             this.GenomicAlterations |> GenomicAlterations.somatic
+
+        member this.GenomicAlterationsWithMolecularConsequence =
+            this.GenomicAlterations |> GenomicAlterations.withMolecularConsequence
 
     module Report =
         open FSharp.Data
@@ -1286,14 +1344,20 @@ module Caris =
             )
 
         let toVariantRows (report: Report) =
-            report.GenomicAlterations
+            report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
                 let row = context.Public.Variants.Create()
 
                 row.GeneName <- ga.GeneName.Value
-                row.AllelicFraction <- ga.AlleleFrequency |> Option.map (fun af -> float af.Value)
-                row.Category <- "somatic"
+                row.Name     <- ga.HGVS.ProteinChangeValue
+                // row.SampleReportId
 
+                row.AllelicFraction <- ga.AlleleFrequency |> Option.map (fun af -> float af.Value)
+                row.Category <- ga.SourceValue
+                row.Type <- ga.MolecularConsequenceValue |> Some
+
+                row.HgvsC <- ga.HGVS.CodingChangeValue |> Some
+                row.HgvsProtein <- ga.HGVS.ProteinChangeValue |> Some
 
                 row
             )
