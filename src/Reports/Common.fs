@@ -30,10 +30,17 @@ module Common =
     type FullName =
         { LastName: LastName
           FirstName: FirstName }
-    and LastName = internal LastName of string
-    and FirstName = internal FirstName of string
+    and LastName =
+        internal | LastName of string
+        member this.Value = this |> fun (LastName lastName) -> lastName
+    and FirstName =
+        internal | FirstName of string
+        member this.Value = this |> fun (FirstName firstName) -> firstName
 
-    type DateOfBirth = DateOfBirth of System.DateTime
+    type DateOfBirth =
+        internal | DateOfBirth of System.DateTime
+
+        member this.Value = this |> fun (DateOfBirth dob) -> dob
 
     /// An International Classification of Diseases code
     type IcdCode =

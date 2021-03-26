@@ -1250,10 +1250,10 @@ module Caris =
             let patient = report.Patient
             let row = context.Public.Patients.Create()
 
-            row.Mrn <- patient.MRN |> MRN.toInteger
-            row.FirstName   <- patient.FirstName   |> FirstName.toString
-            row.LastName    <- patient.LastName    |> LastName.toString
-            row.DateOfBirth <- patient.DateOfBirth |> DateOfBirth.unwrap
+            row.Mrn         <- patient.MRN.Value
+            row.FirstName   <- patient.FirstName.Value
+            row.LastName    <- patient.LastName.Value
+            row.DateOfBirth <- patient.DateOfBirth.Value
 
             row
 
