@@ -4,14 +4,9 @@ module Tempus =
     open Thoth.Json.Net
     open Utilities
 
-    type Diagnosis =
-        { DiagnosisName: DiagnosisName
-          DiagnosisDate: DiagnosisDate option }
-    and DiagnosisName = internal DiagnosisName of string
-    and DiagnosisDate = internal DiagnosisDate of System.DateTime
-
+    /// Tempus has either normal or tumor sample categories
     type TumorCategory = internal | TumorCategory
-    type GermlineCategory = internal | GermlineCategory
+    type NormalCategory = internal | NormalCategory
 
     type Sample<'Category> =
         { SampleId: SampleId
@@ -29,10 +24,15 @@ module Tempus =
     and BlockId = internal BlockId of string
     and TumorPercentage = internal TumorPercentage of uint
 
+    /// The "report" section of the Tempus report. Each report has a diagnosis, a tumor sample, and an optional normal sample
     type Report =
         { Diagnosis: Diagnosis
-          GermlineSample: Sample<GermlineCategory> option
+          NormalSample: Sample<NormalCategory> option
           TumorSample: Sample<TumorCategory> }
+    and Diagnosis =
+        { DiagnosisName: Diagnosis.Name
+          DiagnosisDate: DiagnosisDate option }
+    and DiagnosisDate = internal DiagnosisDate of System.DateTime
 
     type Variant =
         internal
@@ -54,9 +54,9 @@ module Tempus =
     and ``Somatic Biologically Relevant Gene`` =
         internal
         | Gene of Gene
-        | FusionGene of FusionGene
+        | FusionGene of Fusion
 
-    and FusionGene =
+    and Fusion =
         { ``5' Gene``: Gene
           ``3' Gene``: Gene
           FusionType: FusionType }
@@ -74,11 +74,17 @@ module Tempus =
     and ``Full Protein Sequence Change`` = internal ``Full Protein Sequence Change`` of string
     and ``HGVS Coding DNA Sequence Change`` = internal ``HGVS Coding DNA Sequence Change`` of string
     and ReferenceSequence = internal ReferenceSequence of string
-
     and VariantDescription = internal VariantDescription of string
     and VariantType = internal VariantType of string
     and NucleotideAlteration = internal NucleotideAlteration of string
     and AllelicFraction = internal AllelicFraction of float
+
+    type ``Abbreviated Protein Sequence Change`` with
+        member this.Value = this |> fun (``Abbreviated Protein Sequence Change`` proteinChange) -> proteinChange
+    type ``Full Protein Sequence Change`` with
+        member this.Value = this |> fun (``Full Protein Sequence Change`` proteinChange) -> proteinChange
+    type ``HGVS Coding DNA Sequence Change`` with
+        member this.Value = this |> fun (``HGVS Coding DNA Sequence Change`` codingChange) -> codingChange
 
     module Gene =
         /// Json object attributes that identifies genes
@@ -109,42 +115,46 @@ module Tempus =
                       EntrezId = "gene3entrezId" |> flip get.Required.Field Decode.string })
 
         module Json =
-            let (|NotBlank|BlankString|) string =
-                if string = "" then BlankString
-                else NotBlank
+            open StringValidations
 
+            /// Validate that a json object representing a gene has a gene name, hgnc id, and entrez id
             let validate (json: Json) =
                 match (json.GeneId, json.HgncId, json.EntrezId) with
                 | (NotBlank, NotBlank, NotBlank) -> Ok { GeneName = GeneName json.GeneId; HgncId = HgncId json.HgncId; EntrezId = EntrezId json.EntrezId }
                 | _ -> Error $"Gene missing name, hgnc id, or entrez id: {json}"
 
-    module FusionGene =
-        open FsToolkit.ErrorHandling
-        open Utilities.StringValidations
-
+    module Fusion =
         type Json =
-            { Gene5Json: Gene.Json
-              Gene3Json: Gene.Json
-              FusionType: string }
+            { Gene5: Gene.Json
+              Gene3: Gene.Json
+              VariantDescription: string
+              FusionType: string
+              StructuralVariant: string option }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
-                    { Gene5Json  = get.Required.Raw Gene.Json.Gene5Decoder
-                      Gene3Json  = get.Required.Raw Gene.Json.Gene3Decoder
-                      FusionType = "fusionType" |> flip get.Required.Field Decode.string }
+                    { Gene5 = get.Required.Raw Gene.Json.Gene5Decoder
+                      Gene3 = get.Required.Raw Gene.Json.Gene3Decoder
+                      VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
+                      FusionType         = "fusionType"         |> flip get.Required.Field Decode.string
+                      StructuralVariant  = "structuralVariant"  |> flip get.Required.Field Decoder.optionalString }
                 )
 
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
         module FusionType =
+            /// Validate that a fusion type is not blank
             let validate =
                 validateNotBlank
                 >> Result.map FusionType
                 >> Result.mapError (fun e -> $"Fusion type can't be blank: {e}")
 
-
+        /// Validate that a fusion has 2 valid genes and a valid fusion type
         let validate (json: Json) =
             validation {
-                let! gene5 = json.Gene5Json |> Gene.Json.validate
-                and! gene3 = json.Gene3Json |> Gene.Json.validate
+                let! gene5 = json.Gene5 |> Gene.Json.validate
+                and! gene3 = json.Gene3 |> Gene.Json.validate
                 and! fusionType = json.FusionType |> FusionType.validate
 
                 return { ``5' Gene`` = gene5
@@ -172,19 +182,16 @@ module Tempus =
                       MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
 
+        /// Retrieve the mutation effect for HGVS. If the protein change is present, report that. If not, report the coding change.
         let mutationEffect hgvs =
             match hgvs.``Protein Sequence Change`` with
-            | Some proteinSequenceChange ->
-                let (``Abbreviated Protein Sequence Change`` sc) = proteinSequenceChange.AbbreviatedChange
-                sc
-            | _ ->
-                let (``HGVS Coding DNA Sequence Change`` sc) = hgvs.``Coding DNA Sequence Change``
-                sc
-
+            | Some proteinSequenceChange -> proteinSequenceChange.AbbreviatedChange.Value
+            | _ -> hgvs.``Coding DNA Sequence Change``.Value
 
         open Utilities.StringValidations
 
         /// Validate a HGVS reference sequence:
+        ///
         /// 1. all hgvs fields are blank OR
         /// 2. if hgvs.c is present and hgvs.p is blank, mutationEffect == hgvs.c OR
         /// 3. if hgvs.p is present
@@ -214,8 +221,6 @@ module Tempus =
             else
                 validate json
                 |> Result.map Some
-
-
 
     module Order =
         type Json =
@@ -294,6 +299,7 @@ module Tempus =
               SigningPathologist: string
               SignoutDate: DateTime }
 
+            /// Deserializer for the "report" section of the Tempus report
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     let pathologistDecoder = ["signing_pathologist"; "signingPathologist"] |> List.map (flip Decode.field Decode.string) |> Decode.oneOf
@@ -316,6 +322,7 @@ module Tempus =
               SampleType: string
               Institution: InstitutionJson }
 
+            /// Deserializer for the sample seciton of the Tempus report
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     { SampleId       = "tempusSampleId"  |> flip get.Required.Field Decode.guid
@@ -385,8 +392,6 @@ module Tempus =
                         }
                     )
 
-            // let validate json =
-
         type Json =
             { GeneJson: Gene.Json
               VariantJsons: Variant.Json list }
@@ -415,7 +420,7 @@ module Tempus =
         module Gene =
             /// Validate that a gene or a fusion gene is present and valid
             let validate geneJson fusionGeneJson =
-              match Gene.Json.validate geneJson, FusionGene.validate fusionGeneJson with
+              match Gene.Json.validate geneJson, Fusion.validate fusionGeneJson with
               | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
               | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
               | (Ok gene, _) -> Ok <| Gene gene
@@ -424,7 +429,7 @@ module Tempus =
         /// Represents a json object found in results.somaticBiologicallyRelevantVariants
         type Json =
             { GeneJson: Gene.Json
-              FusionGene: FusionGene.Json
+              FusionGene: Fusion.Json
               HgvsJson: HGVS.Json
               NucleotideAlteration: string
               AllelicFraction: string
@@ -434,9 +439,9 @@ module Tempus =
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
-                    { GeneJson   = Gene.Json.Decoder       |> get.Required.Raw
-                      FusionGene = FusionGene.Json.Decoder |> get.Required.Raw
-                      HgvsJson   = HGVS.Json.Decoder       |> get.Required.Raw
+                    { GeneJson   = Gene.Json.Decoder   |> get.Required.Raw
+                      FusionGene = Fusion.Json.Decoder |> get.Required.Raw
+                      HgvsJson   = HGVS.Json.Decoder   |> get.Required.Raw
                       VariantType          = "variantType" |> flip get.Required.Field Decode.string
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
                       StructuralVariant    = "structuralVariant"    |> flip get.Required.Field Decode.string
@@ -466,22 +471,7 @@ module Tempus =
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
 
-    module FusionVariant =
-        type Json =
-            { Gene5: Gene.Json
-              Gene3: Gene.Json
-              VariantDescription: string
-              FusionType: string
-              StructuralVariant: string option }
 
-            static member Decoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    { Gene5 = get.Required.Raw Gene.Json.Gene5Decoder
-                      Gene3 = get.Required.Raw Gene.Json.Gene3Decoder
-                      VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
-                      FusionType         = "fusionType"         |> flip get.Required.Field Decode.string
-                      StructuralVariant  = "structuralVariant"  |> flip get.Required.Field Decoder.optionalString }
-                )
 
     module InheritedRelevantVariant =
         type Json =
@@ -520,7 +510,7 @@ module Tempus =
               ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant``.Json list
               ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
               ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list
-              FusionVariants: FusionVariant.Json list
+              Fusions: Fusion.Json list
               InheritedRelevantVariants: InheritedRelevantVariant.Json list }
 
             static member Decoder : Decoder<Json> =
@@ -537,7 +527,7 @@ module Tempus =
                       ``Somatic Potentially Actionable Copy Number Variants`` = "somaticPotentiallyActionableCopyNumberVariants" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Copy Number Variant``.Json.Decoder)
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
                       ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
-                      FusionVariants = "fusionVariants" |> flip get.Required.Field (Decode.list FusionVariant.Json.Decoder)
+                      Fusions = "fusionVariants" |> flip get.Required.Field (Decode.list Fusion.Json.Decoder)
                       InheritedRelevantVariants = ["inheritedRelevantVariants"; "values"] |> flip get.Required.At (Decode.list InheritedRelevantVariant.Json.Decoder)}
                 )
 
