@@ -30,6 +30,17 @@ module Caris =
         { OrderingMdName: FullName
           NationalProviderId: NationalProviderId }
 
+    type Pathologist =
+        { Organization: PathologistOrganization option }
+    and PathologistOrganization =
+        internal
+        | PathologistOrganization of string
+
+        member this.Value =
+            let (PathologistOrganization org) = this
+            org
+
+    /// The report's specimen/sample. Caris reports only list a tumor specimen.
     type Specimen =
         { SpecimenId: SpecimenId
           AccessionId: AccessionId
@@ -57,7 +68,9 @@ module Caris =
     type SpecimenId     with member this.Value = this |> fun (SpecimenId specimenId) -> specimenId
     type SpecimenSite   with member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
     type CollectionDate with member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
+    type ReceivedDate   with member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
 
+    /// Test meta information
     type Test =
         { LabName: LabName
           OrderedDate: OrderedDate
@@ -67,10 +80,9 @@ module Caris =
     and OrderedDate = internal OrderedDate of System.DateTime
     and ReportId    = internal ReportId of string
 
-    type LabName      with member this.Value = this |> fun (LabName labName)           -> labName
-    type OrderedDate  with member this.Value = this |> fun (OrderedDate orderedDate)   -> orderedDate
-    type ReceivedDate with member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
-    type ReportId     with member this.Value = this |> fun (ReportId reportId)         -> reportId
+    type LabName     with member this.Value = this |> fun (LabName labName)           -> labName
+    type OrderedDate with member this.Value = this |> fun (OrderedDate orderedDate)   -> orderedDate
+    type ReportId    with member this.Value = this |> fun (ReportId reportId)         -> reportId
 
     type GenomicAlteration =
         { GeneName: GeneName
@@ -165,33 +177,14 @@ module Caris =
         | HGVS of {| CodingChange: HgvsCodingChange
                      ProteinChange: HgvsProteinChange |}
         | BlankHGVS
+    and HgvsCodingChange  = internal | HgvsCodingChange of codingChange: string
+    and HgvsProteinChange = internal | HgvsProteinChange of proteinChange: string
 
-        /// Convert any coding change value into a string
-        member this.CodingChangeValue =
-            match this with
-            | HGVS hgvs -> hgvs.CodingChange.Value
-            | BlankHGVS -> ""
-
-        /// Convert any protein change value into a string
-        member this.ProteinChangeValue =
-            match this with
-            | HGVS hgvs -> hgvs.ProteinChange.Value
-            | BlankHGVS -> ""
-
-    and HgvsCodingChange =
-        internal
-        | HgvsCodingChange of codingChange: string
-
-        member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
-
-    and HgvsProteinChange =
-        internal
-        | HgvsProteinChange of proteinChange: string
-
-        member this.Value = this |> fun (HgvsProteinChange proteinChange) -> proteinChange
 
     (* Genomic Alteration Type Extensions *)
+
     type MolecularConsequence with
+        /// The string representation of a molecular consequence
         member this.Value =
             match this with
             | Missense -> "missense"
@@ -206,7 +199,24 @@ module Caris =
             // special case where molecular consequence attribute is present with no value
             | BlankConsequence -> ""
 
-    type AlleleFrequency with member this.Value = this |> fun (AlleleFrequency af) -> af
+    // Unwrap these single case unions to their string value
+    type AlleleFrequency   with member this.Value = this |> fun (AlleleFrequency af) -> af
+    type HgvsCodingChange  with member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
+    type HgvsProteinChange with member this.Value = this |> fun (HgvsProteinChange proteinChange) -> proteinChange
+    type TranscriptId      with member this.Value = this |> fun (TranscriptId transcriptId) -> transcriptId
+
+    type HGVS with
+        /// The string representation of an hgvs coding change
+        member this.CodingChangeValue =
+            match this with
+            | HGVS hgvs -> hgvs.CodingChange.Value
+            | BlankHGVS -> ""
+
+        /// The string represenation of an hgvs protein change
+        member this.ProteinChangeValue =
+            match this with
+            | HGVS hgvs -> hgvs.ProteinChange.Value
+            | BlankHGVS -> ""
 
     type GenomicAlterationSource with
         member this.Value =
@@ -216,7 +226,9 @@ module Caris =
     type GenomicAlteration with
         member this.MolecularConsequenceValue = this.MolecularConsequence |> Option.map (fun mc -> mc.Value) |> Option.defaultValue ""
         member this.SourceValue = this.Source |> Option.map (fun src -> src.Value) |> Option.defaultValue ""
+        member this.TryTranscriptIdValue = this.TranscriptAlterationDetails |> Option.map (fun tad -> tad.TranscriptId.Value)
 
+    /// Fusions are marked as "translocations" in a Caris report
     type Fusion =
         { Gene1Name: GeneName
           Gene2Name: GeneName
@@ -237,7 +249,7 @@ module Caris =
         | IntermediateTmb of int<mutation/megabase>
         | HighTmb of int<mutation/megabase>
 
-        member this.Value =
+        member this.TryValue =
             match this with
             | IndeterminateTmb -> None
             | LowTmb tmb -> Some (int tmb)
@@ -257,16 +269,6 @@ module Caris =
             | StableMSI -> "stable"
             | HighMSI -> "high"
             | IndeterminateMSI -> "indeterminate"
-
-    type Pathologist =
-        { Organization: PathologistOrganization option }
-    and PathologistOrganization =
-        internal
-        | PathologistOrganization of string
-
-        member this.Value =
-            let (PathologistOrganization org) = this
-            org
 
     module Patient =
         open FsToolkit.ErrorHandling
@@ -1252,7 +1254,7 @@ module Caris =
     module Database =
         open Database
 
-        /// Extract the patient from the report & prepare it as a database row.
+        /// Convert report's patient information to a patient database row.
         let toPatientRow (report: Report) =
             let patient = report.Patient
             let row = context.Public.Patients.Create()
@@ -1264,6 +1266,7 @@ module Caris =
 
             row
 
+        /// Prepare a row to be created in the "vendors" table for Caris Life Sciences
         let toVendorRow =
             let row = context.Public.Vendors.Create()
 
@@ -1277,6 +1280,7 @@ module Caris =
 
             row
 
+        /// Prepare a database row in the "reports" table
         let toReportRow (report: Report) =
             let { Patient = patient
                   Diagnosis = diagnosis
@@ -1305,11 +1309,14 @@ module Caris =
             row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes |> List.map IcdCode.toString |> List.toArray |> Some
 
             // biomarkers
-            row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.Value)
+            row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue)
             row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
 
             row
 
+        /// Each report lists a sample that may be referred to across reports. Therefore, samples are given their own table and listings of a sample in a report are givne their own table.
+        ///
+        /// Only tumor samplesa are listed in Caris reports.
         let toSampleRow (report: Report) =
             let specimen = report.Specimen
             let row = context.Public.Samples.Create()
@@ -1318,10 +1325,10 @@ module Caris =
             row.SampleType     <- specimen.SpecimenType.Value
             row.Category       <- "tumor"
             row.BiopsySite     <- specimen.SpecimenSite.Value
-            row.CollectionDate <- specimen.CollectionDate.Value
 
             row
 
+        /// The parent sample and report must exist in the datbase.
         let toSampleReportRow (report: Report) =
             let specimen = report.Specimen
             let test = report.Test
@@ -1333,8 +1340,9 @@ module Caris =
 
             row
 
+        /// Convert all genomic alterations with molecular consequences to 'gene' database rows
         let toGeneRows (report: Report) =
-            report.GenomicAlterations
+            report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
                 let row = context.Public.Genes.Create()
 
@@ -1343,21 +1351,35 @@ module Caris =
                 row
             )
 
+        /// Convert a report's genomic alterations that have a 'molecular consequence' to 'Variant' database rows.
+        /// Each genomic alteration with a "molecular consequence" will also have an hgvs coding change and protein change.
+        ///
+        /// Each variant row has a parent sample report and a parent gene. The parent sample report and gene must already exist in the database.
         let toVariantRows (report: Report) =
+            // Find the existing sample report based on this report's report id and sample id
+            let sampleReportId =
+                query {
+                    for sampleReport in context.Public.SampleReports do
+                    where (sampleReport.ReportId = report.Test.ReportId.Value && sampleReport.SampleId = report.Specimen.SpecimenId.Value)
+                    select sampleReport.Id
+                } |> Seq.head
+
             report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
                 let row = context.Public.Variants.Create()
 
-                row.GeneName <- ga.GeneName.Value
-                row.Name     <- ga.HGVS.ProteinChangeValue
-                // row.SampleReportId
+                // Associate the variant to the gene by its name
+                row.GeneName       <- ga.GeneName.Value
+                row.SampleReportId <- sampleReportId
+                row.Name           <- ga.HGVS.ProteinChangeValue
 
                 row.AllelicFraction <- ga.AlleleFrequency |> Option.map (fun af -> float af.Value)
-                row.Category <- ga.SourceValue
+                row.Category <- ga.SourceValue // is 'somatic'
                 row.Type <- ga.MolecularConsequenceValue |> Some
 
                 row.HgvsC <- ga.HGVS.CodingChangeValue |> Some
                 row.HgvsProtein <- ga.HGVS.ProteinChangeValue |> Some
+                row.Transcript <- ga.TryTranscriptIdValue
 
                 row
             )
