@@ -12,19 +12,16 @@ module Caris =
     and Sex = internal Male | Female
 
     type Diagnosis =
-        { DiagnosisName: DiagnosisName
+        { DiagnosisName: Diagnosis.Name
           DiagnosisCodes: IcdCode list
           PathologicDiagnosis: PathologicDiagnosis
           DiagnosisSite: DiagnosisSite
           Lineage: Lineage
           SubLineage: SubLineage }
-    and DiagnosisName = internal DiagnosisName of string
     and PathologicDiagnosis = internal PathologicDiagnosis of string
     and DiagnosisSite = internal DiagnosisSite of string
     and Lineage = internal Lineage of string
     and SubLineage = internal SubLineage of string
-
-    type DiagnosisName with member this.Value = this |> fun (DiagnosisName diagnosisName) -> diagnosisName
 
     type OrderingMd =
         { OrderingMdName: FullName
@@ -318,13 +315,11 @@ module Caris =
         module Name =
             open Utilities.StringValidations
 
-            type Input = Input of string
-
             /// Validate that diagnosis name is not blank
-            let validate (Input input) =
+            let validate (Diagnosis.NameInput input) =
                 input
                 |> validateNotBlank
-                |> Result.map DiagnosisName
+                |> Result.map Diagnosis.Name
                 |> Result.mapError (fun _ -> "Diagnosis name can't be blank")
 
         module Site =
@@ -377,7 +372,7 @@ module Caris =
 
         type Input =
             { DiagnosisCodesInput: Codes.Input
-              DiagnosisNameInput: Name.Input
+              DiagnosisNameInput: Diagnosis.NameInput
               DiagnosisSiteInput: Site.Input
               PathologicDiagnosisInput: PathologicDiagnosis.Input
               LineageInput: Lineage.Input
@@ -1143,7 +1138,7 @@ module Caris =
                 { OrganizationInput = (Pathologist.Organization.Input this.PathologistInformation.Organization) }
 
             member _.DiagnosisInput : Diagnosis.Input =
-                { DiagnosisNameInput = Diagnosis.Name.Input patientInfo.Diagnosis
+                { DiagnosisNameInput = Diagnosis.NameInput patientInfo.Diagnosis
                   DiagnosisCodesInput = Diagnosis.Codes.Input patientInfo.IcdCode
                   PathologicDiagnosisInput = Diagnosis.PathologicDiagnosis.Input patientInfo.PathologicDiagnosis
                   DiagnosisSiteInput = Diagnosis.Site.Input patientInfo.PrimarySite

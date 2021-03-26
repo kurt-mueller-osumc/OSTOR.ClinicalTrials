@@ -18,14 +18,13 @@ module FoundationMedicine =
         { MRN: MRN option
           LastName: LastName
           FirstName: FirstName
-          SubmittedDiagnosis: SubmittedDiagnosis
+          SubmittedDiagnosis: Diagnosis.Name
           Gender: Gender
           DateOfBirth: DateOfBirth
           SpecimenSite: SpecimenSite
           CollectionDate: CollectionDate
           OrderingMd: OrderingMd
           Pathologist: Pathologist }
-    and SubmittedDiagnosis = internal SubmittedDiagnosis of string
     and Gender = internal Male | Female
     and DateOfBirth = internal DateOfBirth of System.DateTime
     and SpecimenSite = internal SpecimenSite of string
@@ -72,8 +71,7 @@ module FoundationMedicine =
 
     type Lab =
         { Address: Address
-          CliaNumber: CliaNumber }
-    and CliaNumber = CliaNumber of string
+          CliaNumber: Lab.CliaNumber }
 
     type Report =
         { ReportId: ReportId
@@ -224,7 +222,7 @@ module FoundationMedicine =
 
             let validate (Input input) =
                 validateNotBlank input
-                |> Result.map SubmittedDiagnosis
+                |> Result.map Diagnosis.Name
                 |> Result.mapError (fun e -> $"SubmittedDiagnosis: {e}")
 
         module Pathologist =
@@ -456,7 +454,7 @@ module FoundationMedicine =
 
         type Input =
             { AddressInput: Address.Input
-              CliaNumber: CliaNumber }
+              CliaNumber: Lab.CliaNumber }
 
         open FsToolkit.ErrorHandling
 
@@ -610,7 +608,7 @@ module FoundationMedicine =
                 let processSite = this.ReportSample.ProcessSites.[0]
 
                 { AddressInput = Lab.Address.Input processSite.Address
-                  CliaNumber = CliaNumber processSite.CliaNumber }
+                  CliaNumber = Lab.CliaNumber processSite.CliaNumber }
 
             /// Retrieve the report's sample
             member this.SampleInput : Sample.Input =

@@ -148,8 +148,19 @@ module Common =
             | _, Some npi -> Error $"NPI must be a 10 digit number: {npi}"
             | _ -> Error $"NPI is invalid {input}"
 
-    module DateOfBirth =
-        let unwrap (DateOfBirth dob) = dob
+    module Lab =
+        type CliaNumber =
+            internal | CliaNumber of string
+
+            member this.Value = this |> fun (CliaNumber clia) -> clia
+
+    module Diagnosis =
+        type NameInput = NameInput of string
+
+        type Name =
+            internal | Name of string
+
+            member this.Value = this |> fun (Name name) -> name
 
     module IcdCode =
         open System.Text.RegularExpressions
