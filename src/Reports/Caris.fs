@@ -78,11 +78,9 @@ module Caris =
           ReportId: ReportId }
     and LabName     = internal LabName of string
     and OrderedDate = internal OrderedDate of System.DateTime
-    and ReportId    = internal ReportId of string
 
     type LabName     with member this.Value = this |> fun (LabName labName)           -> labName
     type OrderedDate with member this.Value = this |> fun (OrderedDate orderedDate)   -> orderedDate
-    type ReportId    with member this.Value = this |> fun (ReportId reportId)         -> reportId
 
     type GenomicAlteration =
         { GeneName: GeneName
@@ -544,9 +542,7 @@ module Caris =
         module ReportId =
             open System.Text.RegularExpressions
 
-            type Input = Input of string
-
-            let validate (Input input) =
+            let validate (ReportId.Input input) =
                 if Regex("^TN\d{2}-\d{6}$").Match(input).Success then
                     Ok <| ReportId input
                 else Error $"ReportId - Invalid report id: {input}"
@@ -1122,7 +1118,7 @@ module Caris =
 
             member _.TestInput : Test.Input =
                 { LabNameInput = testDetails.LabName |> Test.LabName.Input
-                  ReportIdInput = testDetails.LabReportId |> Test.ReportId.Input
+                  ReportIdInput = testDetails.LabReportId |> ReportId.Input
                   OrderedDate = testDetails.OrderedDate |> Test.OrderedDate.Input
                   ReceivedDate = testDetails.ReceivedDate |> Test.ReceivedDate.Input }
 
@@ -1289,11 +1285,10 @@ module Caris =
                   Pathologist = pathologist } = report
 
             let row = context.Public.Reports.Create()
-            let (ReportId reportId) = test.ReportId
 
             // overall report info
             row.VendorCliaNumber <- "03D1019490"
-            row.ReportId   <- reportId
+            row.ReportId   <- test.ReportId.Value
             row.PatientMrn <- patient.MRN.Value
             row.IssuedDate <- test.ReceivedDate.Value
 

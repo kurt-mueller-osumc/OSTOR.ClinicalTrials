@@ -54,6 +54,15 @@ module Common =
     [<Measure>] type mutation
     [<Measure>] type megabase
 
+    type ReportId =
+        internal
+        | ReportId of string
+
+        member this.Value = this |>fun (ReportId reportId) -> reportId
+
+    module ReportId =
+        type Input = Input of string
+
     module MRN =
         open Utilities
 

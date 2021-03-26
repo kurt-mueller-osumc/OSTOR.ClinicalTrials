@@ -1,9 +1,6 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module FoundationMedicine =
-    [<Measure>] type mutation
-    [<Measure>] type megabase
-
     /// The sample for each FMI report.
     /// FMI only reports tumor samples.
     type Sample =
@@ -28,8 +25,6 @@ module FoundationMedicine =
           CollectionDate: CollectionDate
           OrderingMd: OrderingMd
           Pathologist: Pathologist }
-    and LastName = internal LastName of string
-    and FirstName = internal FirstName of string
     and SubmittedDiagnosis = internal SubmittedDiagnosis of string
     and Gender = internal Male | Female
     and DateOfBirth = internal DateOfBirth of System.DateTime
@@ -48,7 +43,6 @@ module FoundationMedicine =
     and VariantInfo =
         { GeneName: GeneName
           VariantNames: VariantName list }
-    and GeneName = internal GeneName of string
     and VariantName = internal VariantName of string
 
     type Fusion =
@@ -92,19 +86,16 @@ module FoundationMedicine =
           Genes: Gene list
           Variants: Variant list
           Fusions: Fusion list }
-    and ReportId = internal ReportId of string
     and IssuedDate = IssuedDate of System.DateTime
 
     module ReportId =
         open System.Text.RegularExpressions
 
-        type Input = Input of string
-
         /// Validate that a report id is in the following format where 'd' is a digit: `ORD-ddddddd-dd`
         ///
         ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
         ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
-        let validate (Input reportId) =
+        let validate (ReportId.Input reportId) =
             if Regex("ORD-\d{7,}-\d{2,}").Match(reportId).Success then
                 Ok <| ReportId reportId
             else
