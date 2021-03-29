@@ -45,6 +45,26 @@ module Tempus =
         { DiagnosisName: Diagnosis.Name
           DiagnosisDate: DiagnosisDate option }
 
+    /// The "order" section of the Tempus report.
+    type Order =
+        { Institution: Institution
+          Physician: Physician
+          OrderId: OrderId
+          AccessionId: AccessionId
+          Test: OrderTest }
+    and Institution = internal Institution of string
+    and Physician = internal Physician of string // ordering md
+    and OrderId = internal OrderId of string // different than the report id
+    and AccessionId = internal AccessionId of string
+    /// The "test" subsection residing in the "order" section.
+    and OrderTest =
+        { TestCode: TestCode
+          TestName: TestName
+          TestDescription: TestDescription }
+    and TestCode = internal TestCode of string
+    and TestName = internal TestName of string
+    and TestDescription = internal TestDescription of string
+
     type Variant =
         internal
         | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
@@ -142,6 +162,7 @@ module Tempus =
               FusionType: string
               StructuralVariant: string option }
 
+            /// Deserializer for a fusion of genes
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     { Gene5 = get.Required.Raw Gene.Json.Gene5Decoder
@@ -241,10 +262,10 @@ module Tempus =
               AccessionId: string
               OrderTest: TestJson }
 
-            /// Deserializer for the 'report' json object.
+            /// Deserializer for the 'order' json object.
             ///
             ///  The following object attributes can be camel-cased or snake-cased:
-            /// - tempusOrderId / tempusOrder_id
+            /// - `"tempusOrderId"` / `"tempusOrder_id"`
             static member Decoder: Decoder<Json> =
                 Decode.object (fun get ->
                     let orderIdDecoder = ["tempusOrderId"; "tempusOrder_id"] |> List.map (flip Decode.field Decode.string) |> Decode.oneOf
@@ -261,12 +282,72 @@ module Tempus =
               Name: string
               Description: string }
 
+            /// Deserializer for the actual test code, name, and description ran on the report's patient
             static member Decoder : Decoder<TestJson> =
                 Decode.object (fun get ->
                     { Code        = "code" |> flip get.Required.Field Decode.string
                       Name        = "name" |> flip get.Required.Field Decode.string
                       Description = "description" |> flip get.Required.Field Decode.string }
                 )
+
+        module Test =
+            open Utilities.StringValidations
+
+            /// Validate that a test's code, name, and description are not blank
+            let validate (json: TestJson) =
+                match (json.Code, json.Name, json.Description) with
+                | NotBlank, NotBlank, NotBlank -> Ok <| { TestCode = TestCode json.Code; TestName = TestName json.Name; TestDescription = TestDescription json.Description }
+                | _ -> Error $"Either test code, name, or description is blank: {json}"
+
+        module OrderId =
+            open System.Text.RegularExpressions
+
+            type Input = Input of string
+
+            /// Validate that a tempus order id is in the following format where the first character is a 0, 1 or 2, followed by one digit, follwed by four letters: `"(0|1|2)dxxxx"`
+            ///
+            ///    validate (Input "20hnyc") = Ok (OrderId "20hnyc")
+            ///    validate (Input "30aaaa") = Error "Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: 30aaaa"
+            let validate (Input input) =
+                if Regex("^(0|1|2){1}\d{1}[a-zA-z]{4}$").Match(input).Success then
+                    Ok <| OrderId input
+                else
+                    Error $"Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: {input}"
+
+        module AccessionId =
+            open System.Text.RegularExpressions
+
+            type Input = Input of string
+
+            /// Validate that Tempus order's accession id is the in the following format where d is a digit and x is any alphanumeric character: `"TL-(0|1|2)d-xxxxxx"`
+            ///
+            ///    validate (Input "TL-19-DF60D1") = Ok (AccessionId "TL-19-DF60D1")
+            //     validate (Input "TL-33-AAAAAA") = Error "Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: TL-33-AAAAAA"
+            let validate (Input input) =
+                if Regex("^TL-(0|1|2){1}\d{1}-(\d|[A-Z]|[a-z]){6}$").Match(input).Success then
+                    Ok <| AccessionId input
+                else
+                    Error $"Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: {input}"
+
+        module Json =
+            open Utilities.StringValidations
+            open FsToolkit.ErrorHandling
+
+            /// Validate the input from the "order" section of the json report
+            let validate (json: Json) =
+                validation {
+                    let! institution = json.Institution |> validateNotBlank |> Result.map Institution
+                    and! physician = json.Physician |> validateNotBlank |> Result.map Physician
+                    and! orderId = json.OrderId |> OrderId.Input |> OrderId.validate
+                    and! accessionId = json.AccessionId |> AccessionId.Input |> AccessionId.validate
+                    and! orderTest = json.OrderTest |> Test.validate
+
+                    return { Institution = institution
+                             Physician = physician
+                             OrderId = orderId
+                             AccessionId = accessionId
+                             Test = orderTest
+                           } }
 
     module Lab =
         type Json =
@@ -612,7 +693,7 @@ module Tempus =
             let row = context.Public.Patients.Create()
             let patient = json.Patient
 
-            row.Mrn <- patient.MRN.Value
+            // row.Mrn <- patient.MRN.Value
 
             row
 
