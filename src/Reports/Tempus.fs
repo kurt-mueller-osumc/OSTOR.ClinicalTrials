@@ -36,6 +36,12 @@ module Tempus =
     and BlockId = internal BlockId of string
     and TumorPercentage = internal TumorPercentage of uint
 
+    type Lab =
+        { LabName: LabName
+          CliaNumber: LabCliaNumber
+          Address: Address }
+    and LabName = LabName of string
+
     /// The "report" section of the Tempus report. Each report has a diagnosis, a tumor sample, and an optional normal sample
     type Report =
         { Diagnosis: Diagnosis
@@ -382,6 +388,29 @@ module Tempus =
             /// for the lab's clia #, which is camel-cased or snake-cased for some reason.
             static member Decoder : Decoder<Json> =
                 Decode.oneOf [ Json.CamelCaseDecoder; Json.PascalCaseDecoder ]
+
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
+        /// Validate the lab section of the json report
+        let validate (json: Json) : Validation<Lab,string> =
+            validation {
+                let! labName = json.Name |> validateNotBlank |> Result.map LabName
+                and! streetAddress = json.StreetAddress |> validateNotBlank |> Result.map StreetAddress
+                and! city = json.City |> validateNotBlank |> Result.map City
+                and! state = json.State |> validateNotBlank |> Result.map State
+                and! zip = json.Zip |> validateNotBlank |> Result.map Zipcode
+                and! cliaNumber = json.CliaNumber |> Lab.CliaNumber.Input |> Lab.CliaNumber.validate
+
+                return { LabName = labName
+                         Address = {
+                             StreetAddress = streetAddress
+                             City = city
+                             State = state
+                             Zipcode = zip
+                         }
+                         CliaNumber = cliaNumber
+                       } }
 
     module Report =
         open System

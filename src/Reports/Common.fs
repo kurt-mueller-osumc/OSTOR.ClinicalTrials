@@ -27,6 +27,12 @@ module Common =
     and State = internal State of string
     and Zipcode = internal Zipcode of string
 
+    type LabCliaNumber =
+        internal | LabCliaNumber of string
+
+        member this.Value = this |> fun (LabCliaNumber clia) -> clia
+
+
     type FullName =
         { LastName: LastName
           FirstName: FirstName }
@@ -156,10 +162,20 @@ module Common =
             | _ -> Error $"NPI is invalid {input}"
 
     module Lab =
-        type CliaNumber =
-            internal | CliaNumber of string
+        module CliaNumber =
+            open System.Text.RegularExpressions
 
-            member this.Value = this |> fun (CliaNumber clia) -> clia
+            type Input = Input of string
+
+            /// Validate that a CLIA # is 10 alphanumerica numbers.
+            ///
+            ///    validate (Input "22D2027531") |> Ok (CliaNumber "22D2027531")
+            ///    validate (Input "12345-7890") |> Error ("Invalid CLIA #: 12345-7890")
+            let validate (Input input) =
+                if Regex("^(\d|[a-zA-Z]){10}$").Match(input).Success then
+                    Ok <| LabCliaNumber input
+                else
+                    Error $"Invalid CLIA #: {input}. CLIA #s consist of 10 alphanumeric characters."
 
     module Diagnosis =
         type NameInput = NameInput of string

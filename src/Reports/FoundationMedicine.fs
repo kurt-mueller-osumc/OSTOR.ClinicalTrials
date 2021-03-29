@@ -71,7 +71,7 @@ module FoundationMedicine =
 
     type Lab =
         { Address: Address
-          CliaNumber: Lab.CliaNumber }
+          CliaNumber: LabCliaNumber }
 
     type Report =
         { ReportId: ReportId
@@ -454,7 +454,7 @@ module FoundationMedicine =
 
         type Input =
             { AddressInput: Address.Input
-              CliaNumber: Lab.CliaNumber }
+              CliaNumber: Lab.CliaNumber.Input }
 
         open FsToolkit.ErrorHandling
 
@@ -462,9 +462,10 @@ module FoundationMedicine =
         let validate input =
             validation {
                 let! address = Address.validate input.AddressInput
+                and! cliaNumber = Lab.CliaNumber.validate input.CliaNumber
 
                 return { Address = address
-                         CliaNumber = input.CliaNumber }
+                         CliaNumber = cliaNumber }
             }
 
     module Gene =
@@ -608,7 +609,7 @@ module FoundationMedicine =
                 let processSite = this.ReportSample.ProcessSites.[0]
 
                 { AddressInput = Lab.Address.Input processSite.Address
-                  CliaNumber = Lab.CliaNumber processSite.CliaNumber }
+                  CliaNumber = Lab.CliaNumber.Input processSite.CliaNumber }
 
             /// Retrieve the report's sample
             member this.SampleInput : Sample.Input =
