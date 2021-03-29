@@ -159,6 +159,9 @@ module Utilities =
         let isBlank str =
             str = ""
 
+        let isNotBlank (str: string) =
+            str <> ""
+
         let matches (regex: Regex) (str: string) =
             regex.Match(str).Success
 
