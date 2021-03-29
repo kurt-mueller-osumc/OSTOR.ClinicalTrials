@@ -82,13 +82,13 @@ module Common =
             | _ -> Error $"MRN - Invalid MRN: ({input})"
 
         /// Validate an MRN if it is present.
-        let validateOptional (Input input) =
-            if input = "" then
-                Ok None
-            else
-                (Input input)
-                |> validate
-                |> Result.map Some
+        let validateOptional (optionalInput: Input option) =
+            match optionalInput with
+            | None -> Ok None
+            | Some input ->
+                match validate input with
+                | Ok mrn -> Ok <| (Some mrn)
+                | Error e -> Error e
 
         let toInteger (mrn: MRN) = mrn.Value
 
