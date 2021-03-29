@@ -65,7 +65,7 @@ module Tempus =
     and ``Somatic Biologically Relevant Gene`` =
         internal
         | Gene of Gene
-        | FusionGene of Fusion
+        | Fusion of Fusion
 
     and Fusion =
         { ``5' Gene``: Gene
@@ -469,7 +469,7 @@ module Tempus =
               | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
               | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
               | (Ok gene, _) -> Ok <| Gene gene
-              | (_, Ok fusionGene) -> Ok <| FusionGene fusionGene
+              | (_, Ok fusion) -> Ok <| Fusion fusion
 
         /// Represents a json object found in results.somaticBiologicallyRelevantVariants
         type Json =
