@@ -550,9 +550,24 @@ module Tempus =
                          DiagnosisDate = json.DiagnosisDate |> Option.map DiagnosisDate
                        }}
 
+    module Variant =
+        module AllelicFraction =
+            type Input = Input of string
 
+            let (|ValidFraction|_|) (Input input) =
+                input |> Float.tryParse |> Option.map AllelicFraction
+
+            /// Validate that an allelic fraction is either not present or is a valid, parseable float.
+            let validate input=
+                match input with
+                | (Input "") -> Ok None
+                | ValidFraction allelicFraction -> Ok <| (Some allelicFraction)
+                | _ -> Error $"Invalid allelic fraction: {input}"
+
+    /// Logic for the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
     module ``Somatic Potentially Actionable Mutation`` =
         module Variant =
+            /// The json object for the `variants` section in each `somatic potentially actionable mutation`
             type Json =
                 { HgvsJson: HGVS.Json
                   NucleotideAlteration: string
@@ -565,8 +580,7 @@ module Tempus =
                           NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
                           AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
                           VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
-                        }
-                    )
+                        } )
 
         type Json =
             { GeneJson: Gene.Json
@@ -692,8 +706,6 @@ module Tempus =
                 | None, Some _ -> Error $"TMB score is missing: {scoreInput}"
 
         module MicrosatelliteInstabilityStatus =
-            open Utilities
-
             type Input = Input of string
 
             /// Validate that msi status, if present, contains at least one character
@@ -737,7 +749,9 @@ module Tempus =
         /// Validate the `results` section of the json report
         let validate (json: Json) =
             validation {
-                let! tmb = (json.TumorMutationBurden |> Option.map TumorMutationBurden.ScoreInput, json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput) ||> TumorMutationBurden.validateOptional
+                let! tmb = (json.TumorMutationBurden           |> Option.map TumorMutationBurden.ScoreInput,
+                            json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput
+                           ) ||> TumorMutationBurden.validateOptional
                 and! msiStatus = json.MsiStatus |> Option.map MicrosatelliteInstabilityStatus.Input |> MicrosatelliteInstabilityStatus.validateOptional
 
                 return { TumorMutationBurden = tmb
