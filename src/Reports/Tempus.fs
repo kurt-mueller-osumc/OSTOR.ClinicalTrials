@@ -4,6 +4,18 @@ module Tempus =
     open Thoth.Json.Net
     open Utilities
 
+    type Patient =
+        { MRN: MRN option
+          FirstName: FirstName
+          LastName: LastName
+          TempusId: System.Guid
+          Sex: Sex
+          DateOfBirth: DateOfBirth
+          DiagnosisName: Diagnosis.Name
+          DiagnosisDate: DiagnosisDate option }
+    and Sex = Male | Female
+    and DiagnosisDate = internal DiagnosisDate of System.DateTime
+
     /// Tempus has either normal or tumor sample categories
     type TumorCategory = internal | TumorCategory
     type NormalCategory = internal | NormalCategory
@@ -32,7 +44,6 @@ module Tempus =
     and Diagnosis =
         { DiagnosisName: Diagnosis.Name
           DiagnosisDate: DiagnosisDate option }
-    and DiagnosisDate = internal DiagnosisDate of System.DateTime
 
     type Variant =
         internal
@@ -346,19 +357,32 @@ module Tempus =
     module Patient =
         open System
 
+        module Sex =
+            type Input = Input of string
+
+            /// Validate that sex is either `"(M|m)ale"` or `"(F|f)emale"`
+            let validate (Input input) =
+                match input with
+                | "Male" | "male" -> Ok Male
+                | "Female" | "female" -> Ok Female
+                | _ -> Error $"Invalid sex: {input}"
+
+
         type Json =
             { FirstName: string
               LastName: string
               TempusId: Guid
-              MRN: string option
-              Sex: string
+              MrnJson: string option
+              SexJson: string
               DateOfBirth: DateTime
               Diagnosis: string
               DiagnosisDate: DateTime option }
 
-            /// Deserializer for the 'patient' json object. The following object attributes can be camel-cased or snake-cased:
-            /// - emrId / emr_id
-            /// - dateOfBirth / DoB
+            /// Deserializer for the 'patient' json object.
+            ///
+            /// The following object attributes can be camel-cased or snake-cased:
+            /// - `emrId` / `emr_id`
+            /// - `dateOfBirth` / `DoB`
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.optionalDateTime
@@ -368,12 +392,33 @@ module Tempus =
                     { FirstName     = "firstName" |> flip get.Required.Field Decode.string
                       LastName      = "lastName"  |> flip get.Required.Field Decode.string
                       TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
-                      MRN           = get.Required.Raw mrnDecoder
-                      Sex           = "sex"       |> flip get.Required.Field Decode.string
+                      MrnJson       = get.Required.Raw mrnDecoder
+                      SexJson       = "sex"       |> flip get.Required.Field Decode.string
                       DateOfBirth   = get.Required.Raw dobDecoder
                       Diagnosis     = "diagnosis"   |> flip get.Required.Field Decode.string
                       DiagnosisDate = diagnosisDate }
                 )
+
+        open FsToolkit.ErrorHandling
+
+        /// Validate a patient input: their name, mrn, and sex
+        let validate (json: Json) =
+            validation {
+                let! firstName = json.FirstName |> FirstName.Input |> FirstName.validate
+                and! lastName  = json.LastName  |> LastName.Input |> LastName.validate
+                and! mrn       = json.MrnJson |> Option.map MRN.Input |> MRN.validateOptional
+                and! sex       = json.SexJson |> Sex.Input |> Sex.validate
+
+                return { MRN = mrn
+                         FirstName = firstName
+                         LastName = lastName
+                         TempusId = json.TempusId
+                         Sex = sex
+                         DateOfBirth = json.DateOfBirth |> DateOfBirth
+                         DiagnosisName = json.Diagnosis |> Diagnosis.Name
+                         DiagnosisDate = json.DiagnosisDate |> Option.map DiagnosisDate
+                       }}
+
 
     module ``Somatic Potentially Actionable Mutation`` =
         module Variant =
@@ -471,8 +516,6 @@ module Tempus =
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
 
-
-
     module InheritedRelevantVariant =
         type Json =
             { GeneJson: Gene.Json
@@ -561,4 +604,15 @@ module Tempus =
         let deserializeWithError fileName =
             deserialize
             >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
+
+    module Database =
+        open Database
+
+        let toPatientRow (json: Json) =
+            let row = context.Public.Patients.Create()
+            let patient = json.Patient
+
+            row.Mrn <- patient.MRN.Value
+
+            row
 
