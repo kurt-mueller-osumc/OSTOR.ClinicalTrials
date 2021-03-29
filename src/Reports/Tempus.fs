@@ -107,28 +107,28 @@ module Tempus =
     and FusionType = internal FusionType of string
 
     and HGVS =
-        { ``Protein Sequence Change``: ``HGVS Protein Sequence Change`` option
-          ``Coding DNA Sequence Change``: ``HGVS Coding DNA Sequence Change``
+        { ProteinChange: HgvsProteinChange option
+          CodingChange: HgvsCodingChange
           ReferenceSequence: ReferenceSequence }
 
-    and ``HGVS Protein Sequence Change`` =
-        { AbbreviatedChange: ``Abbreviated Protein Sequence Change``
-          FullChange: ``Full Protein Sequence Change`` }
-    and ``Abbreviated Protein Sequence Change`` = internal ``Abbreviated Protein Sequence Change`` of string
-    and ``Full Protein Sequence Change`` = internal ``Full Protein Sequence Change`` of string
-    and ``HGVS Coding DNA Sequence Change`` = internal ``HGVS Coding DNA Sequence Change`` of string
+    and HgvsProteinChange =
+        { AbbreviatedChange: HgvsAbbreviatedProteinChange
+          FullChange: HgvsProteinFullChange }
+    and  HgvsAbbreviatedProteinChange = internal  HgvsAbbreviatedProteinChange of string
+    and HgvsProteinFullChange = internal HgvsProteinFullChange of string
+    and HgvsCodingChange = internal HgvsCodingChange of string
     and ReferenceSequence = internal ReferenceSequence of string
     and VariantDescription = internal VariantDescription of string
     and VariantType = internal VariantType of string
     and NucleotideAlteration = internal NucleotideAlteration of string
     and AllelicFraction = internal AllelicFraction of float
 
-    type ``Abbreviated Protein Sequence Change`` with
-        member this.Value = this |> fun (``Abbreviated Protein Sequence Change`` proteinChange) -> proteinChange
-    type ``Full Protein Sequence Change`` with
-        member this.Value = this |> fun (``Full Protein Sequence Change`` proteinChange) -> proteinChange
-    type ``HGVS Coding DNA Sequence Change`` with
-        member this.Value = this |> fun (``HGVS Coding DNA Sequence Change`` codingChange) -> codingChange
+    type  HgvsAbbreviatedProteinChange with
+        member this.Value = this |> fun (HgvsAbbreviatedProteinChange proteinChange) -> proteinChange
+    type HgvsProteinFullChange with
+        member this.Value = this |> fun (HgvsProteinFullChange proteinChange) -> proteinChange
+    type HgvsCodingChange with
+        member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
 
     type Results =
         { TumorMutationBurden: TumorMutationBurden option
@@ -243,9 +243,9 @@ module Tempus =
 
         /// Retrieve the mutation effect for HGVS. If the protein change is present, report that. If not, report the coding change.
         let mutationEffect hgvs =
-            match hgvs.``Protein Sequence Change`` with
+            match hgvs.ProteinChange with
             | Some proteinSequenceChange -> proteinSequenceChange.AbbreviatedChange.Value
-            | _ -> hgvs.``Coding DNA Sequence Change``.Value
+            | _ -> hgvs.CodingChange.Value
 
         open Utilities.StringValidations
 
@@ -260,14 +260,14 @@ module Tempus =
             match (json.``HGVS.p``, json.``HGVS.pFull``, json.``HGVS.c``, json.MutationEffect, json.Transcript) with
             /// No HGVS protein sequence change present; only a coding DNA sequence is present
             | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when json.``HGVS.c`` = json.MutationEffect ->
-                Ok <| { ``Protein Sequence Change`` = None
-                        ``Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` json.``HGVS.c``
+                Ok <| { ProteinChange = None
+                        CodingChange = HgvsCodingChange json.``HGVS.c``
                         ReferenceSequence = ReferenceSequence json.Transcript }
             /// Both HGVS protein sequence change and coding DNA sequence change are present
             | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when json.``HGVS.p`` = json.MutationEffect ->
-                Ok <| { ``Protein Sequence Change`` = Some { AbbreviatedChange = ``Abbreviated Protein Sequence Change`` json.``HGVS.p``
-                                                             FullChange = ``Full Protein Sequence Change`` json.``HGVS.pFull`` }
-                        ``Coding DNA Sequence Change`` = ``HGVS Coding DNA Sequence Change`` json.``HGVS.c``
+                Ok <| { ProteinChange = Some { AbbreviatedChange =  HgvsAbbreviatedProteinChange json.``HGVS.p``
+                                               FullChange = HgvsProteinFullChange json.``HGVS.pFull`` }
+                        CodingChange = HgvsCodingChange json.``HGVS.c``
                         ReferenceSequence = ReferenceSequence json.Transcript }
             | _ -> Error $"Invalid HGVS: {json}"
 
@@ -551,6 +551,15 @@ module Tempus =
                        }}
 
     module Variant =
+        module NucleotideAlteration =
+            type Input = Input of string
+
+            /// Validate that a nucleotide alteration is either none or something
+            let validate input =
+                match input with
+                | (Input "") -> Ok None
+                | (Input na) -> Ok <| Some (NucleotideAlteration na)
+
         module AllelicFraction =
             type Input = Input of string
 
@@ -563,6 +572,17 @@ module Tempus =
                 | (Input "") -> Ok None
                 | ValidFraction allelicFraction -> Ok <| (Some allelicFraction)
                 | _ -> Error $"Invalid allelic fraction: {input}"
+
+        module Description =
+            open StringValidations
+            type Input = Input of string
+
+            /// Validate that a variant description is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map VariantDescription
+                |> Result.mapError (fun _ -> $"Variant description can't be blank: {input}")
 
     /// Logic for the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
     module ``Somatic Potentially Actionable Mutation`` =
