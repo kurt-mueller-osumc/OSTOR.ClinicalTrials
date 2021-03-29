@@ -32,7 +32,6 @@ module Common =
 
         member this.Value = this |> fun (LabCliaNumber clia) -> clia
 
-
     type FullName =
         { LastName: LastName
           FirstName: FirstName }
