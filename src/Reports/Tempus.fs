@@ -71,6 +71,13 @@ module Tempus =
     and TestName = internal TestName of string
     and TestDescription = internal TestDescription of string
 
+    type TumorMutationBurden =
+        { Score: TumorMutationBurdenScore
+          Percentile: TumorMutationBurdenPercentile }
+    and TumorMutationBurdenScore        = internal TumorMutationBurdenScore of float
+    and TumorMutationBurdenPercentile   = internal TumorMutationBurdenPercentile of uint
+    and MicrosatelliteInstabilityStatus = internal MicrosatelliteInstabilityStatus of string
+
     type Variant =
         internal
         | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
@@ -122,6 +129,20 @@ module Tempus =
         member this.Value = this |> fun (``Full Protein Sequence Change`` proteinChange) -> proteinChange
     type ``HGVS Coding DNA Sequence Change`` with
         member this.Value = this |> fun (``HGVS Coding DNA Sequence Change`` codingChange) -> codingChange
+
+    type Results =
+        { TumorMutationBurden: TumorMutationBurden option
+          MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option }
+
+    type OverallReport =
+        { Lab: Lab
+          Patient: Patient
+          Report: Report
+          Order: Order
+          TumorSample: Sample<TumorCategory>
+          NormalSample: Sample<NormalCategory> option
+        //   Results: Results
+        }
 
     module Gene =
         /// Json object attributes that identifies genes
@@ -655,6 +676,33 @@ module Tempus =
 
     /// The `results` section in the Tempus report
     module Results =
+        module TumorMutationBurden =
+            type ScoreInput = ScoreInput of float
+            type PercentileInput = PercentileInput of int
+
+            /// Validate that tmb score and percentile are both present or absent.
+            ///
+            ///    validateOptional None None = Ok None
+            ///    validateOptional (Some (ScoreInput 1.0)) (Some (PercentileInput 34)) = Ok
+            let validateOptional (scoreInput: ScoreInput option) (percentileInput: PercentileInput option) =
+                match scoreInput, percentileInput with
+                | Some (ScoreInput score), Some (PercentileInput percentile) -> Ok <| Some { Score = TumorMutationBurdenScore score; Percentile = TumorMutationBurdenPercentile (uint percentile) }
+                | None, None -> Ok None
+                | Some _, None -> Error $"TMB percentile is missing: {scoreInput}"
+                | None, Some _ -> Error $"TMB score is missing: {scoreInput}"
+
+        module MicrosatelliteInstabilityStatus =
+            open Utilities
+
+            type Input = Input of string
+
+            /// Validate that msi status, if present, contains at least one character
+            let validateOptional (input: Input option) =
+                match input with
+                | None -> Ok None
+                | Some (Input status) when String.isNotBlank status -> Ok <| Some (MicrosatelliteInstabilityStatus status)
+                | Some _ -> Error $"MSI status can't be blank"
+
         type Json =
             { TumorMutationBurden: float option
               TumorMutationBurdenPercentile: int option
@@ -681,8 +729,21 @@ module Tempus =
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
                       ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
                       Fusions = "fusionVariants" |> flip get.Required.Field (Decode.list Fusion.Json.Decoder)
-                      InheritedRelevantVariants = ["inheritedRelevantVariants"; "values"] |> flip get.Required.At (Decode.list InheritedRelevantVariant.Json.Decoder)}
-                )
+                      InheritedRelevantVariants = ["inheritedRelevantVariants"; "values"] |> flip get.Required.At (Decode.list InheritedRelevantVariant.Json.Decoder)
+                    } )
+
+        open FsToolkit.ErrorHandling
+
+        /// Validate the `results` section of the json report
+        let validate (json: Json) =
+            validation {
+                let! tmb = (json.TumorMutationBurden |> Option.map TumorMutationBurden.ScoreInput, json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput) ||> TumorMutationBurden.validateOptional
+                and! msiStatus = json.MsiStatus |> Option.map MicrosatelliteInstabilityStatus.Input |> MicrosatelliteInstabilityStatus.validateOptional
+
+                return { TumorMutationBurden = tmb
+                         MicrosatelliteInstabilityStatus = msiStatus }
+            }
+
 
       type Json =
           { Order: Order.Json
