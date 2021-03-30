@@ -136,12 +136,9 @@ module Tempus =
     and NucleotideAlteration = internal NucleotideAlteration of string
     and AllelicFraction = internal AllelicFraction of float
 
-    type  HgvsAbbreviatedProteinChange with
-        member this.Value = this |> fun (HgvsAbbreviatedProteinChange proteinChange) -> proteinChange
-    type HgvsProteinFullChange with
-        member this.Value = this |> fun (HgvsProteinFullChange proteinChange) -> proteinChange
-    type HgvsCodingChange with
-        member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
+    type HgvsAbbreviatedProteinChange with member this.Value = this |> fun (HgvsAbbreviatedProteinChange proteinChange) -> proteinChange
+    type HgvsProteinFullChange        with member this.Value = this |> fun (HgvsProteinFullChange proteinChange) -> proteinChange
+    type HgvsCodingChange             with member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
 
     type Results =
         { TumorMutationBurden: TumorMutationBurden option
@@ -455,6 +452,19 @@ module Tempus =
                       SigningPathologist = pathologistDecoder |> get.Required.Raw
                       SignoutDate        = signoutDateDecoder |> get.Required.Raw
                     } )
+
+        open Utilities.StringValidations
+        open FsToolkit.ErrorHandling
+
+        /// Validate that a signing pathologist's name is not blank
+        let validate (json: Json) : Validation<Report,string> =
+            validation {
+                let! signingPathologist = json.SigningPathologist |> validateNotBlank |> Result.map SigningPathologist
+
+                return ({ ReportId = ReportId json.ReportId
+                          SigningPathologist = signingPathologist
+                          SignoutDate = SignoutDate json.SignoutDate} : Report
+                       ) }
 
     module Sample =
         open System
@@ -853,7 +863,7 @@ module Tempus =
     type OverallReport =
         { Lab: Lab
           Patient: Patient
-        //   Report: Report
+          Report: Report
           Order: Order
           Results: Results
         }
@@ -875,14 +885,16 @@ module Tempus =
         /// Validate an overall report
         let validate (json: Json) =
             validation {
-                let! lab     = json.Lab |> Lab.validate
+                let! lab     = json.Lab     |> Lab.validate
+                and! report  = json.Report  |> Report.validate
                 and! patient = json.Patient |> Patient.validate
-                and! order   = json.Order |> Order.Json.validate
+                and! order   = json.Order   |> Order.Json.validate
                 and! results = json.Results |> Results.validate
 
-                return { Lab = lab
+                return { Lab     = lab
+                         Report  = report
                          Patient = patient
-                         Order = order
+                         Order   = order
                          Results = results
                        } }
 
