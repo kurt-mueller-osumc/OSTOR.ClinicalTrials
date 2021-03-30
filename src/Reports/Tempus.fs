@@ -58,18 +58,27 @@ module Tempus =
         { SampleId: SampleId
           SampleSite: SampleSite
           SampleType: SampleType
-          CollectionDate: CollectionDate
-          ReceivedDate: ReceivedDate
-          BlockId: BlockId
-          TumorPercentage: TumorPercentage }
+          SampleDates: SampleDates
+          BlockId: BlockId option
+          TumorPercentage: TumorPercentage option }
     /// Tempus has either normal or tumor sample categories
     and TumorCategory = internal | TumorCategory
     and NormalCategory = internal | NormalCategory
-    and SampleId = internal SampleId of System.Guid
-    and SampleSite = internal SampleSite of string
-    and SampleType = internal SampleType of string
+    and TumorSample = Sample<TumorCategory>
+    and NormalSample = Sample<NormalCategory>
+    and SampleDates =
+        { CollectionDate: CollectionDate
+          ReceivedDate: ReceivedDate}
     and CollectionDate = internal CollectionDate of System.DateTime
     and ReceivedDate = internal ReceivedDate of System.DateTime
+    and SampleId = internal SampleId of System.Guid
+    and SampleSite = internal SampleSite of string
+    and SampleType =
+        internal
+        | Blood
+        | ``FFPE Block``
+        | ``FFPE Slides (Unstained)``
+        | Saliva
     and BlockId = internal BlockId of string
     and TumorPercentage = internal TumorPercentage of uint
 
@@ -469,6 +478,34 @@ module Tempus =
     module Sample =
         open System
 
+        module SampleType =
+            type Input = Input of string
+
+            /// Validate that a sample type is either blood, block, slides, or saliva.
+            let validate (Input input) =
+                match input with
+                | "Blood" -> Ok Blood
+                | "FFPE Block" -> Ok ``FFPE Block``
+                | "FFPE Slides (Unstained)" -> Ok ``FFPE Slides (Unstained)``
+                | "Saliva" -> Ok Saliva
+                | _ -> Error $"Invalid sample type: {input}"
+
+        module CollectionDate =
+            type Input = Input of DateTime
+
+        module ReceivedDate =
+            type Input = Input of DateTime
+
+        module SampleDates =
+            /// Validate that sample's collection date happens before its received date
+            let validate (CollectionDate.Input collectionDate) (ReceivedDate.Input receivedDate) =
+                if collectionDate < receivedDate then
+                    Ok { CollectionDate = CollectionDate collectionDate; ReceivedDate = ReceivedDate receivedDate }
+                else
+                    Error $"Collection date, {collectionDate}, doesn't happen before received date, {receivedDate}."
+
+
+        /// each entry in the `specimens` section of the Tempus report
         type Json =
             { SampleId: Guid
               CollectionDate: DateTime
@@ -491,13 +528,71 @@ module Tempus =
 
         and InstitutionJson =
             { BlockId: string option
-              TumorPercentage: int option }
+              TumorPercentage: uint option }
 
             static member Decoder : Decoder<InstitutionJson> =
                 Decode.object (fun get ->
                     { BlockId         = "blockId"         |> flip get.Optional.Field Decode.string
-                      TumorPercentage = "tumorPercentage" |> flip get.Optional.Field Decode.int }
-                )
+                      TumorPercentage = "tumorPercentage" |> flip get.Optional.Field Decode.uint32
+                    } )
+
+    module TumorSample =
+        module Category =
+            type Input = Input of string
+
+            let validate (Input input) =
+                match input with
+                | "tumor" -> Ok "tumor"
+                | _ -> Error $"Sample category is not tumor: {input}"
+
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
+        /// Validate a tumor sample
+        let validate (json: Sample.Json) : Validation<TumorSample, string> =
+            validation {
+                // validate that the sample's listed category is 'tumor'
+                let! tumorCategory = json.SampleCategory |> Category.Input |> Category.validate
+                and! sampleDates   = (json.CollectionDate |> Sample.CollectionDate.Input, json.ReceivedDate |> Sample.ReceivedDate.Input) ||> Sample.SampleDates.validate
+                and! sampleSite    = json.SampleSite |> validateNotBlank |> Result.map SampleSite
+                and! sampleType    = json.SampleType |> Sample.SampleType.Input |> Sample.SampleType.validate
+
+                return { SampleId = SampleId json.SampleId
+                         SampleSite = sampleSite
+                         SampleDates = sampleDates
+                         SampleType = sampleType
+                         BlockId = json.Institution.BlockId |> Option.map BlockId
+                         TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
+                       } }
+
+    module NormalSample =
+        module Category =
+            type Input = Input of string
+
+            let validate (Input input) =
+                match input with
+                | "normal" -> Ok "normal"
+                | _ -> Error $"Sample category is not normal: {input}"
+
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
+        /// Validate a normal sample
+        let validate (json: Sample.Json) : Validation<NormalSample, string> =
+            validation {
+                // validate that the sample's listed category is 'nromal'
+                let! normalCategory = json.SampleCategory |> Category.Input |> Category.validate
+                and! sampleDates    = (json.CollectionDate |> Sample.CollectionDate.Input, json.ReceivedDate |> Sample.ReceivedDate.Input) ||> Sample.SampleDates.validate
+                and! sampleSite     = json.SampleSite |> validateNotBlank |> Result.map SampleSite
+                and! sampleType     = json.SampleType |> Sample.SampleType.Input |> Sample.SampleType.validate
+
+                return { SampleId = SampleId json.SampleId
+                         SampleSite = sampleSite
+                         SampleDates = sampleDates
+                         SampleType = sampleType
+                         BlockId = json.Institution.BlockId |> Option.map BlockId
+                         TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
+                       } }
 
     module Patient =
         open System
