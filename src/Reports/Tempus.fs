@@ -645,8 +645,8 @@ module Tempus =
             static member Decoder =
                 Decode.object (fun get ->
                     { GeneJson = get.Required.Raw Gene.Json.Decoder
-                      VariantJsons = "variants" |> flip get.Required.Field (Decode.list Variant.Json.Decoder) }
-                )
+                      VariantJsons = "variants" |> flip get.Required.Field (Decode.list Variant.Json.Decoder)
+                    })
 
         open FsToolkit.ErrorHandling
 
@@ -656,8 +656,18 @@ module Tempus =
                 and! variants = json.VariantJsons |> Variants.validate
 
                 return { Gene = gene
-                         Variants = variants }
-            }
+                         Variants = variants } }
+
+    module ``Somatic Potentially Actionable Mutations`` =
+        open FsToolkit.ErrorHandling
+
+        /// Validate a list of somatic, potentially actionable mutaitons
+        let validate (jsons: ``Somatic Potentially Actionable Mutation``.Json list) =
+            jsons
+            |> Seq.map ``Somatic Potentially Actionable Mutation``.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
 
     module ``Somatic Potentially Actionable Copy Number Variant`` =
         type Json =
