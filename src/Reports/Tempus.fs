@@ -4,6 +4,23 @@ module Tempus =
     open Thoth.Json.Net
     open Utilities
 
+    /// the `lab` section of the Tempus report
+    type Lab =
+        { LabName: LabName
+          CliaNumber: LabCliaNumber
+          Address: Address }
+    and LabName = LabName of string
+
+    /// the `report` section of the Tempus report
+    type Report =
+        { ReportId: ReportId
+          SigningPathologist: SigningPathologist
+          SignoutDate: SignoutDate }
+    and ReportId = ReportId of System.Guid
+    and SigningPathologist = SigningPathologist of string
+    and SignoutDate = SignoutDate of System.DateTime
+
+    /// the `patient` section of the Tempus report
     type Patient =
         { MRN: MRN option
           FirstName: FirstName
@@ -16,42 +33,7 @@ module Tempus =
     and Sex = Male | Female
     and DiagnosisDate = internal DiagnosisDate of System.DateTime
 
-    /// Tempus has either normal or tumor sample categories
-    type TumorCategory = internal | TumorCategory
-    type NormalCategory = internal | NormalCategory
-
-    type Sample<'Category> =
-        { SampleId: SampleId
-          SampleSite: SampleSite
-          SampleType: SampleType
-          CollectionDate: CollectionDate
-          ReceivedDate: ReceivedDate
-          BlockId: BlockId
-          TumorPercentage: TumorPercentage }
-    and SampleId = internal SampleId of System.Guid
-    and SampleSite = internal SampleSite of string
-    and SampleType = internal SampleType of string
-    and CollectionDate = internal CollectionDate of System.DateTime
-    and ReceivedDate = internal ReceivedDate of System.DateTime
-    and BlockId = internal BlockId of string
-    and TumorPercentage = internal TumorPercentage of uint
-
-    type Lab =
-        { LabName: LabName
-          CliaNumber: LabCliaNumber
-          Address: Address }
-    and LabName = LabName of string
-
-    /// The "report" section of the Tempus report. Each report has a diagnosis, a tumor sample, and an optional normal sample
-    type Report =
-        { Diagnosis: Diagnosis
-          NormalSample: Sample<NormalCategory> option
-          TumorSample: Sample<TumorCategory> }
-    and Diagnosis =
-        { DiagnosisName: Diagnosis.Name
-          DiagnosisDate: DiagnosisDate option }
-
-    /// The "order" section of the Tempus report.
+    /// The `order` section of the Tempus report.
     type Order =
         { Institution: Institution
           Physician: Physician
@@ -62,7 +44,7 @@ module Tempus =
     and Physician = internal Physician of string // ordering md
     and OrderId = internal OrderId of string // different than the report id
     and AccessionId = internal AccessionId of string
-    /// The "test" subsection residing in the "order" section.
+    /// The `test` subsection of the `order` section in the Tempus report
     and OrderTest =
         { TestCode: TestCode
           TestName: TestName
@@ -70,6 +52,26 @@ module Tempus =
     and TestCode = internal TestCode of string
     and TestName = internal TestName of string
     and TestDescription = internal TestDescription of string
+
+    /// Each `sample` in the `samples` section of the Tempus report
+    type Sample<'Category> =
+        { SampleId: SampleId
+          SampleSite: SampleSite
+          SampleType: SampleType
+          CollectionDate: CollectionDate
+          ReceivedDate: ReceivedDate
+          BlockId: BlockId
+          TumorPercentage: TumorPercentage }
+    /// Tempus has either normal or tumor sample categories
+    and TumorCategory = internal | TumorCategory
+    and NormalCategory = internal | NormalCategory
+    and SampleId = internal SampleId of System.Guid
+    and SampleSite = internal SampleSite of string
+    and SampleType = internal SampleType of string
+    and CollectionDate = internal CollectionDate of System.DateTime
+    and ReceivedDate = internal ReceivedDate of System.DateTime
+    and BlockId = internal BlockId of string
+    and TumorPercentage = internal TumorPercentage of uint
 
     type TumorMutationBurden =
         { Score: TumorMutationBurdenScore
@@ -145,16 +147,6 @@ module Tempus =
         { TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option
           ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation`` list }
-
-    type OverallReport =
-        { Lab: Lab
-          Patient: Patient
-          Report: Report
-          Order: Order
-          TumorSample: Sample<TumorCategory>
-          NormalSample: Sample<NormalCategory> option
-        //   Results: Results
-        }
 
     module Gene =
         /// Json object attributes that identifies genes
@@ -510,7 +502,6 @@ module Tempus =
                 | "Female" | "female" -> Ok Female
                 | _ -> Error $"Invalid sex: {input}"
 
-
         type Json =
             { FirstName: string
               LastName: string
@@ -859,6 +850,14 @@ module Tempus =
                     Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
               )
 
+    type OverallReport =
+        { Lab: Lab
+          Patient: Patient
+        //   Report: Report
+          Order: Order
+          Results: Results
+        }
+
     module Json =
         type Error =
           { FileName: string
@@ -870,6 +869,22 @@ module Tempus =
         let deserializeWithError fileName =
             deserialize
             >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
+
+        open FsToolkit.ErrorHandling
+
+        /// Validate an overall report
+        let validate (json: Json) =
+            validation {
+                let! lab     = json.Lab |> Lab.validate
+                and! patient = json.Patient |> Patient.validate
+                and! order   = json.Order |> Order.Json.validate
+                and! results = json.Results |> Results.validate
+
+                return { Lab = lab
+                         Patient = patient
+                         Order = order
+                         Results = results
+                       } }
 
     module Database =
         open Database
