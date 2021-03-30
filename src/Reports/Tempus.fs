@@ -840,14 +840,13 @@ module Tempus =
                          ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
                        } }
 
-
-      type Json =
-          { Order: Order.Json
-            Lab: Lab.Json
-            Report: Report.Json
-            Patient: Patient.Json
-            Samples: Sample.Json list
-            Results: Results.Json }
+    type Json =
+        { Order: Order.Json
+          Lab: Lab.Json
+          Report: Report.Json
+          Patient: Patient.Json
+          Samples: Sample.Json list
+          Results: Results.Json }
 
           /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
           static member Decoder : Decoder<Json> =
