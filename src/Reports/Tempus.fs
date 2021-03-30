@@ -171,7 +171,8 @@ module Tempus =
         { TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option
           ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation`` list
-          ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant`` list }
+          ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant`` list
+          ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant`` list }
 
     module Gene =
         /// Json object attributes that identifies genes
@@ -915,21 +916,31 @@ module Tempus =
 
         open FsToolkit.ErrorHandling
 
-        /// Validate that a somatic, biologically relevant variant has either a gene or a fusion of genese, hgvs, a variant type of cnv, snv, or fusion, and valid nucleotide laterations and allelic fractions.
-        let validate (json: Json) =
-            validation {
-                let! fusionOrGene = (json.GeneJson, json.FusionJson) ||> Gene.validate
-                and! hgvs = json.HgvsJson |> HGVS.validateOptional
-                and! variantType = json.VariantType |> Type.Input |> Type.validate
-                and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
-                and! allelicFraction = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
+        module Json =
+            /// Validate that a somatic, biologically relevant variant has either a gene or a fusion of genese, hgvs, a variant type of cnv, snv, or fusion, and valid nucleotide laterations and allelic fractions.
+            let validate (json: Json) =
+                validation {
+                    let! fusionOrGene = (json.GeneJson, json.FusionJson) ||> Gene.validate
+                    and! hgvs = json.HgvsJson |> HGVS.validateOptional
+                    and! variantType = json.VariantType |> Type.Input |> Type.validate
+                    and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
+                    and! allelicFraction = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
 
-                return { Gene = fusionOrGene
-                         HGVS = hgvs
-                         AllelicFraction = allelicFraction
-                         NucleotideAlteration = nucleotideAlteration
-                         Type = variantType
-                } }
+                    return { Gene = fusionOrGene
+                             HGVS = hgvs
+                             AllelicFraction = allelicFraction
+                             NucleotideAlteration = nucleotideAlteration
+                             Type = variantType
+                    } }
+
+    module ``Somatic Biologically Relevant Variants`` =
+        /// Validate a list of somatic biologically relevant variant inputs
+        let validate (jsons: ``Somatic Biologically Relevant Variant``.Json list) =
+            jsons
+            |> Seq.map ``Somatic Biologically Relevant Variant``.Json.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
 
     module ``Somatic Variant of Unknown Significance`` =
         type Json =
@@ -1043,11 +1054,13 @@ module Tempus =
                 and! msiStatus = json.MsiStatus |> Option.map MicrosatelliteInstabilityStatus.Input |> MicrosatelliteInstabilityStatus.validateOptional
                 and! somaticPotentiallyActionableMutations = json.``Somatic Potentially Actionable Mutations`` |> ``Somatic Potentially Actionable Mutations``.validate
                 and! somaticPotentiallyActionableCopyNumberVariants = json.``Somatic Potentially Actionable Copy Number Variants`` |> ``Somatic Potentially Actionable Copy Number Variants``.validate
+                and! somaticPotentiallyRelevantVariants = json.``Somatic Biologically Relevant Variants`` |> ``Somatic Biologically Relevant Variants``.validate
 
                 return { TumorMutationBurden = tmb
                          MicrosatelliteInstabilityStatus = msiStatus
                          ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
                          ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
+                         ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
                        } }
 
     type Json =
