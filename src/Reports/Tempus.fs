@@ -86,16 +86,12 @@ module Tempus =
     and ``Somatic Potentially Actionable Mutation`` =
         { Gene: Gene
           Variants: ``Somatic Potentially Actionable Variant`` list }
+    /// the `variants` section of a `somaticPotnetiallyActionableMutations` listing
     and ``Somatic Potentially Actionable Variant`` =
         { HGVS: HGVS
           NucleotideAlteration: NucleotideAlteration option
           AllelicFraction: AllelicFraction option
           VariantDescription: VariantDescription }
-    and ``Somatic Biologically Relevant Variant`` =
-        { Gene: ``Somatic Biologically Relevant Gene``
-          HGVS: HGVS option
-          AllelicFraction: AllelicFraction option
-          NucleotideAlteration: NucleotideAlteration option }
 
     and Gene =
         { GeneName: GeneName
@@ -103,6 +99,12 @@ module Tempus =
           EntrezId: EntrezId }
     and HgncId = internal HgncId of string
     and EntrezId = internal EntrezId of string
+
+    and ``Somatic Biologically Relevant Variant`` =
+        { Gene: ``Somatic Biologically Relevant Gene``
+          HGVS: HGVS option
+          AllelicFraction: AllelicFraction option
+          NucleotideAlteration: NucleotideAlteration option }
 
     and ``Somatic Biologically Relevant Gene`` =
         internal
@@ -123,7 +125,7 @@ module Tempus =
     and HgvsProteinChange =
         { AbbreviatedChange: HgvsAbbreviatedProteinChange
           FullChange: HgvsProteinFullChange }
-    and  HgvsAbbreviatedProteinChange = internal  HgvsAbbreviatedProteinChange of string
+    and HgvsAbbreviatedProteinChange = internal  HgvsAbbreviatedProteinChange of string
     and HgvsProteinFullChange = internal HgvsProteinFullChange of string
     and HgvsCodingChange = internal HgvsCodingChange of string
     and ReferenceSequence = internal ReferenceSequence of string
@@ -141,7 +143,8 @@ module Tempus =
 
     type Results =
         { TumorMutationBurden: TumorMutationBurden option
-          MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option }
+          MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option
+          ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation`` list }
 
     type OverallReport =
         { Lab: Lab
@@ -830,10 +833,12 @@ module Tempus =
                             json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput
                            ) ||> TumorMutationBurden.validateOptional
                 and! msiStatus = json.MsiStatus |> Option.map MicrosatelliteInstabilityStatus.Input |> MicrosatelliteInstabilityStatus.validateOptional
+                and! somaticPotentiallyActionableMutations = json.``Somatic Potentially Actionable Mutations`` |> ``Somatic Potentially Actionable Mutations``.validate
 
                 return { TumorMutationBurden = tmb
-                         MicrosatelliteInstabilityStatus = msiStatus }
-            }
+                         MicrosatelliteInstabilityStatus = msiStatus
+                         ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
+                       } }
 
 
       type Json =
