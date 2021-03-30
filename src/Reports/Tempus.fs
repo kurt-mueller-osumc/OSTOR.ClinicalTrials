@@ -82,6 +82,15 @@ module Tempus =
         internal
         | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
 
+    /// a listing in the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
+    and ``Somatic Potentially Actionable Mutation`` =
+        { Gene: Gene
+          Variants: ``Somatic Potentially Actionable Variant`` list }
+    and ``Somatic Potentially Actionable Variant`` =
+        { HGVS: HGVS
+          NucleotideAlteration: NucleotideAlteration option
+          AllelicFraction: AllelicFraction option
+          VariantDescription: VariantDescription }
     and ``Somatic Biologically Relevant Variant`` =
         { Gene: ``Somatic Biologically Relevant Gene``
           HGVS: HGVS option
@@ -449,8 +458,8 @@ module Tempus =
 
                     { ReportId           = "reportId"         |> flip get.Required.Field Decode.guid
                       SigningPathologist = pathologistDecoder |> get.Required.Raw
-                      SignoutDate        = signoutDateDecoder |> get.Required.Raw }
-                )
+                      SignoutDate        = signoutDateDecoder |> get.Required.Raw
+                    } )
 
     module Sample =
         open System
@@ -602,6 +611,33 @@ module Tempus =
                           VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
                         } )
 
+            open FsToolkit.ErrorHandling
+
+            /// Validate a somatic, potentially actionable variant's hgvs, nucleotide alteration, allelic fraction, and variant description
+            let validate (json: Json) : Validation<``Somatic Potentially Actionable Variant``,string> =
+                validation {
+                    let! hgvs = json.HgvsJson |> HGVS.validate
+                    and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validate
+                    and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.Input |> Variant.AllelicFraction.validate
+                    and! variantDescription = json.VariantDescription |> Variant.Description.Input |> Variant.Description.validate
+
+                    return { HGVS = hgvs
+                             NucleotideAlteration = nucleotideAlteration
+                             AllelicFraction = allelicFraction
+                             VariantDescription = variantDescription
+                           } }
+
+        module Variants =
+            open FsToolkit.ErrorHandling
+
+            /// Validate a list of somatic, potentially actionable variants and return either a list of successfully validated variants or a list of errors
+            let validate (json: Variant.Json list) =
+                json
+                |> Seq.map Variant.validate
+                |> Seq.toList
+                |> Result.combine
+                |> Result.mapError List.flatten
+
         type Json =
             { GeneJson: Gene.Json
               VariantJsons: Variant.Json list }
@@ -611,6 +647,17 @@ module Tempus =
                     { GeneJson = get.Required.Raw Gene.Json.Decoder
                       VariantJsons = "variants" |> flip get.Required.Field (Decode.list Variant.Json.Decoder) }
                 )
+
+        open FsToolkit.ErrorHandling
+
+        let validate (json: Json) : Validation<``Somatic Potentially Actionable Mutation``, string> =
+            validation {
+                let! gene = json.GeneJson |> Gene.Json.validate
+                and! variants = json.VariantJsons |> Variants.validate
+
+                return { Gene = gene
+                         Variants = variants }
+            }
 
     module ``Somatic Potentially Actionable Copy Number Variant`` =
         type Json =
