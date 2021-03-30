@@ -89,27 +89,37 @@ module Tempus =
     and TumorMutationBurdenPercentile   = internal TumorMutationBurdenPercentile of uint
     and MicrosatelliteInstabilityStatus = internal MicrosatelliteInstabilityStatus of string
 
-    type Variant =
-        internal
-        | ``Somatic Biologically Relevant Variant`` of ``Somatic Biologically Relevant Variant``
+    type Gene =
+        { GeneName: GeneName
+          HgncId: HgncId
+          EntrezId: EntrezId }
+    and HgncId = internal HgncId of string
+    and EntrezId = internal EntrezId of string
 
     /// a listing in the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
-    and ``Somatic Potentially Actionable Mutation`` =
+    type ``Somatic Potentially Actionable Mutation`` =
         { Gene: Gene
           Variants: ``Somatic Potentially Actionable Variant`` list }
-    /// the `variants` section of a `somaticPotnetiallyActionableMutations` listing
+    /// the `variants` section of a `somaticPotentiallyActionableMutations` entry
     and ``Somatic Potentially Actionable Variant`` =
         { HGVS: HGVS
           NucleotideAlteration: NucleotideAlteration option
           AllelicFraction: AllelicFraction option
           VariantDescription: VariantDescription }
 
-    and Gene =
-        { GeneName: GeneName
-          HgncId: HgncId
-          EntrezId: EntrezId }
-    and HgncId = internal HgncId of string
-    and EntrezId = internal EntrezId of string
+    /// a listing in the `somaticPotentiallyActionableCopyNumberVariants` subsection of the report's `results` section
+    and ``Somatic Potentially Actionable Copy Number Variant`` =
+        { Gene: Gene
+          Description: CopyNumberVariantDescription
+          Type: CopyNumberVariantType }
+    and CopyNumberVariantDescription =
+        internal
+        | ``Copy number gain``
+        | ``Copy number loss``
+    and CopyNumberVariantType =
+        internal
+        | Amplification
+        | Deletion
 
     and ``Somatic Biologically Relevant Variant`` =
         { Gene: ``Somatic Biologically Relevant Gene``
@@ -152,7 +162,8 @@ module Tempus =
     type Results =
         { TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option
-          ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation`` list }
+          ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation`` list
+          ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant`` list }
 
     module Gene =
         /// Json object attributes that identifies genes
@@ -777,7 +788,28 @@ module Tempus =
             |> Result.combine
             |> Result.mapError List.flatten
 
+    /// logic for `somaticPotentiallyActionableCopyNumberVariants` subsection of the `results` section
     module ``Somatic Potentially Actionable Copy Number Variant`` =
+        module Description =
+            type Input = Input of string
+
+            /// Validate that a copy number variant description is either 'copy number gain' or 'copy number loss'
+            let validate (Input input) =
+                match input with
+                | "Copy number gain" -> Ok ``Copy number gain``
+                | "Copy number loss" -> Ok ``Copy number loss``
+                | _ -> Error $"Invalid copy number variant description: {input}"
+
+        module Type =
+            type Input = Input of string
+
+            /// Validate that a copy number variant type is either 'amplification' or 'deletion'
+            let validate (Input input) =
+                match input with
+                | "amplification" -> Ok Amplification
+                | "deletion" -> Ok Deletion
+                | _ -> Error $"Invalid copy number variant type: {input}"
+
         type Json =
             { Gene: Gene.Json
               VariantDescription: string
@@ -787,8 +819,33 @@ module Tempus =
                 Decode.object (fun get ->
                     { Gene = get.Required.Raw Gene.Json.Decoder
                       VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
-                      VariantType = "variantType" |> flip get.Required.Field Decode.string }
-                )
+                      VariantType = "variantType" |> flip get.Required.Field Decode.string
+                    } )
+
+        open FsToolkit.ErrorHandling
+
+        /// Validate a copy number variant input
+        let validate (json: Json) =
+            validation {
+                let! gene = json.Gene |> Gene.Json.validate
+                and! variantDescription = json.VariantDescription |> Description.Input |> Description.validate
+                and! variantType = json.VariantType |> Type.Input |> Type.validate
+
+                return { Gene = gene
+                         Description = variantDescription
+                         Type = variantType
+                       } }
+
+    module ``Somatic Potentially Actionable Copy Number Variants`` =
+        open FsToolkit.ErrorHandling
+
+        /// Validate a collection of somatic potentially actionable copy number variants
+        let validate (jsons: ``Somatic Potentially Actionable Copy Number Variant``.Json list) =
+            jsons
+            |> Seq.map ``Somatic Potentially Actionable Copy Number Variant``.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
 
 
     module ``Somatic Biologically Relevant Variant`` =
@@ -935,14 +992,15 @@ module Tempus =
         let validate (json: Json) =
             validation {
                 let! tmb = (json.TumorMutationBurden           |> Option.map TumorMutationBurden.ScoreInput,
-                            json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput
-                           ) ||> TumorMutationBurden.validateOptional
+                            json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput) ||> TumorMutationBurden.validateOptional
                 and! msiStatus = json.MsiStatus |> Option.map MicrosatelliteInstabilityStatus.Input |> MicrosatelliteInstabilityStatus.validateOptional
                 and! somaticPotentiallyActionableMutations = json.``Somatic Potentially Actionable Mutations`` |> ``Somatic Potentially Actionable Mutations``.validate
+                and! somaticPotentiallyActionableCopyNumberVariants = json.``Somatic Potentially Actionable Copy Number Variants`` |> ``Somatic Potentially Actionable Copy Number Variants``.validate
 
                 return { TumorMutationBurden = tmb
                          MicrosatelliteInstabilityStatus = msiStatus
                          ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
+                         ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
                        } }
 
     type Json =
