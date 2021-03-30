@@ -121,6 +121,7 @@ module Tempus =
         | Amplification
         | Deletion
 
+    /// a listing in the `somaticBiologicallyRelevantVariant` subsection of the report's `results` section
     and ``Somatic Biologically Relevant Variant`` =
         { Gene: ``Somatic Biologically Relevant Gene``
           HGVS: HGVS option
@@ -143,8 +144,19 @@ module Tempus =
     and RelevantVariantType =
         internal
         | CNV
-        | SNV
+        | RelevantSNV
         | Fusion
+
+    /// a listin in the `somaticVariantsOfUnknownSignificance` subsection of the report's `results` section
+    and ``Somatic Variant of Unknown Significance`` =
+        { Gene: Gene
+          Hgvs: HGVS
+          Type: VusVariantType
+          Description: VariantDescription
+          NucleotideAlteration: NucleotideAlteration
+          AllelicFraction: AllelicFraction }
+
+    and VusVariantType = internal | SNV
 
     and HGVS =
         { ProteinChange: HgvsProteinChange option
@@ -689,22 +701,26 @@ module Tempus =
 
     module Variant =
         module NucleotideAlteration =
+            open Utilities.StringValidations
+
             type Input = Input of string
 
-            /// Validate that a nucleotide alteration is either none or something
-            let validate input : Result<NucleotideAlteration option,string> =
-                match input with
-                | (Input "") -> Ok None
-                | (Input na) -> Ok <| Some (NucleotideAlteration na)
+            /// Validate that a nucleotide alteration is not blank
+            let validate (Input input) =
+                input
+                |> validateNotBlank
+                |> Result.map NucleotideAlteration
+                |> Result.mapError (fun _ -> $"Nucleotide alteration cannot be blank")
 
-            let validateOptional (optionalInput: Input option) : Result<NucleotideAlteration option, string> =
+            let validateOptional (optionalInput: Input option) =
                 match optionalInput with
-                | Some input -> validate input
                 | None -> Ok None
+                | Some input ->
+                    match validate input with
+                    | Ok nucleotideAlteration -> Ok <| Some nucleotideAlteration
+                    | Error e -> Error e
 
         module AllelicFraction =
-            open Utilities.FloatValidations
-
             type Input = Input of string
 
             let (|ValidFraction|_|) (Input input) =
@@ -713,14 +729,16 @@ module Tempus =
             /// Validate that an allelic fraction is either not present or is a valid, parseable float.
             let validate input =
                 match input with
-                | (Input "") -> Ok None
-                | ValidFraction allelicFraction when allelicFraction >= 0.0 -> Ok <| Some (AllelicFraction allelicFraction)
+                | ValidFraction allelicFraction when allelicFraction >= 0.0 -> Ok <| (AllelicFraction allelicFraction)
                 | _ -> Error $"Invalid allelic fraction: {input}"
 
             let validateOptional (optionalInput: Input option) =
                 match optionalInput with
                 | None -> Ok None
-                | Some input -> validate input
+                | Some input ->
+                    match validate input with
+                    | Ok allelicFraction -> Ok <| Some allelicFraction
+                    | Error e -> Error e
 
 
         module Description =
@@ -740,15 +758,15 @@ module Tempus =
             /// The json object for the `variants` section in each `somatic potentially actionable mutation`
             type Json =
                 { HgvsJson: HGVS.Json
-                  NucleotideAlteration: string
-                  AllelicFraction: string
+                  NucleotideAlteration: string option
+                  AllelicFraction: string option
                   VariantDescription: string }
 
                 static member Decoder : Decoder<Json> =
                     Decode.object (fun get ->
                         { HgvsJson = get.Required.Raw HGVS.Json.Decoder
-                          NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
-                          AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
+                          NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decoder.optionalString
+                          AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decoder.optionalString
                           VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
                         } )
 
@@ -758,8 +776,8 @@ module Tempus =
             let validate (json: Json) : Validation<``Somatic Potentially Actionable Variant``,string> =
                 validation {
                     let! hgvs = json.HgvsJson |> HGVS.validate
-                    and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validate
-                    and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.Input |> Variant.AllelicFraction.validate
+                    and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
+                    and! allelicFraction = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
                     and! variantDescription = json.VariantDescription |> Variant.Description.Input |> Variant.Description.validate
 
                     return { HGVS = hgvs
@@ -887,7 +905,7 @@ module Tempus =
             let validate (Input input) =
                 match input with
                 | "CNV" -> Ok CNV
-                | "SNV" -> Ok SNV
+                | "SNV" -> Ok RelevantSNV
                 | "fusion" -> Ok Fusion
                 | _ -> Error $"Invalid somatic biologically relevant variant type: {input}"
 
@@ -943,6 +961,14 @@ module Tempus =
             |> Result.mapError List.flatten
 
     module ``Somatic Variant of Unknown Significance`` =
+        module Type =
+            type Input = Input of string
+
+            let validate (Input input) =
+                match input with
+                | "SNV" -> Ok SNV
+                | _ -> Error $"Invalid VUS variant type: {input}"
+
         type Json =
             { GeneJson: Gene.Json
               HgvsJson: HGVS.Json
@@ -960,6 +986,26 @@ module Tempus =
                       VariantType          = "variantType"          |> flip get.Required.Field Decode.string
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
+
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
+        let validate (json: Json) : Validation<``Somatic Variant of Unknown Significance``, string> =
+            validation {
+                let! gene = json.GeneJson |> Gene.Json.validate
+                and! hgvs = json.HgvsJson |> HGVS.validate
+                and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.Input |> Variant.AllelicFraction.validate
+                and! variantType = json.VariantType |> Type.Input |> Type.validate
+                and! variantDescription = json.VariantDescription |> validateNotBlank |> Result.map VariantDescription
+                and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validate
+
+                return { Gene = gene
+                         Hgvs = hgvs
+                         AllelicFraction = allelicFraction
+                         Type = variantType
+                         NucleotideAlteration = nucleotideAlteration
+                         Description = variantDescription
+                       } }
 
     module InheritedRelevantVariant =
         type Json =
