@@ -594,6 +594,15 @@ module Tempus =
                          TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
                        } }
 
+        /// Validate normal sample, if it's present
+        let validateOptional (optionalJson: Sample.Json option) =
+            match optionalJson with
+            | None -> Ok None
+            | Some json ->
+                match validate json with
+                | Ok normalSample -> Ok <| Some normalSample
+                | Error e -> Error e
+
     module Patient =
         open System
 
@@ -952,8 +961,14 @@ module Tempus =
                     Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
                     Order   = "order"     |> flip get.Required.Field Order.Json.Decoder
                     Samples = "specimens" |> flip get.Required.Field (Decode.list Sample.Json.Decoder)
-                    Results = "results"   |> flip get.Required.Field Results.Json.Decoder }
-              )
+                    Results = "results"   |> flip get.Required.Field Results.Json.Decoder
+                  } )
+
+            member this.TumorSample =
+                this.Samples |> Seq.find (fun sample -> sample.SampleCategory = "tumor")
+
+            member this.TryNormalSample =
+                this.Samples |> Seq.tryFind (fun sample -> sample.SampleCategory = "normal")
 
     type OverallReport =
         { Lab: Lab
@@ -961,6 +976,8 @@ module Tempus =
           Report: Report
           Order: Order
           Results: Results
+          TumorSample: TumorSample
+          NormalSample: NormalSample option
         }
 
     module Json =
@@ -984,12 +1001,16 @@ module Tempus =
                 and! report  = json.Report  |> Report.validate
                 and! patient = json.Patient |> Patient.validate
                 and! order   = json.Order   |> Order.Json.validate
+                and! tumorSample  = json.TumorSample     |> TumorSample.validate
+                and! normalSample = json.TryNormalSample |> NormalSample.validateOptional
                 and! results = json.Results |> Results.validate
 
                 return { Lab     = lab
                          Report  = report
                          Patient = patient
                          Order   = order
+                         TumorSample  = tumorSample
+                         NormalSample = normalSample
                          Results = results
                        } }
 
