@@ -196,6 +196,11 @@ module Utilities =
             else
                 Error $"{regex} does not match {str}"
 
+    module FloatValidations =
+        let ``validate >= 0`` (x: float) =
+            if x >= 0.0 then Ok x
+            else Error $"{x} is not >= 0"
+
     module Xml =
         open System.IO
         open System.Linq

@@ -125,18 +125,26 @@ module Tempus =
         { Gene: ``Somatic Biologically Relevant Gene``
           HGVS: HGVS option
           AllelicFraction: AllelicFraction option
-          NucleotideAlteration: NucleotideAlteration option }
+          NucleotideAlteration: NucleotideAlteration option
+          Type: RelevantVariantType }
 
     and ``Somatic Biologically Relevant Gene`` =
         internal
-        | Gene of Gene
-        | Fusion of Fusion
+        | RelevantGene of Gene
+        | RelevantFusion of Fusion
 
     and Fusion =
         { ``5' Gene``: Gene
           ``3' Gene``: Gene
           FusionType: FusionType }
+
     and FusionType = internal FusionType of string
+
+    and RelevantVariantType =
+        internal
+        | CNV
+        | SNV
+        | Fusion
 
     and HGVS =
         { ProteinChange: HgvsProteinChange option
@@ -683,23 +691,36 @@ module Tempus =
             type Input = Input of string
 
             /// Validate that a nucleotide alteration is either none or something
-            let validate input =
+            let validate input : Result<NucleotideAlteration option,string> =
                 match input with
                 | (Input "") -> Ok None
                 | (Input na) -> Ok <| Some (NucleotideAlteration na)
 
+            let validateOptional (optionalInput: Input option) : Result<NucleotideAlteration option, string> =
+                match optionalInput with
+                | Some input -> validate input
+                | None -> Ok None
+
         module AllelicFraction =
+            open Utilities.FloatValidations
+
             type Input = Input of string
 
             let (|ValidFraction|_|) (Input input) =
-                input |> Float.tryParse |> Option.map AllelicFraction
+                input |> Float.tryParse
 
             /// Validate that an allelic fraction is either not present or is a valid, parseable float.
-            let validate input=
+            let validate input =
                 match input with
                 | (Input "") -> Ok None
-                | ValidFraction allelicFraction -> Ok <| (Some allelicFraction)
+                | ValidFraction allelicFraction when allelicFraction >= 0.0 -> Ok <| Some (AllelicFraction allelicFraction)
                 | _ -> Error $"Invalid allelic fraction: {input}"
+
+            let validateOptional (optionalInput: Input option) =
+                match optionalInput with
+                | None -> Ok None
+                | Some input -> validate input
+
 
         module Description =
             open StringValidations
@@ -855,34 +876,60 @@ module Tempus =
               match Gene.Json.validate geneJson, Fusion.validate fusionGeneJson with
               | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
               | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
-              | (Ok gene, _) -> Ok <| Gene gene
-              | (_, Ok fusion) -> Ok <| Fusion fusion
+              | (Ok gene, _) -> Ok <| RelevantGene gene
+              | (_, Ok fusion) -> Ok <| RelevantFusion fusion
+
+        module Type =
+            type Input = Input of string
+
+            /// Validate that a somatic biologically relevant variant type is either 'CNV', 'SNV', or 'fusion'
+            let validate (Input input) =
+                match input with
+                | "CNV" -> Ok CNV
+                | "SNV" -> Ok SNV
+                | "fusion" -> Ok Fusion
+                | _ -> Error $"Invalid somatic biologically relevant variant type: {input}"
 
         /// Represents a json object found in results.somaticBiologicallyRelevantVariants
         type Json =
             { GeneJson: Gene.Json
-              FusionGene: Fusion.Json
+              FusionJson: Fusion.Json
               HgvsJson: HGVS.Json
-              NucleotideAlteration: string
-              AllelicFraction: string
+              NucleotideAlteration: string option
+              AllelicFraction: string option
               VariantType: string
               VariantDescription: string
-              StructuralVariant: string }
+              StructuralVariant: string option }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
                     { GeneJson   = Gene.Json.Decoder   |> get.Required.Raw
-                      FusionGene = Fusion.Json.Decoder |> get.Required.Raw
+                      FusionJson = Fusion.Json.Decoder |> get.Required.Raw
                       HgvsJson   = HGVS.Json.Decoder   |> get.Required.Raw
-                      VariantType          = "variantType" |> flip get.Required.Field Decode.string
+                      VariantType          = "variantType"          |> flip get.Required.Field Decode.string
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
-                      StructuralVariant    = "structuralVariant"    |> flip get.Required.Field Decode.string
-                      NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
-                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string }
-                )
+                      StructuralVariant    = "structuralVariant"    |> flip get.Required.Field Decoder.optionalString
+                      NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decoder.optionalString
+                      AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decoder.optionalString
+                    } )
 
-        let validate json =
-            json
+        open FsToolkit.ErrorHandling
+
+        /// Validate that a somatic, biologically relevant variant has either a gene or a fusion of genese, hgvs, a variant type of cnv, snv, or fusion, and valid nucleotide laterations and allelic fractions.
+        let validate (json: Json) =
+            validation {
+                let! fusionOrGene = (json.GeneJson, json.FusionJson) ||> Gene.validate
+                and! hgvs = json.HgvsJson |> HGVS.validateOptional
+                and! variantType = json.VariantType |> Type.Input |> Type.validate
+                and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
+                and! allelicFraction = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
+
+                return { Gene = fusionOrGene
+                         HGVS = hgvs
+                         AllelicFraction = allelicFraction
+                         NucleotideAlteration = nucleotideAlteration
+                         Type = variantType
+                } }
 
     module ``Somatic Variant of Unknown Significance`` =
         type Json =
