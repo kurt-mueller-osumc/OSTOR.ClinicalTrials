@@ -152,7 +152,7 @@ module Tempus =
         | RelevantSNV
         | Fusion
 
-    /// a listin in the `somaticVariantsOfUnknownSignificance` subsection of the report's `results` section
+    /// a listing in the `somaticVariantsOfUnknownSignificance` subsection of the report's `results` section
     and ``Somatic Variant of Unknown Significance`` =
         { Gene: Gene
           Hgvs: HGVS
@@ -162,6 +162,36 @@ module Tempus =
           AllelicFraction: AllelicFraction }
 
     and VusVariantType = internal | SNV
+
+    /// the `inheritedRelevantVariants` section of `results` section
+    and InheritedRelevantVariants =
+        { Note: Note
+          Values: InheritedRelevantVariantValue list }
+    and Note = internal Note of string
+    and InheritedRelevantVariantValue =
+        { Gene: Gene
+          Hgvs: HGVS
+          Description: VariantDescription
+          ClinicalSignificance: ClinicalSignificance
+          Disease: Disease
+          AllelicFraction: AllelicFraction
+          Chromosome: Chromosome
+          Position: Position
+          ReferencedNucleotide: ReferencedNucleotide
+          AlteredNucleotide: AlteredNucleotide }
+
+    and ClinicalSignificance =
+        internal
+        | ``Likely Pathogenic``
+        | Pathogenic
+        | ``Risk Allele``
+        | ``VUS Favoring Pathogenic``
+
+    and Disease = internal Disease of string
+    and Chromosome = internal Chromosome of position: uint
+    and ReferencedNucleotide = ReferencedNucleotide of string
+    and AlteredNucleotide = AlteredNucleotide of string
+    and Position = Position of uint
 
     and HGVS =
         { ProteinChange: HgvsProteinChange option
@@ -194,6 +224,7 @@ module Tempus =
           ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant`` list
           ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance`` list
           Fusions: Fusion list
+          InheritedRelevantVariants: InheritedRelevantVariants
         }
 
     module Gene =
@@ -1055,32 +1086,106 @@ module Tempus =
             |> Result.combine
             |> Result.mapError List.flatten
 
-    module InheritedRelevantVariant =
+    /// logic `results.inheritedRelevantVariants` section
+    module InheritedRelevantVariants =
+        module ClinicalSignificance =
+            type Input = Input of string
+
+            /// Validate that an inherited relevant variant's clinical signficance is either "Likely Pathogenic", "Pathogenic", "Risk Allele", or "VUS Favoring Pathogenic"
+            let validate (Input input) =
+                match input with
+                | "Likely Pathogenic" -> Ok ``Likely Pathogenic``
+                | "Pathogenic" -> Ok Pathogenic
+                | "Risk Allele" -> Ok ``Risk Allele``
+                | "VUS Favoring Pathogenic" -> Ok ``VUS Favoring Pathogenic``
+                | _ -> Error $"Invalid inherited relevant variant clinical significance: {input}"
+
+        /// logic for a value in the `values` array of an inherited relevant variant
+        module Value =
+            type Json =
+                { GeneJson: Gene.Json
+                  HgvsJson: HGVS.Json
+                  VariantDescription: string
+                  ClinicalSignificance: string
+                  Disease: string
+                  AllelicFraction: string
+                  Chromosome: uint
+                  Ref: string
+                  Alt: string
+                  Pos: uint }
+
+                static member Decoder : Decoder<Json> =
+                    Decode.object (fun get ->
+                      { GeneJson = get.Required.Raw Gene.Json.Decoder
+                        HgvsJson = get.Required.Raw HGVS.Json.Decoder
+                        VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
+                        ClinicalSignificance = "clinicalSignificance" |> flip get.Required.Field Decode.string
+                        Disease              = "disease"              |> flip get.Required.Field Decode.string
+                        AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
+                        Chromosome           = "chromosome"           |> flip get.Required.Field Decode.uint32
+                        Ref = "ref" |> flip get.Required.Field Decode.string
+                        Alt = "alt" |> flip get.Required.Field Decode.string
+                        Pos = "pos" |> flip get.Required.Field Decode.uint32
+                      } )
+
+            open FsToolkit.ErrorHandling
+            open Utilities.StringValidations
+
+            /// Validate that an inherited relevant variant value has a gene, hgvs, description, clinical significance, disease, allelic fraction, and nucleotide alterations
+            let validate (json: Json) =
+                validation {
+                    let! gene = json.GeneJson |> Gene.Json.validate
+                    and! hgvs = json.HgvsJson |> HGVS.validate
+                    and! variantDescription = json.VariantDescription |> validateNotBlank |> Result.map VariantDescription
+                    and! clinicalSignificance = json.ClinicalSignificance |> ClinicalSignificance.Input |> ClinicalSignificance.validate
+                    and! disease = json.Disease |> validateNotBlank |> Result.map Disease
+                    and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.Input |> Variant.AllelicFraction.validate
+                    and! referencedNucleotide = json.Ref |> validateNotBlank |> Result.map ReferencedNucleotide
+                    and! alteredNucleotide = json.Alt |> validateNotBlank |> Result.map AlteredNucleotide
+
+                    return { Gene = gene
+                             Hgvs = hgvs
+                             Description = variantDescription
+                             ClinicalSignificance = clinicalSignificance
+                             Disease = disease
+                             AllelicFraction = allelicFraction
+                             ReferencedNucleotide = referencedNucleotide
+                             AlteredNucleotide = alteredNucleotide
+                             Chromosome = Chromosome json.Chromosome
+                             Position = Position json.Pos
+                           } }
+
+        module Values =
+            open FsToolkit.ErrorHandling
+
+            let validate (jsons: Value.Json list) =
+                jsons
+                |> List.map Value.validate
+                |> Result.combine
+                |> Result.mapError List.flatten
+
         type Json =
-            { GeneJson: Gene.Json
-              HgvsJson: HGVS.Json
-              VariantDescription: string
-              ClinicalSignificance: string
-              Disease: string
-              AllelicFraction: string
-              Chromosome: int
-              Ref: string
-              Alt: string
-              Pos: int }
+            { NoteJson: string
+              Values: Value.Json list }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
-                  { GeneJson = get.Required.Raw Gene.Json.Decoder
-                    HgvsJson = get.Required.Raw HGVS.Json.Decoder
-                    VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
-                    ClinicalSignificance = "clinicalSignificance" |> flip get.Required.Field Decode.string
-                    Disease              = "disease"              |> flip get.Required.Field Decode.string
-                    AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
-                    Chromosome           = "chromosome"           |> flip get.Required.Field Decode.int
-                    Ref = "ref" |> flip get.Required.Field Decode.string
-                    Alt = "alt" |> flip get.Required.Field Decode.string
-                    Pos = "pos" |> flip get.Required.Field Decode.int }
-                )
+                    { NoteJson = "note"   |> flip get.Required.Field Decode.string
+                      Values   = "values" |> flip get.Required.Field (Decode.list Value.Json.Decoder)
+                    } )
+
+        open FsToolkit.ErrorHandling
+        open Utilities.StringValidations
+
+        /// Validate an inherited relevant variant and any associated inherited relevant variant values
+        let validate (json: Json) =
+            validation {
+                let! note = json.NoteJson |> validateNotBlank |> Result.map Note
+                and! values = json.Values |> Values.validate
+
+                return { Note = note
+                         Values = values } }
+
 
     /// The `results` section in the Tempus report
     module Results =
@@ -1118,7 +1223,7 @@ module Tempus =
               ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
               ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list
               Fusions: Fusion.Json list
-              InheritedRelevantVariants: InheritedRelevantVariant.Json list }
+              InheritedRelevantVariants: InheritedRelevantVariants.Json }
 
             static member Decoder : Decoder<Json> =
                 Decode.object (fun get ->
@@ -1135,7 +1240,7 @@ module Tempus =
                       ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
                       ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
                       Fusions = "fusionVariants" |> flip get.Required.Field (Decode.list Fusion.Json.Decoder)
-                      InheritedRelevantVariants = ["inheritedRelevantVariants"; "values"] |> flip get.Required.At (Decode.list InheritedRelevantVariant.Json.Decoder)
+                      InheritedRelevantVariants = "inheritedRelevantVariants" |> flip get.Required.Field InheritedRelevantVariants.Json.Decoder
                     } )
 
         open FsToolkit.ErrorHandling
@@ -1151,6 +1256,7 @@ module Tempus =
                 and! somaticPotentiallyRelevantVariants = json.``Somatic Biologically Relevant Variants`` |> ``Somatic Biologically Relevant Variants``.validate
                 and! somaticVariantsOfUnknownSignificance = json.``Somatic Variants of Unknown Significance`` |> ``Somatic Variants of Unknown Significance``.validate
                 and! fusions = json.Fusions |> Fusions.validate
+                and! inheritedRelevantVariants = json.InheritedRelevantVariants |> InheritedRelevantVariants.validate
 
                 return { TumorMutationBurden = tmb
                          MicrosatelliteInstabilityStatus = msiStatus
@@ -1159,6 +1265,7 @@ module Tempus =
                          ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
                          ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
                          Fusions = fusions
+                         InheritedRelevantVariants = inheritedRelevantVariants
                        } }
 
     type Json =
