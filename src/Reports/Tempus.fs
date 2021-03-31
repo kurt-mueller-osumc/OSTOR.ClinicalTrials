@@ -163,6 +163,7 @@ module Tempus =
           CodingChange: HgvsCodingChange
           ReferenceSequence: ReferenceSequence }
 
+    /// Human Genome Variation Society Sequence Variant
     and HgvsProteinChange =
         { AbbreviatedChange: HgvsAbbreviatedProteinChange
           FullChange: HgvsProteinFullChange }
