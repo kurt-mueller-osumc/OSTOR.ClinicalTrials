@@ -137,9 +137,14 @@ module Tempus =
     and Fusion =
         { ``5' Gene``: Gene
           ``3' Gene``: Gene
-          FusionType: FusionType option }
+          FusionType: FusionType option
+          VariantDescription: FusionVariantDescription }
 
     and FusionType = internal | GeneFusion
+    and FusionVariantDescription =
+        internal
+        | ``Chromosomal rearrangement``
+        | ``Deletion (exons 2-7)``
 
     and RelevantVariantType =
         internal
@@ -265,17 +270,38 @@ module Tempus =
                     | Ok fusionType -> Ok <| Some fusionType
                     | Error e -> Error e
 
-        /// Validate that a fusion has 2 valid genes and a valid fusion type
+        module VariantDescription =
+            type Input = Input of string
+
+            /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
+            let validate (Input input) =
+                match input with
+                | "Chromosomal rearrangement" -> Ok ``Chromosomal rearrangement``
+                | "Deletion (exons 2-7)" -> Ok ``Deletion (exons 2-7)``
+                | _ -> Error $"Invalid fusion variant description: {input}"
+
+        /// Validate that a fusion has 2 valid genes and a valid fusion type, if present.
         let validate (json: Json) =
             validation {
                 let! gene5 = json.Gene5 |> Gene.Json.validate
                 and! gene3 = json.Gene3 |> Gene.Json.validate
                 and! fusionType = json.FusionType |> Option.map FusionType.Input |> FusionType.validateOptional
+                and! variantDescription = json.VariantDescription |> VariantDescription.Input |> VariantDescription.validate
 
                 return { ``5' Gene`` = gene5
                          ``3' Gene`` = gene3
-                         FusionType = fusionType }
-            }
+                         FusionType = fusionType
+                         VariantDescription = variantDescription
+                       } }
+
+    module Fusions =
+        /// Validate a list of fusions
+        let validate (jsons: Fusion.Json list) =
+            jsons
+            |> Seq.map Fusion.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
 
     module HGVS =
         /// Represents HGVS reference sequences for proteins and coding DNA
@@ -549,7 +575,6 @@ module Tempus =
                     Ok { CollectionDate = CollectionDate collectionDate; ReceivedDate = ReceivedDate receivedDate }
                 else
                     Error $"Collection date, {collectionDate}, doesn't happen before received date, {receivedDate}."
-
 
         /// each entry in the `specimens` section of the Tempus report
         type Json =
