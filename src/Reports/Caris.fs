@@ -86,7 +86,7 @@ module Caris =
           MolecularConsequence: MolecularConsequence option
           Interpretation: GeneInterpretation
           AlleleFrequency: AlleleFrequency option
-          HGVS: HGVS
+          HGVS: HGVS option
           TranscriptAlterationDetails: TranscriptAlterationDetails option }
 
         member this.IsSomatic =
@@ -168,13 +168,10 @@ module Caris =
     and TranscriptStopPosition  = internal TranscriptStopPosition  of position: uint64
 
     and HGVS =
-        internal
-        | HGVS of {| CodingChange: HgvsCodingChange
-                     ProteinChange: HgvsProteinChange |}
-        | BlankHGVS
+        { CodingChange: HgvsCodingChange
+          ProteinChange: HgvsProteinChange }
     and HgvsCodingChange  = internal | HgvsCodingChange of codingChange: string
     and HgvsProteinChange = internal | HgvsProteinChange of proteinChange: string
-
 
     (* Genomic Alteration Type Extensions *)
 
@@ -200,19 +197,6 @@ module Caris =
     type HgvsProteinChange with member this.Value = this |> fun (HgvsProteinChange proteinChange) -> proteinChange
     type TranscriptId      with member this.Value = this |> fun (TranscriptId transcriptId) -> transcriptId
 
-    type HGVS with
-        /// The string representation of an hgvs coding change
-        member this.CodingChangeValue =
-            match this with
-            | HGVS hgvs -> hgvs.CodingChange.Value
-            | BlankHGVS -> ""
-
-        /// The string represenation of an hgvs protein change
-        member this.ProteinChangeValue =
-            match this with
-            | HGVS hgvs -> hgvs.ProteinChange.Value
-            | BlankHGVS -> ""
-
     type GenomicAlterationSource with
         member this.Value =
             match this with
@@ -222,6 +206,8 @@ module Caris =
         member this.MolecularConsequenceValue = this.MolecularConsequence |> Option.map (fun mc -> mc.Value) |> Option.defaultValue ""
         member this.SourceValue = this.Source |> Option.map (fun src -> src.Value) |> Option.defaultValue ""
         member this.TryTranscriptIdValue = this.TranscriptAlterationDetails |> Option.map (fun tad -> tad.TranscriptId.Value)
+        member this.TryHgvsProteinChangeValue = this.HGVS |> Option.map (fun hgvs -> hgvs.ProteinChange.Value)
+        member this.TryHgvsCodingChangeValue  = this.HGVS |> Option.map (fun hgvs -> hgvs.CodingChange.Value)
 
     /// Fusions are marked as "translocations" in a Caris report
     type Fusion =
@@ -596,8 +582,8 @@ module Caris =
         /// Validate that HGVS coding and protein change are both empty or are both present.
         let validate (codingChangeInput: CodingChange.Input option) (proteinChangeInput: ProteinChange.Input option) =
             match codingChangeInput, proteinChangeInput with
-            | None, None -> Ok BlankHGVS
-            | Some (CodingChange.Input codingChange), Some (ProteinChange.Input proteinChange) -> Ok <| HGVS {| CodingChange = HgvsCodingChange codingChange; ProteinChange = HgvsProteinChange proteinChange |}
+            | None, None -> Ok None
+            | Some (CodingChange.Input codingChange), Some (ProteinChange.Input proteinChange) -> Ok <| Some { CodingChange = HgvsCodingChange codingChange; ProteinChange = HgvsProteinChange proteinChange }
             | _ -> Error $"HGVS change error: {(codingChangeInput, proteinChangeInput)}"
 
     module GenomicAlteration =
@@ -1361,14 +1347,14 @@ module Caris =
                 // Associate the variant to the gene by its name
                 row.GeneName       <- ga.GeneName.Value
                 row.SampleReportId <- sampleReportId
-                row.Name           <- ga.HGVS.ProteinChangeValue
+                row.Name           <- ga.TryHgvsProteinChangeValue |> Option.defaultValue ""
 
                 row.AllelicFraction <- ga.AlleleFrequency |> Option.map (fun af -> float af.Value)
                 row.Category <- ga.SourceValue // is 'somatic'
                 row.Type <- ga.MolecularConsequenceValue |> Some
 
-                row.HgvsC <- ga.HGVS.CodingChangeValue |> Some
-                row.HgvsProtein <- ga.HGVS.ProteinChangeValue |> Some
+                row.HgvsC <- ga.TryHgvsCodingChangeValue
+                row.HgvsProtein <- ga.TryHgvsProteinChangeValue
                 row.Transcript <- ga.TryTranscriptIdValue
 
                 row
