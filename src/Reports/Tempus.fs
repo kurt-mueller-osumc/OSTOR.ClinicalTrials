@@ -193,6 +193,7 @@ module Tempus =
           ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant`` list
           ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant`` list
           ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance`` list
+          Fusions: Fusion list
         }
 
     module Gene =
@@ -1149,6 +1150,7 @@ module Tempus =
                 and! somaticPotentiallyActionableCopyNumberVariants = json.``Somatic Potentially Actionable Copy Number Variants`` |> ``Somatic Potentially Actionable Copy Number Variants``.validate
                 and! somaticPotentiallyRelevantVariants = json.``Somatic Biologically Relevant Variants`` |> ``Somatic Biologically Relevant Variants``.validate
                 and! somaticVariantsOfUnknownSignificance = json.``Somatic Variants of Unknown Significance`` |> ``Somatic Variants of Unknown Significance``.validate
+                and! fusions = json.Fusions |> Fusions.validate
 
                 return { TumorMutationBurden = tmb
                          MicrosatelliteInstabilityStatus = msiStatus
@@ -1156,6 +1158,7 @@ module Tempus =
                          ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
                          ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
                          ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
+                         Fusions = fusions
                        } }
 
     type Json =
