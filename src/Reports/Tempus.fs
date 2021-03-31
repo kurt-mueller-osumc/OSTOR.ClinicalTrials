@@ -179,12 +179,15 @@ module Tempus =
     type HgvsProteinFullChange        with member this.Value = this |> fun (HgvsProteinFullChange proteinChange) -> proteinChange
     type HgvsCodingChange             with member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
 
+    /// The `results` section of the Tempus report
     type Results =
         { TumorMutationBurden: TumorMutationBurden option
           MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option
           ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation`` list
           ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant`` list
-          ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant`` list }
+          ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant`` list
+          ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance`` list
+        }
 
     module Gene =
         /// Json object attributes that identifies genes
@@ -740,7 +743,6 @@ module Tempus =
                     | Ok allelicFraction -> Ok <| Some allelicFraction
                     | Error e -> Error e
 
-
         module Description =
             open StringValidations
             type Input = Input of string
@@ -909,7 +911,7 @@ module Tempus =
                 | "fusion" -> Ok Fusion
                 | _ -> Error $"Invalid somatic biologically relevant variant type: {input}"
 
-        /// Represents a json object found in results.somaticBiologicallyRelevantVariants
+        /// Represents a json object found in `results.somaticBiologicallyRelevantVariants`
         type Json =
             { GeneJson: Gene.Json
               FusionJson: Fusion.Json
@@ -990,6 +992,7 @@ module Tempus =
         open FsToolkit.ErrorHandling
         open Utilities.StringValidations
 
+        /// Validate that a variant of unknown significance has a valid gene, hgvs, allelic fraction, nucleotide alteration, and variant type and description.
         let validate (json: Json) : Validation<``Somatic Variant of Unknown Significance``, string> =
             validation {
                 let! gene = json.GeneJson |> Gene.Json.validate
@@ -1006,6 +1009,14 @@ module Tempus =
                          NucleotideAlteration = nucleotideAlteration
                          Description = variantDescription
                        } }
+
+    module ``Somatic Variants of Unknown Significance`` =
+        let validate (jsons: ``Somatic Variant of Unknown Significance``.Json list) =
+            jsons
+            |> Seq.map ``Somatic Variant of Unknown Significance``.validate
+            |> Seq.toList
+            |> Result.combine
+            |> Result.mapError List.flatten
 
     module InheritedRelevantVariant =
         type Json =
@@ -1101,12 +1112,14 @@ module Tempus =
                 and! somaticPotentiallyActionableMutations = json.``Somatic Potentially Actionable Mutations`` |> ``Somatic Potentially Actionable Mutations``.validate
                 and! somaticPotentiallyActionableCopyNumberVariants = json.``Somatic Potentially Actionable Copy Number Variants`` |> ``Somatic Potentially Actionable Copy Number Variants``.validate
                 and! somaticPotentiallyRelevantVariants = json.``Somatic Biologically Relevant Variants`` |> ``Somatic Biologically Relevant Variants``.validate
+                and! somaticVariantsOfUnknownSignificance = json.``Somatic Variants of Unknown Significance`` |> ``Somatic Variants of Unknown Significance``.validate
 
                 return { TumorMutationBurden = tmb
                          MicrosatelliteInstabilityStatus = msiStatus
                          ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
                          ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
                          ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
+                         ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
                        } }
 
     type Json =
