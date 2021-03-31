@@ -137,9 +137,9 @@ module Tempus =
     and Fusion =
         { ``5' Gene``: Gene
           ``3' Gene``: Gene
-          FusionType: FusionType }
+          FusionType: FusionType option }
 
-    and FusionType = internal FusionType of string
+    and FusionType = internal | GeneFusion
 
     and RelevantVariantType =
         internal
@@ -232,7 +232,7 @@ module Tempus =
             { Gene5: Gene.Json
               Gene3: Gene.Json
               VariantDescription: string
-              FusionType: string
+              FusionType: string option
               StructuralVariant: string option }
 
             /// Deserializer for a fusion of genes
@@ -241,26 +241,36 @@ module Tempus =
                     { Gene5 = get.Required.Raw Gene.Json.Gene5Decoder
                       Gene3 = get.Required.Raw Gene.Json.Gene3Decoder
                       VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
-                      FusionType         = "fusionType"         |> flip get.Required.Field Decode.string
+                      FusionType         = "fusionType"         |> flip get.Required.Field Decoder.optionalString
                       StructuralVariant  = "structuralVariant"  |> flip get.Required.Field Decoder.optionalString }
                 )
 
         open FsToolkit.ErrorHandling
-        open Utilities.StringValidations
 
         module FusionType =
-            /// Validate that a fusion type is not blank
-            let validate =
-                validateNotBlank
-                >> Result.map FusionType
-                >> Result.mapError (fun e -> $"Fusion type can't be blank: {e}")
+            type Input = Input of string
+
+            /// Validate that a fusion type is `gene`, for now.
+            let validate (Input input) =
+                match input with
+                | "gene" -> Ok GeneFusion
+                | _ -> Error $"Invalid fusion type: {input}"
+
+            /// Validate an optional fusion type if it exists.
+            let validateOptional (optionalInput: Input option) =
+                match optionalInput with
+                | None -> Ok None
+                | Some input ->
+                    match validate input with
+                    | Ok fusionType -> Ok <| Some fusionType
+                    | Error e -> Error e
 
         /// Validate that a fusion has 2 valid genes and a valid fusion type
         let validate (json: Json) =
             validation {
                 let! gene5 = json.Gene5 |> Gene.Json.validate
                 and! gene3 = json.Gene3 |> Gene.Json.validate
-                and! fusionType = json.FusionType |> FusionType.validate
+                and! fusionType = json.FusionType |> Option.map FusionType.Input |> FusionType.validateOptional
 
                 return { ``5' Gene`` = gene5
                          ``3' Gene`` = gene3
