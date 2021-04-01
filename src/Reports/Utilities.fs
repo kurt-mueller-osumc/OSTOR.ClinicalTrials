@@ -45,40 +45,62 @@ module Utilities =
         open System
         open Thoth.Json.Net
 
-        let optionalDateTime : Decoder<DateTime option> =
-            Decode.map DateTime.tryParse Decode.string
+        module Optional =
 
-        /// Deserialize json field into an optional float from a value that can be one of:
-        ///
-        /// - `float`
-        /// - `null`
-        /// - blank string (i.e. `""`)
-        let optionalFloat : Decoder<float option> =
-            let strDecoder = Decode.map Float.tryParse Decode.string
+            /// Deserialize json field into an optional datetime from a value that can be one of:
+            ///
+            /// - `datetime`
+            /// - `null`
+            /// - blank string (i.e. `""`)
+            let dateTime: Decoder<DateTime option> =
+                let decodeDateTimeFromString = Decode.map DateTime.tryParse Decode.string
 
-            Decode.oneOf [ Decode.option Decode.float; strDecoder ]
+                Decode.oneOf [ Decode.option Decode.datetime // field is null or datetime
+                               decodeDateTimeFromString // attempt to decode and parse string into datetime
+                              ]
 
-        /// Deserialize json field into an optional integer from a value that can be one of:
-        ///
-        /// - `int`
-        /// - `null`
-        /// - blank string (i.e. `""`)
-        let optionalInteger : Decoder<int option> =
-            let strDecoder = Decode.map Integer.tryParse Decode.string
+            /// Deserialize json field into an optional float from a value that can be one of:
+            ///
+            /// - `float`
+            /// - `null`
+            /// - blank string (i.e. `""`)
+            let float : Decoder<float option> =
+                let strDecoder = Decode.map Float.tryParse Decode.string
 
-            Decode.oneOf [ Decode.option Decode.int; strDecoder ]
+                Decode.oneOf [ Decode.option Decode.float; strDecoder ]
 
-        /// Deserialize json field into an optional integer from a value that can be one of:
-        ///
-        /// - `string` -> `Some string`
-        /// - `null`  -> `None`
-        /// - blank string (i.e. `""`) -> `None`
-        let optionalString : Decoder<string option> =
-            Decode.string
-            |> Decode.map (fun str ->
-                match str with
-                | "" | null -> None
-                | _ -> Some str)
+            /// Deserialize json field into an optional integer from a value that can be one of:
+            ///
+            /// - `int`
+            /// - `null`
+            /// - blank string (i.e. `""`)
+            let integer : Decoder<int option> =
+                let strDecoder = Decode.map Integer.tryParse Decode.string
+
+                Decode.oneOf [ Decode.option Decode.int; strDecoder ]
+
+            /// Deserialize json field into an optional integer from a value that can be one of:
+            ///
+            /// - `string` -> `Some string`
+            /// - `null`  -> `None`
+            /// - blank string (i.e. `""`) -> `None`
+            let string: Decoder<string option> =
+                Decode.string
+                |> Decode.map (fun str ->
+                    match str with
+                    | "" | null -> None
+                    | _ -> Some str)
+
+            /// Deserialize json field into an optional integer from a value that can be one of:
+            ///
+            /// - `uint`
+            /// - `null`
+            /// - blank string (i.e. `""`)
+            let unsignedInteger : Decoder<uint option> =
+                let strDecoder = Decode.map UnsignedInteger.tryParse Decode.string
+
+                Decode.oneOf [ Decode.option Decode.uint32; strDecoder ]
+
 
     module Guid =
         let tryParse(input: string) =
@@ -196,10 +218,28 @@ module Utilities =
             else
                 Error $"{regex} does not match {str}"
 
+        module Typed =
+            let validateNotBlank (createValidType: string -> 'validType) errorMessage input =
+                input
+                |> validateNotBlank
+                |> Result.map createValidType
+                |> Result.mapError (fun _ -> errorMessage)
+
+
     module FloatValidations =
         let ``validate >= 0`` (x: float) =
             if x >= 0.0 then Ok x
             else Error $"{x} is not >= 0"
+
+    module Optional =
+        /// Validate an optional input, if it exists. If an input does not exist, it is still valid.
+        let validateWith validator (optionalInput: 'input option) =
+            match optionalInput with
+            | None -> Ok None
+            | Some input ->
+                match validator input with
+                | Ok ok -> Ok <| Some ok
+                | Error e -> Error e
 
     module Xml =
         open System.IO
