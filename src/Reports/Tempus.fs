@@ -1329,7 +1329,7 @@ module Tempus =
         open FsToolkit.ErrorHandling
 
         /// Validate the `results` section of the json report
-        let validate (json: Json) : Validation<Results,string> =
+        let validate (json: Json) =
             validation {
                 let! tmb = (json.TumorMutationBurden           |> Option.map TumorMutationBurden.ScoreInput,
                             json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput) ||> TumorMutationBurden.validateOptional
@@ -1342,16 +1342,16 @@ module Tempus =
                 and! inheritedRelevantVariants = json.``Inherited Relevant Variants`` |> ``Inherited Relevant Variants``.validate
                 and! inheritedVUS = json.``Inherited Variants Of Unknown Significance`` |> ``Inherited Variants Of Unknown Significance``.validate
 
-                return ({ TumorMutationBurden = tmb
-                          MicrosatelliteInstabilityStatus = msiStatus
-                          ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
-                          ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
-                          ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
-                          ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
-                          Fusions = fusions
-                          ``Inherited Relevant Variants`` = inheritedRelevantVariants
-                          ``Inherited Variants of Unknown Significance`` = inheritedVUS
-                        } : Results) }
+                return { TumorMutationBurden = tmb
+                         MicrosatelliteInstabilityStatus = msiStatus
+                         ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
+                         ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
+                         ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
+                         ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
+                         Fusions = fusions
+                         ``Inherited Relevant Variants`` = inheritedRelevantVariants
+                         ``Inherited Variants of Unknown Significance`` = inheritedVUS
+                       } }
 
     type Json =
         { Order: Order.Json
