@@ -1285,7 +1285,7 @@ module Caris =
             row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes |> List.map IcdCode.toString |> List.toArray |> Some
 
             // biomarkers
-            row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue)
+            row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
             row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
 
             row
