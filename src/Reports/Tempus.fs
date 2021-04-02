@@ -9,7 +9,11 @@ module Tempus =
         { LabName: LabName
           CliaNumber: LabCliaNumber
           Address: Address }
-    and LabName = LabName of string
+    and LabName =
+        internal
+        | LabName of string
+
+        member this.Value = this |> fun (LabName labName) -> labName
 
     /// the `report` section of the Tempus report
     type Report =
@@ -19,6 +23,10 @@ module Tempus =
     and ReportId = ReportId of System.Guid
     and SigningPathologist = SigningPathologist of string
     and SignoutDate = SignoutDate of System.DateTime
+
+    type ReportId with member this.Value = this |> fun (ReportId reportId) -> reportId
+    type SigningPathologist with member this.Value = this |> fun (SigningPathologist signingPathologist) -> signingPathologist
+    type SignoutDate with member this.Value = this |> fun (SignoutDate signoutDate) -> signoutDate
 
     /// the `patient` section of the Tempus report
     type Patient =
@@ -31,7 +39,20 @@ module Tempus =
           DiagnosisName: Diagnosis.Name
           DiagnosisDate: DiagnosisDate option }
     and Sex = Male | Female
-    and DiagnosisDate = internal DiagnosisDate of System.DateTime
+    and DiagnosisDate =
+        internal | DiagnosisDate of System.DateTime
+
+        member this.Value = this |> fun (DiagnosisDate diagnosisDate) -> diagnosisDate
+
+    type Patient with member this.TryDiagnosisDateValue = this.DiagnosisDate |> Option.map (fun dd -> dd.Value)
+
+    type Sex with
+        member this.Value =
+            match this with
+            | Male -> "male"
+            | Female -> "female"
+
+    type Patient with member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
 
     /// The `order` section of the Tempus report.
     type Order =
@@ -52,6 +73,8 @@ module Tempus =
     and TestCode = internal TestCode of string
     and TestName = internal TestName of string
     and TestDescription = internal TestDescription of string
+
+    type Physician with member this.Value = this |> fun (Physician physician) -> physician
 
     /// Each `sample` in the `samples` section of the Tempus report
     type Sample<'Category> =
@@ -88,6 +111,10 @@ module Tempus =
     and TumorMutationBurdenScore        = internal TumorMutationBurdenScore of float
     and TumorMutationBurdenPercentile   = internal TumorMutationBurdenPercentile of uint
     and MicrosatelliteInstabilityStatus = internal MicrosatelliteInstabilityStatus of string
+
+    type TumorMutationBurdenPercentile   with member this.Value = this |> fun (TumorMutationBurdenPercentile tmbPercentile) -> tmbPercentile
+    type TumorMutationBurdenScore        with member this.Value = this |> fun (TumorMutationBurdenScore tmbScore) -> tmbScore
+    type MicrosatelliteInstabilityStatus with member this.Value = this |> fun (MicrosatelliteInstabilityStatus msiStatus) -> msiStatus
 
     type Gene =
         { GeneName: GeneName
@@ -237,6 +264,20 @@ module Tempus =
           Fusions: Fusion list
           ``Inherited Relevant Variants``: ``Inherited Relevant Variants``
           ``Inherited Variants of Unknown Significance``: ``Inherited Variants of Unknown Significance``
+        }
+
+        member this.TryTmbScoreValue      = this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Score.Value)
+        member this.TryTmbPercentileValue = this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Percentile.Value)
+        member this.TryMsiStatusValue = this.MicrosatelliteInstabilityStatus |> Option.map (fun msiStatus -> msiStatus.Value)
+
+    type OverallReport =
+        { Lab: Lab
+          Patient: Patient
+          Report: Report
+          Order: Order
+          TumorSample: TumorSample
+          NormalSample: NormalSample option
+          Results: Results
         }
 
     module Gene =
@@ -1378,15 +1419,9 @@ module Tempus =
             member this.TryNormalSample =
                 this.Samples |> Seq.tryFind (fun sample -> sample.SampleCategory = "normal")
 
-    type OverallReport =
-        { Lab: Lab
-          Patient: Patient
-          Report: Report
-          Order: Order
-          Results: Results
-          TumorSample: TumorSample
-          NormalSample: NormalSample option
-        }
+    module OverallReport =
+        let patientHasMrn (overallReport: OverallReport) =
+            overallReport.Patient.MRN.IsSome
 
     module Json =
         type Error =
@@ -1425,11 +1460,60 @@ module Tempus =
     module Database =
         open Database
 
-        let toPatientRow (json: Json) =
+        let tryPatientRow (overallReport: OverallReport) =
             let row = context.Public.Patients.Create()
-            let patient = json.Patient
+            let patient = overallReport.Patient
 
-            // row.Mrn <- patient.MRN.Value
+            patient.TryMrnValue
+            |> Option.map (fun mrnValue ->
+
+                row.Mrn          <- mrnValue
+                row.LastName     <- patient.LastName.Value
+                row.FirstName    <- patient.FirstName.Value
+                row.DateOfBirth  <- patient.DateOfBirth.Value
+                row.Sex          <- patient.Sex.Value
+
+                row
+            )
+
+        let toVendorRow (overallReport: OverallReport) =
+            let row = context.Public.Vendors.Create()
+            let lab = overallReport.Lab
+
+            row.Name          <- lab.LabName.Value
+            row.CliaNumber    <- lab.CliaNumber.Value
+            row.StreetAddress <- lab.Address.StreetAddress.Value
+            row.City          <- lab.Address.City.Value
+            row.State         <- lab.Address.State.Value
+            row.ZipCode       <- lab.Address.Zipcode.Value
 
             row
+
+        let tryReportRow (overallReport: OverallReport) =
+            let patient = overallReport.Patient
+
+            patient.TryMrnValue
+            |> Option.map (fun mrnValue ->
+                let row = context.Public.Reports.Create()
+                let lab = overallReport.Lab
+                let report = overallReport.Report
+                let order = overallReport.Order
+                let results = overallReport.Results
+
+                row.PatientMrn <- mrnValue
+                row.VendorCliaNumber <- lab.CliaNumber.Value
+                row.ReportId <- report.ReportId.Value.ToString()
+                row.OrderingPhysician <- Some order.Physician.Value
+                row.Pathologist <- Some report.SigningPathologist.Value
+                row.IssuedDate <- report.SignoutDate.Value
+
+                row.TumorMutationalBurden <- results.TryTmbScoreValue
+                row.TumorMutationalBurdenPercentile <- results.TryTmbPercentileValue |> Option.map int
+                row.MsiStatus <- results.TryMsiStatusValue
+
+                row.DiagnosisName <- patient.DiagnosisName.Value
+                row.DiagnosisDate <- patient.TryDiagnosisDateValue
+
+                row
+            )
 
