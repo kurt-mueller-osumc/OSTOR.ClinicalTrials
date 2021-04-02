@@ -105,6 +105,22 @@ module Tempus =
     and BlockId = internal BlockId of string
     and TumorPercentage = internal TumorPercentage of uint
 
+    type SampleId with member this.Value = this |> fun (SampleId sampleId) -> sampleId
+    type BlockId with member this.Value = this |> fun (BlockId blockId) -> blockId
+    type SampleSite with member this.Value = this |> fun (SampleSite sampleSite) -> sampleSite
+    type CollectionDate with member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
+    type ReceivedDate with member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
+    type TumorPercentage with member this.Value = this |> fun (TumorPercentage tumorPercentage) -> tumorPercentage
+
+    type Sample<'Category> with
+        member this.TryBlockIdValue =
+            this.BlockId |> Option.map (fun blockId -> blockId.Value)
+
+        member this.TryTumorPercentageValue =
+            this.TumorPercentage |> Option.map (fun tumorPercentage -> tumorPercentage.Value)
+
+
+
     type TumorMutationBurden =
         { Score: TumorMutationBurdenScore
           Percentile: TumorMutationBurdenPercentile }
@@ -115,6 +131,14 @@ module Tempus =
     type TumorMutationBurdenPercentile   with member this.Value = this |> fun (TumorMutationBurdenPercentile tmbPercentile) -> tmbPercentile
     type TumorMutationBurdenScore        with member this.Value = this |> fun (TumorMutationBurdenScore tmbScore) -> tmbScore
     type MicrosatelliteInstabilityStatus with member this.Value = this |> fun (MicrosatelliteInstabilityStatus msiStatus) -> msiStatus
+
+    type SampleType with
+        member this.Value =
+            match this with
+            | Blood -> "Blood"
+            | ``FFPE Block`` -> "FFPE Block"
+            | ``FFPE Slides (Unstained)`` -> "FFPE Slides (Unstained)"
+            | Saliva -> "Saliva"
 
     type Gene =
         { GeneName: GeneName
@@ -1460,6 +1484,7 @@ module Tempus =
     module Database =
         open Database
 
+        /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
         let tryPatientRow (overallReport: OverallReport) =
             let row = context.Public.Patients.Create()
             let patient = overallReport.Patient
@@ -1476,6 +1501,7 @@ module Tempus =
                 row
             )
 
+        /// Build a row to be inserted into the `vendors` database table.
         let toVendorRow (overallReport: OverallReport) =
             let row = context.Public.Vendors.Create()
             let lab = overallReport.Lab
@@ -1489,6 +1515,7 @@ module Tempus =
 
             row
 
+        /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
         let tryReportRow (overallReport: OverallReport) =
             let patient = overallReport.Patient
 
@@ -1517,3 +1544,65 @@ module Tempus =
                 row
             )
 
+        /// Build a row for the tumor sample to be inserted into the `samples` database table.
+        let toTumorSampleRow (overallReport: OverallReport) =
+            let tumorSample = overallReport.TumorSample
+            let row = context.Public.Samples.Create()
+
+            row.Category   <- "tumor"
+            row.SampleId   <- tumorSample.SampleId.Value.ToString()
+            row.BiopsySite <- tumorSample.SampleSite.Value
+            row.SampleType <- tumorSample.SampleType.Value
+
+            row
+
+        /// Build a row for the normal sample, if it exists, to be inserted into the `samples` database table.
+        let tryNormalSampleRow (overallReport: OverallReport) =
+            overallReport.NormalSample
+            |> Option.map (fun normalSample ->
+                let row = context.Public.Samples.Create()
+
+                row.Category   <- "normal"
+                row.SampleId   <- normalSample.SampleId.Value.ToString()
+                row.BiopsySite <- normalSample.SampleSite.Value
+                row.SampleType <- normalSample.SampleType.Value
+
+                row
+            )
+
+        /// Build a row for the tumor sample to be inserted into the `sample_reports` database table
+        let toTumorSampleReportRow (overallReport: OverallReport) =
+            let tumorSample = overallReport.TumorSample
+            let report = overallReport.Report
+            let row = context.Public.SampleReports.Create()
+
+            row.SampleId <- tumorSample.SampleId.Value.ToString()
+            row.ReportId <- report.ReportId.Value.ToString()
+            row.BlockId  <- tumorSample.TryBlockIdValue
+
+            row.CollectionDate <- tumorSample.SampleDates.CollectionDate.Value
+            row.ReceiptDate    <- tumorSample.SampleDates.ReceivedDate.Value
+
+            row.TumorPercentage <- tumorSample.TryTumorPercentageValue |> Option.map int
+
+            row
+
+        /// Build a row for the normal sample, if it exists, to be insterested into the `sample_reports` database table
+        let tryNormalSampleReportRow (overallReport: OverallReport) =
+            overallReport.NormalSample
+            |> Option.map (fun normalSample ->
+
+                let report = overallReport.Report
+                let row = context.Public.SampleReports.Create()
+
+                row.SampleId <- normalSample.SampleId.Value.ToString()
+                row.ReportId <- report.ReportId.Value.ToString()
+                row.BlockId  <- normalSample.TryBlockIdValue
+
+                row.CollectionDate <- normalSample.SampleDates.CollectionDate.Value
+                row.ReceiptDate    <- normalSample.SampleDates.ReceivedDate.Value
+
+                row.TumorPercentage <- normalSample.TryTumorPercentageValue |> Option.map int
+
+                row
+            )
