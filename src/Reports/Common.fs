@@ -27,6 +27,11 @@ module Common =
     and State = internal State of string
     and Zipcode = internal Zipcode of string
 
+    type StreetAddress with member this.Value = this |> fun (StreetAddress streetAddress) -> streetAddress
+    type City          with member this.Value = this |> fun (City city) -> city
+    type State         with member this.Value = this |> fun (State state) -> state
+    type Zipcode       with member this.Value = this |> fun (Zipcode zipcode) -> zipcode
+
     type LabCliaNumber =
         internal | LabCliaNumber of string
 
