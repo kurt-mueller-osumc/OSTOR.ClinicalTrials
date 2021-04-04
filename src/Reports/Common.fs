@@ -2,6 +2,52 @@ namespace OSTOR.ClinicalTrials.Reports
 
 [<AutoOpen>]
 module Common =
+    [<AutoOpen>]
+    module CoreTypes =
+        module Person =
+            type FirstName = internal | FirstName of string
+            type LastName = internal | LastName of string
+
+
+    [<AutoOpen>]
+    module DomainTypes =
+        module Lab =
+            type CliaNumber =
+                internal | CliaNumber of string
+                member this.Value = this |> fun (CliaNumber cliaNumber) -> cliaNumber
+
+            type Name =
+                internal | Name of string
+                member this.Value = this |> fun (Name name) -> name
+
+        type Lab =
+            { Name: Lab.Name
+              CliaNumber: Lab.CliaNumber }
+
+        module Patient =
+            /// The patient's medical record number
+            type MRN =
+                internal | MRN of int64
+                member this.Value = this |> fun (MRN mrn) -> mrn
+
+            type DateOfBirth =
+                internal | DateOfBirth of System.DateTime
+                member this.Value = this |> fun (DateOfBirth dateOfBirth) -> dateOfBirth
+
+
+        module Gene =
+            type Name =
+                internal | Name of string
+                member this.Value = this |> fun (Name name) -> name
+
+            type HgncId =
+                internal | HgncId of string
+                member this.Value = this |> fun (HgncId hgncId) -> hgncId
+
+            type EntrezId =
+                internal | EntrezId of string
+                member this.Value = this |> fun (EntrezId entrezId) -> entrezId
+
     /// The patient's medical record number
     type MRN =
         internal | MRN of int64
@@ -66,6 +112,11 @@ module Common =
         internal | GeneName of string
 
         member this.Value = this |> fun (GeneName geneName) -> geneName
+
+    type NucleotideAlteration =
+        internal | NucleotideAlteration of string
+        member this.Value = this |> fun (NucleotideAlteration na) -> na
+
 
     // tumor mutation burden units of measure
     [<Measure>] type mutation
