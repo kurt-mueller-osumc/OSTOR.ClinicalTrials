@@ -3,6 +3,7 @@ namespace OSTOR.ClinicalTrials.Reports
 module Tempus =
     module Domain =
         open Core.Domain
+        open Core.Domain.Address
 
         /// the `lab` section of the Tempus report
         type Lab =
@@ -96,7 +97,7 @@ module Tempus =
 
         module Order =
             type Identifier  = internal Identifier of string
-            type AccessionId = internal AccessionId of string
+            type OrderAccessionId = internal OrderAccessionId of string
             type Physician = internal Physician of string // ordering md
             type Institution = internal Institution of string
 
@@ -111,10 +112,10 @@ module Tempus =
 
         /// The `order` section of the Tempus report.
         type Order =
-            { Institution: Order.Institution
-              Physician: Order.Physician
+            { OrderingInstitution: Order.Institution
+              OrderingPhysician: Order.Physician
               OrderId: Order.Identifier
-              AccessionId: Order.AccessionId
+              AccessionId: Order.OrderAccessionId
               Test: Order.Test }
 
 
@@ -353,6 +354,99 @@ module Tempus =
         open Thoth.Json.Net
         open Utilities
 
+        type Lab =
+            { Name: string
+              StreetAddress: string
+              City: string
+              State: string
+              Zip: string
+              CliaNumber: string }
+
+            static member CamelCaseDecoder : Decoder<Lab> =
+                Decode.object (fun get ->
+                    { Name          = "name"          |> flip get.Required.Field Decode.string
+                      StreetAddress = "streetAddress" |> flip get.Required.Field Decode.string
+                      City          = "city"          |> flip get.Required.Field Decode.string
+                      State         = "state"         |> flip get.Required.Field Decode.string
+                      Zip           = "zip"           |> flip get.Required.Field Decode.string
+                      CliaNumber    = "cliaNo"        |> flip get.Required.Field Decode.string }
+                )
+
+            static member PascalCaseDecoder : Decoder<Lab> =
+                Decode.object (fun get ->
+                    { Name          = "Name"          |> flip get.Required.Field Decode.string
+                      StreetAddress = "StreetAddress" |> flip get.Required.Field Decode.string
+                      City          = "City"          |> flip get.Required.Field Decode.string
+                      State         = "State"         |> flip get.Required.Field Decode.string
+                      Zip           = "Zip"           |> flip get.Required.Field Decode.string
+                      CliaNumber    = "clia_no"       |> flip get.Required.Field Decode.string }
+                )
+
+            /// Deserializer for the `lab` json object. Object attributes can be camel-cased or pascal-cased, save
+            /// for the lab's clia #, which is camel-cased or snake-cased for some reason.
+            static member Decoder : Decoder<Lab> =
+                Decode.oneOf [ Lab.CamelCaseDecoder; Lab.PascalCaseDecoder ]
+
+        module Lab =
+            open FsToolkit.ErrorHandling
+            open Utilities.StringValidations
+            open Core
+            open Core.Domain.Address
+
+            /// Validate the lab section of the json report
+            let validate (json: Lab) : Validation<Domain.Lab,string> =
+                validation {
+                    let! labName = json.Name |> validateNotBlank |> Result.map Domain.Lab.Name
+                    and! cliaNumber = json.CliaNumber |> Input.Lab.CliaNo |> Input.Lab.CliaNumber.validate
+                    and! streetAddress = json.StreetAddress |> validateNotBlank |> Result.map StreetAddress
+                    and! city = json.City |> validateNotBlank |> Result.map City
+                    and! state = json.State |> validateNotBlank |> Result.map State
+                    and! zip = json.Zip |> validateNotBlank |> Result.map Zipcode
+
+                    return ({ LabName = labName
+                              Address = {
+                                  StreetAddress = streetAddress
+                                  City = city
+                                  State = state
+                                  Zipcode = zip
+                              }
+                              CliaNumber = cliaNumber
+                            } : Domain.Lab)
+                }
+
+        type Report =
+            { ReportId: System.Guid
+              SigningPathologist: string
+              SignoutDate: System.DateTime }
+
+            /// Deserializer for the "report" section of the Tempus report
+            static member Decoder : Decoder<Report> =
+                Decode.object (fun get ->
+                    let pathologistDecoder = ["signing_pathologist"; "signingPathologist"] |> List.map (flip Decode.field Decode.string) |> Decode.oneOf
+                    let signoutDateDecoder = ["signout_date"; "signoutDate"] |> List.map (flip Decode.field Decode.datetime) |> Decode.oneOf
+
+                    { ReportId           = "reportId"         |> flip get.Required.Field Decode.guid
+                      SigningPathologist = pathologistDecoder |> get.Required.Raw
+                      SignoutDate        = signoutDateDecoder |> get.Required.Raw
+                    } )
+
+        module Report =
+            open Utilities.StringValidations
+            open FsToolkit.ErrorHandling
+            open Domain.Report
+
+            /// Validate that a signing pathologist's name is not blank
+            let validate (report: Report) : Validation<Domain.Report,string> =
+                validation {
+                    let! signingPathologist = report.SigningPathologist |> validateNotBlank |> Result.map SigningPathologist
+
+                    return ({ ReportId = Identifier report.ReportId
+                              SigningPathologist = signingPathologist
+                              SignoutDate = SignoutDate report.SignoutDate
+                            } : Domain.Report)
+                }
+
+
         /// Json object attributes that identifies genes
         type Gene =
             { GeneId: string // 'gene' attribute
@@ -517,21 +611,19 @@ module Tempus =
                     validate json
                     |> Result.map Some
 
-    /// Logic for the `order` section of the Tempus report.
-    module Order =
         /// An `order` json object
-        type Json =
+        type Order =
             { Institution: string
               Physician: string
               OrderId: string
               AccessionId: string
-              OrderTest: TestJson }
+              OrderTest: Test }
 
             /// Deserializer for the 'order' json object.
             ///
             ///  The following object attributes can be camel-cased or snake-cased:
             /// - `"tempusOrderId"` / `"tempusOrder_id"`
-            static member Decoder: Decoder<Json> =
+            static member Decoder: Decoder<Order> =
                 Decode.object (fun get ->
                     let orderIdDecoder = ["tempusOrderId"; "tempusOrder_id"] |> List.map (flip Decode.field Decode.string) |> Decode.oneOf
 
@@ -539,169 +631,85 @@ module Tempus =
                       Physician   = "physician"    |> flip get.Required.Field Decode.string
                       OrderId     = orderIdDecoder |> get.Required.Raw
                       AccessionId = "accessionId"  |> flip get.Required.Field Decode.string
-                      OrderTest   = "test"         |> flip get.Required.Field TestJson.Decoder }
+                      OrderTest   = "test"         |> flip get.Required.Field Test.Decoder }
                 )
 
-        and TestJson =
+        and Test =
             { Code: string
               Name: string
               Description: string }
 
             /// Deserializer for the actual test code, name, and description ran on the report's patient
-            static member Decoder : Decoder<TestJson> =
+            static member Decoder : Decoder<Test> =
                 Decode.object (fun get ->
                     { Code        = "code" |> flip get.Required.Field Decode.string
                       Name        = "name" |> flip get.Required.Field Decode.string
                       Description = "description" |> flip get.Required.Field Decode.string }
                 )
+        /// Logic for the `order` section of the Tempus report.
+        module Order =
+            module Test =
+                open Utilities.StringValidations
 
-        module Test =
-            open Utilities.StringValidations
+                /// Validate that a test's code, name, and description are not blank
+                let validate (test: Test) : Result<Domain.Order.Test, string> =
+                    match (test.Code, test.Name, test.Description) with
+                    | NotBlank, NotBlank, NotBlank ->
+                        Ok <| { TestCode = Domain.Order.TestCode test.Code
+                                TestName = Domain.Order.TestName test.Name
+                                TestDescription = Domain.Order.TestDescription test.Description }
+                    | _ -> Error $"Either test code, name, or description is blank: {test}"
 
-            /// Validate that a test's code, name, and description are not blank
-            let validate (json: TestJson) =
-                match (json.Code, json.Name, json.Description) with
-                | NotBlank, NotBlank, NotBlank -> Ok <| { TestCode = TestCode json.Code; TestName = TestName json.Name; TestDescription = TestDescription json.Description }
-                | _ -> Error $"Either test code, name, or description is blank: {json}"
+            type Identifier = Identifier of string
 
-        module OrderId =
-            open System.Text.RegularExpressions
+            module Identifier =
+                open System.Text.RegularExpressions
 
-            type Input = Input of string
+                /// Validate that a tempus order id is in the following format where the first character is a 0, 1 or 2, followed by one digit, follwed by four letters: `"(0|1|2)dxxxx"`
+                ///
+                ///    validate (Identifier "20hnyc") = Ok (Domain.Order.Identifier "20hnyc")
+                ///    validate (Identifier "30aaaa") = Error "Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: 30aaaa"
+                let validate (Identifier identifier) : Result<Domain.Order.Identifier, string> =
+                    if Regex("^(0|1|2){1}\d{1}[a-zA-z]{4}$").Match(identifier).Success then
+                        Ok <| Domain.Order.Identifier identifier
+                    else
+                        Error $"Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: {identifier}"
 
-            /// Validate that a tempus order id is in the following format where the first character is a 0, 1 or 2, followed by one digit, follwed by four letters: `"(0|1|2)dxxxx"`
-            ///
-            ///    validate (Input "20hnyc") = Ok (OrderId "20hnyc")
-            ///    validate (Input "30aaaa") = Error "Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: 30aaaa"
-            let validate (Input input) =
-                if Regex("^(0|1|2){1}\d{1}[a-zA-z]{4}$").Match(input).Success then
-                    Ok <| OrderId input
-                else
-                    Error $"Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: {input}"
+            type AccessionId = AccessionId of string
 
-        module AccessionId =
-            open System.Text.RegularExpressions
+            module AccessionId =
+                open System.Text.RegularExpressions
 
-            type Input = Input of string
+                /// Validate that Tempus order's accession id is the in the following format where d is a digit and x is any alphanumeric character: `"TL-(0|1|2)d-xxxxxx"`
+                ///
+                ///    validate (AccessionId "TL-19-DF60D1") = Ok (Domain.Order.AccessionId "TL-19-DF60D1")
+                //     validate (AccessionId "TL-33-AAAAAA") = Error "Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: TL-33-AAAAAA"
+                let validate (AccessionId accessionId) : Result<Domain.Order.OrderAccessionId, string> =
+                    if Regex("^TL-(0|1|2){1}\d{1}-(\d|[A-Z]|[a-z]){6}$").Match(accessionId).Success then
+                        Ok <| Domain.Order.OrderAccessionId accessionId
+                    else
+                        Error $"Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: {accessionId}"
 
-            /// Validate that Tempus order's accession id is the in the following format where d is a digit and x is any alphanumeric character: `"TL-(0|1|2)d-xxxxxx"`
-            ///
-            ///    validate (Input "TL-19-DF60D1") = Ok (AccessionId "TL-19-DF60D1")
-            //     validate (Input "TL-33-AAAAAA") = Error "Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: TL-33-AAAAAA"
-            let validate (Input input) =
-                if Regex("^TL-(0|1|2){1}\d{1}-(\d|[A-Z]|[a-z]){6}$").Match(input).Success then
-                    Ok <| AccessionId input
-                else
-                    Error $"Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: {input}"
-
-        module Json =
             open Utilities.StringValidations
             open FsToolkit.ErrorHandling
 
-            /// Validate the input from the "order" section of the json report
-            let validate (json: Json) =
+            /// Validate the `order` section of the json report
+            let validate (order: Order) : Validation<Domain.Order, string> =
                 validation {
-                    let! institution = json.Institution |> validateNotBlank |> Result.map Institution
-                    and! physician = json.Physician |> validateNotBlank |> Result.map Physician
-                    and! orderId = json.OrderId |> OrderId.Input |> OrderId.validate
-                    and! accessionId = json.AccessionId |> AccessionId.Input |> AccessionId.validate
-                    and! orderTest = json.OrderTest |> Test.validate
+                    let! institution = order.Institution |> validateNotBlank |> Result.map Domain.Order.Institution
+                    and! physician = order.Physician |> validateNotBlank |> Result.map Domain.Order.Physician
+                    and! orderId = order.OrderId |> Identifier |> Identifier.validate
+                    and! accessionId = order.AccessionId |> AccessionId |> AccessionId.validate
+                    and! orderTest = order.OrderTest |> Test.validate
 
-                    return { Institution = institution
-                             Physician = physician
-                             OrderId = orderId
-                             AccessionId = accessionId
-                             Test = orderTest
-                           } }
+                    return ({ OrderingInstitution = institution
+                              OrderingPhysician = physician
+                              OrderId = orderId
+                              AccessionId = accessionId
+                              Test = orderTest
+                            } : Domain.Order)
+                }
 
-    module Lab =
-        type Json =
-            { Name: string
-              StreetAddress: string
-              City: string
-              State: string
-              Zip: string
-              CliaNumber: string }
-
-            static member CamelCaseDecoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    { Name          = "name"          |> flip get.Required.Field Decode.string
-                      StreetAddress = "streetAddress" |> flip get.Required.Field Decode.string
-                      City          = "city"          |> flip get.Required.Field Decode.string
-                      State         = "state"         |> flip get.Required.Field Decode.string
-                      Zip           = "zip"           |> flip get.Required.Field Decode.string
-                      CliaNumber    = "cliaNo"        |> flip get.Required.Field Decode.string }
-                )
-
-            static member PascalCaseDecoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    { Name          = "Name"          |> flip get.Required.Field Decode.string
-                      StreetAddress = "StreetAddress" |> flip get.Required.Field Decode.string
-                      City          = "City"          |> flip get.Required.Field Decode.string
-                      State         = "State"         |> flip get.Required.Field Decode.string
-                      Zip           = "Zip"           |> flip get.Required.Field Decode.string
-                      CliaNumber    = "clia_no"       |> flip get.Required.Field Decode.string }
-                )
-
-            /// Deserializer for the `lab` json object. Object attributes can be camel-cased or pascal-cased, save
-            /// for the lab's clia #, which is camel-cased or snake-cased for some reason.
-            static member Decoder : Decoder<Json> =
-                Decode.oneOf [ Json.CamelCaseDecoder; Json.PascalCaseDecoder ]
-
-        open FsToolkit.ErrorHandling
-        open Utilities.StringValidations
-
-        /// Validate the lab section of the json report
-        let validate (json: Json) : Validation<Lab,string> =
-            validation {
-                let! labName = json.Name |> validateNotBlank |> Result.map LabName
-                and! streetAddress = json.StreetAddress |> validateNotBlank |> Result.map StreetAddress
-                and! city = json.City |> validateNotBlank |> Result.map City
-                and! state = json.State |> validateNotBlank |> Result.map State
-                and! zip = json.Zip |> validateNotBlank |> Result.map Zipcode
-                and! cliaNumber = json.CliaNumber |> Lab.CliaNumber.Input |> Lab.CliaNumber.validate
-
-                return { LabName = labName
-                         Address = {
-                             StreetAddress = streetAddress
-                             City = city
-                             State = state
-                             Zipcode = zip
-                         }
-                         CliaNumber = cliaNumber
-                       } }
-
-    module Report =
-        open System
-
-        type Json =
-            { ReportId: Guid
-              SigningPathologist: string
-              SignoutDate: DateTime }
-
-            /// Deserializer for the "report" section of the Tempus report
-            static member Decoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    let pathologistDecoder = ["signing_pathologist"; "signingPathologist"] |> List.map (flip Decode.field Decode.string) |> Decode.oneOf
-                    let signoutDateDecoder = ["signout_date"; "signoutDate"] |> List.map (flip Decode.field Decode.datetime) |> Decode.oneOf
-
-                    { ReportId           = "reportId"         |> flip get.Required.Field Decode.guid
-                      SigningPathologist = pathologistDecoder |> get.Required.Raw
-                      SignoutDate        = signoutDateDecoder |> get.Required.Raw
-                    } )
-
-        open Utilities.StringValidations
-        open FsToolkit.ErrorHandling
-
-        /// Validate that a signing pathologist's name is not blank
-        let validate (json: Json) : Validation<Report,string> =
-            validation {
-                let! signingPathologist = json.SigningPathologist |> validateNotBlank |> Result.map SigningPathologist
-
-                return ({ ReportId = ReportId json.ReportId
-                          SigningPathologist = signingPathologist
-                          SignoutDate = SignoutDate json.SignoutDate} : Report
-                       ) }
 
     module Sample =
         open System
