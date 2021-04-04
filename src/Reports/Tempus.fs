@@ -4,16 +4,384 @@ module Tempus =
     open Thoth.Json.Net
     open Utilities
 
-    /// the `lab` section of the Tempus report
-    type Lab =
-        { LabName: LabName
-          CliaNumber: LabCliaNumber
-          Address: Address }
-    and LabName =
-        internal
-        | LabName of string
+    module DomainTypes =
+        (*
+            Labs
+        *)
 
-        member this.Value = this |> fun (LabName labName) -> labName
+        /// the `lab` section of the Tempus report
+        type Lab =
+            { LabName: Lab.Name
+              CliaNumber: Lab.CliaNumber
+              Address: Address }
+
+        (*
+            Reports
+        *)
+
+        module Report =
+            type Identifier =
+                internal | Identifier of System.Guid
+                member this.Value = this |> fun (Identifier id) -> id
+
+            type SigningPathologist =
+                internal | SigningPathologist of string
+                member this.Value = this |> fun (SigningPathologist signingPathologist) -> signingPathologist
+
+            type SignoutDate =
+                internal | SignoutDate of System.DateTime
+                member this.Value = this |> fun (SignoutDate signoutDate) -> signoutDate
+
+        /// the `report` section of the Tempus report
+        type Report =
+            { ReportId: Report.Identifier
+              SigningPathologist: Report.SigningPathologist
+              SignoutDate: Report.SignoutDate }
+
+
+
+        (*
+            Human Genome Variant Society sequences
+        *)
+
+        module HGVS =
+            /// An abbreviated HGVS protein change
+            type AbbreviatedProteinChange =
+                internal | AbbreviatedProteinChange of string
+                member this.Value = this |> fun (AbbreviatedProteinChange abbreviatedChange) -> abbreviatedChange
+
+            /// a full hgvs protein change
+            type FullProteinChange =
+                internal | FullProteinChange of string
+                member this.Value = this |> fun (FullProteinChange fullChange) -> fullChange
+
+            type ProteinChange =
+                { Abbreviated: AbbreviatedProteinChange
+                  Full: FullProteinChange }
+
+            type CodingChange =
+                internal | CodingChange of string
+                member this.Value = this |> fun (CodingChange codingChange) -> codingChange
+
+            type ReferenceSequence =
+                internal | ReferenceSequence of string
+                member this.Value = this |> fun (ReferenceSequence referenceSequence) -> referenceSequence
+
+        /// Human Genome Variation Society Sequence
+        type HGVS =
+            { ProteinChange: HGVS.ProteinChange option
+              CodingChange: HGVS.CodingChange
+              ReferenceSequence: HGVS.ReferenceSequence }
+
+
+        (*
+            Diagnosis
+        *)
+
+        module Diagnosis =
+            type Name = internal | Name of string
+            type Date = internal | Date of System.DateTime
+
+        type Diagnosis =
+            { Name: Diagnosis.Name
+              Date: Diagnosis.Date option}
+
+
+        (*
+            Patients
+        *)
+
+        module Patient =
+            type TempusId =
+                internal | TempusId of System.Guid
+                member this.Value = this |> fun (TempusId tempusId) -> tempusId
+
+            type Sex =
+                internal | Male | Female
+                member this.Value =
+                    match this with
+                    | Male -> "male"
+                    | Female -> "female"
+
+
+        /// the `patients` section in the Tempus report
+        type Patient =
+            { MRN: Patient.MRN option
+              FirstName: Person.FirstName
+              LastName: Person.LastName
+              DateOfBirth: Patient.DateOfBirth
+              Sex: Patient.Sex
+              Diagnosis: Diagnosis }
+
+
+        module Order =
+            type Identifier  = internal Identifier of string
+            type AccessionId = internal AccessionId of string
+            type Physician = internal Physician of string // ordering md
+            type Institution = internal Institution of string
+
+            /// The `test` subsection of the `order` section in the Tempus report
+            type Test =
+                { TestCode: TestCode
+                  TestName: TestName
+                  TestDescription: TestDescription }
+            and TestCode = internal TestCode of string
+            and TestName = internal TestName of string
+            and TestDescription = internal TestDescription of string
+
+        /// The `order` section of the Tempus report.
+        type Order =
+            { Institution: Order.Institution
+              Physician: Order.Physician
+              OrderId: Order.Identifier
+              AccessionId: Order.AccessionId
+              Test: Order.Test }
+
+
+        (*
+            Samples
+        *)
+
+        module Sample =
+            type Identifier = internal Identifier of System.Guid
+            type Site = internal Site of string
+            type Type =
+                internal
+                | Blood | ``FFPE Block`` | ``FFPE Slides (Unstained)`` | Saliva
+
+            type Dates =
+                { CollectionDate: CollectionDate
+                  ReceivedDate: ReceivedDate }
+            and CollectionDate = internal CollectionDate of System.DateTime
+            and ReceivedDate = internal ReceivedDate of System.DateTime
+
+            type BlockId = BlockId of string
+            type TumorPercentage = internal TumorPercentage of uint
+
+        /// the tumor sample that will be present in the `specimens` section of the report
+        type TumorSample =
+            { SampleId: Sample.Identifier
+              Site: Sample.Site
+              Type: Sample.Type
+              Dates: Sample.Dates
+              BlockId: Sample.BlockId option
+              TumorPercentage: Sample.TumorPercentage option }
+
+        /// the normal sample that might or might not exist in the `specimens` section of the report
+        type NormalSample =
+            { SampleId: Sample.Identifier
+              Site: Sample.Site
+              Type: Sample.Type
+              Dates: Sample.Dates
+              BlockId: Sample.BlockId option }
+
+
+
+        (*
+            Gene
+        *)
+
+        type Gene =
+            { Name: Gene.Name
+              HgncId: Gene.HgncId
+              EntrezId: Gene.EntrezId }
+
+
+        (*
+            Allelic Fraction
+        *)
+
+        module Variant =
+            type NucleotideAlteration =
+                internal | NucleotideAlteration of string
+                member this.Value = this |> fun (NucleotideAlteration na) -> na
+
+            type AllelicFraction =
+                internal | AllelicFraction of float
+                member this.Value = this |> fun (AllelicFraction allelicFraction) -> allelicFraction
+
+            type Description = internal | Description of string
+
+        (*
+            Fusions
+        *)
+
+        module Fusion =
+            type Type = internal | GeneFusion
+            type VariantDescription =
+                internal
+                | ``Chromosomal rearrangement``
+                | ``Deletion (exons 2-7)``
+
+        type Fusion =
+            { ``5' Gene``: Gene
+              ``3' Gene``: Gene
+              FusionType: Fusion.Type option
+              VariantDescription: Fusion.VariantDescription }
+
+            member this.Genes = [this.``5' Gene``; this.``3' Gene``]
+
+        (*
+            Tumor Mutation Burden
+        *)
+
+        module Results =
+            module TumorMutationBurden =
+                type Score =
+                    internal | Score of float
+                    with member this.Value = this |> fun (Score score) -> score
+
+                and Percentile =
+                    internal | Percentile of uint
+                    with member this.Value = this |> fun (Percentile percentile) -> percentile
+
+            /// tumor mutation burden found in the `results` section of the report
+            type TumorMutationBurden =
+                { Score: TumorMutationBurden.Score
+                  Percentile: TumorMutationBurden.Percentile }
+
+            /// the microsattellite instability status found in the `results` section of the report
+            type MicrosatelliteInstabilityStatus =
+                internal | MicrosatelliteInstabilityStatus of string
+                member this.Value = this |> fun (MicrosatelliteInstabilityStatus msiStatus) -> msiStatus
+
+
+            module ``Somatic Potentially Actionable`` =
+                type Variant =
+                    { HGVS: HGVS
+                      NucleotideAlteration: Variant.NucleotideAlteration option
+                      AllelicFraction: Variant.AllelicFraction option
+                      Description: Variant.Description }
+
+                /// represents a mutation found in `results.somaticPotentiallActionableMutations` section of the report
+                type Mutation =
+                    { Gene: Gene
+                      Variants: Variant list }
+
+                module CopyNumberVariant =
+                    type Description =
+                        internal
+                        | ``Copy number gain``
+                        | ``Copy number loss``
+
+                        member this.Value =
+                            match this with
+                            | ``Copy number gain`` -> "copy number gain"
+                            | ``Copy number loss`` -> "copy number loss"
+
+                    type Type =
+                        internal
+                        | Amplification
+                        | Deletion
+
+                        member this.Value =
+                            match this with
+                            | Amplification -> "amplification"
+                            | Deletion -> "deletion"
+
+                type CopyNumberVariant =
+                    { Gene: Gene
+                      Description: CopyNumberVariant.Description
+                      Type: CopyNumberVariant.Type
+                    }
+
+
+            module ``Somatic Biologically Relevant`` =
+                type Mutation =
+                    internal
+                    | Gene of Gene | Fusion of Fusion
+
+                    member this.Genes =
+                        match this with
+                        | Gene gene -> [gene]
+                        | Fusion fusion -> fusion.Genes
+
+                type Type =
+                    internal
+                    | CNV
+                    | SNV
+                    | Fusion
+
+                type Variant =
+                    { Mutation: Mutation
+                      HGVS: HGVS option
+                      AllelicFraction: Variant.AllelicFraction option
+                      NucleotideAlteration: Variant.NucleotideAlteration option
+                      Type: Type }
+
+            module ``Somatic Variant of Unknown Significance`` =
+                type Type = internal | SNV
+
+            /// an entry found in `results.SomaticVariantsOfUnknownSignificance`
+            type ``Somatic Variant of Unknown Significance`` =
+                { Gene: Gene
+                  Hgvs: HGVS
+                  Type: ``Somatic Variant of Unknown Significance``.Type
+                  Description: Variant.Description
+                  NucleotideAlteration: Variant.NucleotideAlteration
+                  AllelicFraction: Variant.AllelicFraction
+                }
+
+            module InheritedVariants =
+                type Note = internal Note of string
+                type Disease = internal Disease of Disease
+                type Chromosome = internal Chromosome of uint
+                type ReferencedNucleotide = ReferencedNucleotide of string
+                type AlteredNucleotide = AlteredNucleotide of string
+                type Position = Position of uint
+
+                type Value<'ClinicalSignificance> =
+                    { Gene: Gene
+                      HGVS: HGVS
+                      Description: Variant.Description
+                      ClinicalSignificance: 'ClinicalSignificance
+                      Disease: Disease
+                      AllelicFraction: Variant.AllelicFraction
+                      Chromosome: Chromosome
+                      ReferencedNucleotide: ReferencedNucleotide
+                      AlteredNucleotide: AlteredNucleotide }
+
+            type InheritedVariants<'ClinicalSignificance> =
+                { Note: InheritedVariants.Note option
+                  Values: InheritedVariants.Value<'ClinicalSignificance> list }
+
+            module ``Inherited Relevant Variants`` =
+                type ClinicalSignificance =
+                    internal
+                    | ``Likely Pathogenic``
+                    | Pathogenic
+                    | ``Risk Allele``
+                    | ``VUS Favoring Pathogenic``
+
+            module ``Inherited Variants of Unknown Significance`` =
+                type ClinicalSignificance =
+                    internal | ``Variant of Unknown Significance``
+
+            type ``Inherited Relevant Variants`` = InheritedVariants<``Inherited Relevant Variants``.ClinicalSignificance>
+            type ``Inherited Variants of Unknown Significance`` = InheritedVariants<``Inherited Variants of Unknown Significance``.ClinicalSignificance>
+
+        type Results =
+            { TumorMutationBurden: Results.TumorMutationBurden option
+              MicrosatelliteInstabilityStatus: Results.MicrosatelliteInstabilityStatus option
+              ``Somatic Potentially Actionable Mutations``: Results.``Somatic Potentially Actionable``.Mutation list
+              ``Somatic Potentially Actionable Copy Number Variants``: Results.``Somatic Potentially Actionable``.CopyNumberVariant list
+              ``Somatic Biologically Relevant Variants``: Results.``Somatic Biologically Relevant``.Variant list
+              ``Somatic Variants of Unknown Significance``: Results.``Somatic Variant of Unknown Significance`` list
+              Fusions: Fusion list
+              ``Inherited Relevant Variants``: Results.``Inherited Relevant Variants``
+              ``Inherited Variants of Unknown Significance``: Results.``Inherited Variants of Unknown Significance``
+            }
+
+        type OverallReport =
+            { Lab: Lab
+              Patient: Patient
+              Report: Report
+              Order: Order
+              TumorSample: TumorSample
+              NormalSample: NormalSample option
+              Results: Results
+            }
+
 
     /// the `report` section of the Tempus report
     type Report =
@@ -38,21 +406,22 @@ module Tempus =
           DateOfBirth: DateOfBirth
           DiagnosisName: Diagnosis.Name
           DiagnosisDate: DiagnosisDate option }
-    and Sex = Male | Female
-    and DiagnosisDate =
-        internal | DiagnosisDate of System.DateTime
 
-        member this.Value = this |> fun (DiagnosisDate diagnosisDate) -> diagnosisDate
-
-    type Patient with member this.TryDiagnosisDateValue = this.DiagnosisDate |> Option.map (fun dd -> dd.Value)
-
-    type Sex with
+    and Sex = internal | Male | Female with
         member this.Value =
             match this with
             | Male -> "male"
             | Female -> "female"
 
-    type Patient with member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
+    and DiagnosisDate =
+        internal | DiagnosisDate of System.DateTime
+        member this.Value = this |> fun (DiagnosisDate diagnosisDate) -> diagnosisDate
+
+    type Patient with
+        member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
+        member this.TryDiagnosisDateValue = this.DiagnosisDate |> Option.map (fun dd -> dd.Value)
+
+
 
     /// The `order` section of the Tempus report.
     type Order =
@@ -119,8 +488,6 @@ module Tempus =
         member this.TryTumorPercentageValue =
             this.TumorPercentage |> Option.map (fun tumorPercentage -> tumorPercentage.Value)
 
-
-
     type TumorMutationBurden =
         { Score: TumorMutationBurdenScore
           Percentile: TumorMutationBurdenPercentile }
@@ -140,17 +507,50 @@ module Tempus =
             | ``FFPE Slides (Unstained)`` -> "FFPE Slides (Unstained)"
             | Saliva -> "Saliva"
 
+    (* Types found in results section: genes, hgvs *)
+
+    /// Human Genome Variation Society Sequence Variant
+    type HGVS =
+        { ProteinChange: HgvsProteinChange option
+          CodingChange: HgvsCodingChange
+          ReferenceSequence: ReferenceSequence }
+
+    and HgvsProteinChange =
+        { AbbreviatedChange: HgvsProteinAbbreviatedChange
+          FullChange: HgvsProteinFullChange }
+
+    and HgvsProteinAbbreviatedChange =
+        internal | HgvsProteinAbbreviatedChange of string
+        member this.Value = this |> fun (HgvsProteinAbbreviatedChange proteinChange) -> proteinChange
+
+    and HgvsProteinFullChange =
+        internal | HgvsProteinFullChange of string
+        member this.Value = this |> fun (HgvsProteinFullChange proteinChange) -> proteinChange
+
+    and HgvsCodingChange =
+        internal | HgvsCodingChange of string
+        member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
+
+    and ReferenceSequence =
+        internal | ReferenceSequence of string
+        member this.Value = this |> fun (ReferenceSequence referenceSequence) -> referenceSequence
+
     type Gene =
         { GeneName: GeneName
           HgncId: HgncId
           EntrezId: EntrezId }
-    and HgncId = internal HgncId of string
-    and EntrezId = internal EntrezId of string
+    and HgncId =
+        internal | HgncId of string
+        member this.Value = this |> fun (HgncId hgncId) -> hgncId
+    and EntrezId =
+        internal | EntrezId of string
+        member this.Value = this |> fun (EntrezId entrezId) -> entrezId
 
     /// a listing in the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
     type ``Somatic Potentially Actionable Mutation`` =
         { Gene: Gene
           Variants: ``Somatic Potentially Actionable Variant`` list }
+
     /// the `variants` section of a `somaticPotentiallyActionableMutations` entry
     and ``Somatic Potentially Actionable Variant`` =
         { HGVS: HGVS
@@ -158,15 +558,20 @@ module Tempus =
           AllelicFraction: AllelicFraction option
           VariantDescription: VariantDescription }
 
+          member this.TryNucleotideAlterationValue = this.NucleotideAlteration |> Option.map (fun na -> na.Value)
+          member this.TryAllelicFractionValue = this.AllelicFraction |> Option.map (fun af -> af.Value)
+
     /// a listing in the `somaticPotentiallyActionableCopyNumberVariants` subsection of the report's `results` section
     and ``Somatic Potentially Actionable Copy Number Variant`` =
         { Gene: Gene
           Description: CopyNumberVariantDescription
           Type: CopyNumberVariantType }
+
     and CopyNumberVariantDescription =
         internal
         | ``Copy number gain``
         | ``Copy number loss``
+
     and CopyNumberVariantType =
         internal
         | Amplification
@@ -180,16 +585,25 @@ module Tempus =
           NucleotideAlteration: NucleotideAlteration option
           Type: RelevantVariantType }
 
+        member this.Genes = this.Gene.Genes
+
     and ``Somatic Biologically Relevant Gene`` =
         internal
         | RelevantGene of Gene
         | RelevantFusion of Fusion
+
+        member this.Genes =
+            match this with
+            | RelevantGene gene -> [gene]
+            | RelevantFusion fusion -> fusion.Genes
 
     and Fusion =
         { ``5' Gene``: Gene
           ``3' Gene``: Gene
           FusionType: FusionType option
           VariantDescription: FusionVariantDescription }
+
+        member this.Genes = [this.``5' Gene``; this.``3' Gene``]
 
     and FusionType = internal | GeneFusion
     and FusionVariantDescription =
@@ -236,7 +650,6 @@ module Tempus =
     and ``Inherited Variants of Unknown Significance`` = InheritedVariants<``Inherited VUS Clinical Significance``>
     and ``Inherited Variant of Unknown Significance Value`` = InheritedVariantValue<``Inherited VUS Clinical Significance``>
 
-
     and ``Inherited Relevant Clinical Significance`` =
         internal
         | ``Likely Pathogenic``
@@ -255,27 +668,12 @@ module Tempus =
     and AlteredNucleotide = AlteredNucleotide of string
     and Position = Position of uint
 
-    and HGVS =
-        { ProteinChange: HgvsProteinChange option
-          CodingChange: HgvsCodingChange
-          ReferenceSequence: ReferenceSequence }
-
-    /// Human Genome Variation Society Sequence Variant
-    and HgvsProteinChange =
-        { AbbreviatedChange: HgvsAbbreviatedProteinChange
-          FullChange: HgvsProteinFullChange }
-    and HgvsAbbreviatedProteinChange = internal  HgvsAbbreviatedProteinChange of string
-    and HgvsProteinFullChange = internal HgvsProteinFullChange of string
-    and HgvsCodingChange = internal HgvsCodingChange of string
-    and ReferenceSequence = internal ReferenceSequence of string
     and VariantDescription = internal VariantDescription of string
     and VariantType = internal VariantType of string
-    and NucleotideAlteration = internal NucleotideAlteration of string
-    and AllelicFraction = internal AllelicFraction of float
+    and AllelicFraction =
+        internal | AllelicFraction of float
+        member this.Value = this |> fun (AllelicFraction allelicFraction) -> allelicFraction
 
-    type HgvsAbbreviatedProteinChange with member this.Value = this |> fun (HgvsAbbreviatedProteinChange proteinChange) -> proteinChange
-    type HgvsProteinFullChange        with member this.Value = this |> fun (HgvsProteinFullChange proteinChange) -> proteinChange
-    type HgvsCodingChange             with member this.Value = this |> fun (HgvsCodingChange codingChange) -> codingChange
 
     /// The `results` section of the Tempus report
     type Results =
@@ -451,7 +849,7 @@ module Tempus =
                         ReferenceSequence = ReferenceSequence json.Transcript }
             /// Both HGVS protein sequence change and coding DNA sequence change are present
             | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when json.``HGVS.p`` = json.MutationEffect ->
-                Ok <| { ProteinChange = Some { AbbreviatedChange =  HgvsAbbreviatedProteinChange json.``HGVS.p``
+                Ok <| { ProteinChange = Some { AbbreviatedChange =  HgvsProteinAbbreviatedChange json.``HGVS.p``
                                                FullChange = HgvsProteinFullChange json.``HGVS.pFull`` }
                         CodingChange = HgvsCodingChange json.``HGVS.c``
                         ReferenceSequence = ReferenceSequence json.Transcript }
@@ -467,7 +865,9 @@ module Tempus =
                 validate json
                 |> Result.map Some
 
+    /// Logic for the `order` section of the Tempus report.
     module Order =
+        /// An `order` json object
         type Json =
             { Institution: string
               Physician: string
@@ -837,6 +1237,7 @@ module Tempus =
                          DiagnosisDate = json.DiagnosisDate |> Option.map DiagnosisDate
                        }}
 
+    /// General logic for variants
     module Variant =
         module NucleotideAlteration =
             open Utilities.StringValidations
@@ -911,8 +1312,8 @@ module Tempus =
                 validation {
                     let! hgvs = json.HgvsJson |> HGVS.validate
                     and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
-                    and! allelicFraction = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
-                    and! variantDescription = json.VariantDescription |> Variant.Description.Input |> Variant.Description.validate
+                    and! allelicFraction      = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
+                    and! variantDescription   = json.VariantDescription |> Variant.Description.Input |> Variant.Description.validate
 
                     return { HGVS = hgvs
                              NucleotideAlteration = nucleotideAlteration
@@ -943,6 +1344,7 @@ module Tempus =
 
         open FsToolkit.ErrorHandling
 
+        /// Validate that somatic, potentially actionable mutation has a valid gene and variants.
         let validate (json: Json) : Validation<``Somatic Potentially Actionable Mutation``, string> =
             validation {
                 let! gene = json.GeneJson |> Gene.Json.validate
@@ -1605,4 +2007,60 @@ module Tempus =
                 row.TumorPercentage <- normalSample.TryTumorPercentageValue |> Option.map int
 
                 row
+            )
+
+        let toGeneRows (overallReport: OverallReport) =
+            let results = overallReport.Results
+            let somaticPotentiallyActionableGenes = results.``Somatic Potentially Actionable Mutations`` |> List.map (fun mutation -> mutation.Gene)
+            let somaticPotentiallyActionableCopyNumberGenes = results.``Somatic Potentially Actionable Copy Number Variants`` |> List.map (fun variant -> variant.Gene)
+            let somaticBiologicallyRelevantGenes = results.``Somatic Biologically Relevant Variants`` |> List.collect (fun variant -> variant.Genes)
+            let somaticVusGenes = results.``Somatic Variants of Unknown Significance`` |> List.map (fun vus -> vus.Gene)
+            let fusionGenes = results.Fusions |> List.collect (fun fusion -> fusion.Genes)
+            let inheritedRelevantGenes = results.``Inherited Relevant Variants``.Values |> List.map (fun irv -> irv.Gene)
+            let inheritedVusGenes = results.``Inherited Variants of Unknown Significance``.Values |> List.map (fun ivus -> ivus.Gene)
+
+            somaticPotentiallyActionableGenes
+            @ somaticPotentiallyActionableCopyNumberGenes
+            @ somaticBiologicallyRelevantGenes
+            @ somaticVusGenes
+            @ fusionGenes
+            @ inheritedRelevantGenes
+            @ inheritedVusGenes
+            |> List.map (fun gene ->
+                let row = context.Public.Genes.Create()
+
+                row.Name <- gene.GeneName.Value
+                row.HgncId <- Some gene.HgncId.Value
+
+                row
+            )
+
+        /// Build variant rows to be inserted into the `variants` database table. This function assumes that an existing sample report exists in the dtabase.
+        let toVariantRows (overallReport: OverallReport) =
+            let results = overallReport.Results
+            let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
+            let reportId = overallReport.Report.ReportId.Value.ToString()
+
+            let sampleReportId =
+                query {
+                    for sampleReport in context.Public.SampleReports do
+                    where (sampleReport.ReportId = reportId && sampleReport.SampleId = sampleId)
+                    select sampleReport.Id
+                    exactlyOne
+                }
+
+            results.``Somatic Potentially Actionable Mutations`` |> Seq.collect (fun mutation ->
+                let row = context.Public.Variants.Create()
+
+                row.GeneName <- mutation.Gene.GeneName.Value
+                row.SampleReportId <- sampleReportId
+
+                mutation.Variants
+                |> Seq.map (fun variant ->
+                    row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
+                    row.AllelicFraction <- variant.TryAllelicFractionValue
+                    row.HgvsProtein <- variant.HGVS.ProteinChange
+
+                    row
+                )
             )
