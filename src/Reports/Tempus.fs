@@ -32,7 +32,6 @@ module Tempus =
               SignoutDate: Report.SignoutDate }
 
 
-
         module HGVS =
             /// An abbreviated HGVS protein change
             type AbbreviatedProteinChange =
@@ -551,65 +550,6 @@ module Tempus =
                 |> Result.combine
                 |> Result.mapError List.flatten
 
-        /// Represents HGVS reference sequences for proteins and coding DNA
-        type HGVS =
-            { ``HGVS.p``: string // abbreviated protein sequence change
-              ``HGVS.pFull``: string // full protein sequence change
-              ``HGVS.c``: string // coding DNA sequence change
-              Transcript: string // the reference sequence (eg NM_012345.1)
-              MutationEffect: string // will either equal 'HGVS.p' or 'HGVS.c'
-            }
-
-            /// Deserializer for hgvs json object attributes
-            static member Decoder : Decoder<HGVS> =
-                Decode.object (fun get ->
-                    { ``HGVS.p``     = "HGVS.p"         |> flip get.Required.Field Decode.string
-                      ``HGVS.pFull`` = "HGVS.pFull"     |> flip get.Required.Field Decode.string
-                      ``HGVS.c``     = "HGVS.c"         |> flip get.Required.Field Decode.string
-                      Transcript     = "transcript"     |> flip get.Required.Field Decode.string
-                      MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
-                )
-
-        module HGVS =
-            open Utilities.StringValidations
-
-            /// Validate a HGVS reference sequence:
-            ///
-            /// 1. all hgvs fields are blank OR
-            /// 2. if hgvs.c is present and hgvs.p is blank, mutationEffect == hgvs.c OR
-            /// 3. if hgvs.p is present
-            ///    - hgvs.pFull (vice versa) is present
-            ///    - hgvs.p == mutation effect
-            let validate (hgvs: HGVS) : Result<Domain.HGVS.Variant, string> =
-                match (hgvs.``HGVS.p``, hgvs.``HGVS.pFull``, hgvs.``HGVS.c``, hgvs.MutationEffect, hgvs.Transcript) with
-                /// No HGVS protein sequence change present; only a coding DNA sequence is present
-                | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.c`` = hgvs.MutationEffect ->
-                    Ok <| { ProteinChange = None
-                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
-                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
-                /// Both HGVS protein sequence change and coding DNA sequence change are present
-                | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.p`` = hgvs.MutationEffect ->
-                    Ok <| { ProteinChange = Some { Abbreviated =  Domain.HGVS.AbbreviatedProteinChange hgvs.``HGVS.p``
-                                                   Full = Domain.HGVS.FullProteinChange hgvs.``HGVS.pFull`` }
-                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
-                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
-                | _ -> Error $"Invalid HGVS: {hgvs}"
-
-            /// If the HGVS is present, validate it.
-            let validateOptional json =
-                let allPartsMissing =
-                    [ json.``HGVS.p``
-                      json.``HGVS.pFull``
-                      json.``HGVS.c``
-                      json.MutationEffect
-                      json.Transcript
-                    ] |> List.forall String.isBlank
-
-                if allPartsMissing then
-                    Ok None
-                else
-                    validate json
-                    |> Result.map Some
 
         /// An `order` json object
         type Order =
@@ -710,48 +650,18 @@ module Tempus =
                             } : Domain.Order)
                 }
 
-
-    module Sample =
-        open System
-
-        module SampleType =
-            type Input = Input of string
-
-            /// Validate that a sample type is either blood, block, slides, or saliva.
-            let validate (Input input) =
-                match input with
-                | "Blood" -> Ok Blood
-                | "FFPE Block" -> Ok ``FFPE Block``
-                | "FFPE Slides (Unstained)" -> Ok ``FFPE Slides (Unstained)``
-                | "Saliva" -> Ok Saliva
-                | _ -> Error $"Invalid sample type: {input}"
-
-        module CollectionDate =
-            type Input = Input of DateTime
-
-        module ReceivedDate =
-            type Input = Input of DateTime
-
-        module SampleDates =
-            /// Validate that sample's collection date happens before its received date
-            let validate (CollectionDate.Input collectionDate) (ReceivedDate.Input receivedDate) =
-                if collectionDate < receivedDate then
-                    Ok { CollectionDate = CollectionDate collectionDate; ReceivedDate = ReceivedDate receivedDate }
-                else
-                    Error $"Collection date, {collectionDate}, doesn't happen before received date, {receivedDate}."
-
         /// each entry in the `specimens` section of the Tempus report
-        type Json =
-            { SampleId: Guid
-              CollectionDate: DateTime
-              ReceivedDate: DateTime
+        type Sample =
+            { SampleId: System.Guid
+              CollectionDate: System.DateTime
+              ReceivedDate: System.DateTime
               SampleCategory: string
               SampleSite: string
               SampleType: string
-              Institution: InstitutionJson }
+              Institution: Institution }
 
             /// Deserializer for the sample seciton of the Tempus report
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<Sample> =
                 Decode.object (fun get ->
                     { SampleId       = "tempusSampleId"  |> flip get.Required.Field Decode.guid
                       CollectionDate = "collectionDate"  |> flip get.Required.Field Decode.datetime
@@ -759,79 +669,108 @@ module Tempus =
                       SampleCategory = "sampleCategory"  |> flip get.Required.Field Decode.string
                       SampleSite     = "sampleSite"      |> flip get.Required.Field Decode.string
                       SampleType     = "sampleType"      |> flip get.Required.Field Decode.string
-                      Institution    = "institutionData" |> flip get.Required.Field InstitutionJson.Decoder })
+                      Institution    = "institutionData" |> flip get.Required.Field Institution.Decoder })
 
-        and InstitutionJson =
+        and Institution =
             { BlockId: string option
               TumorPercentage: uint option }
 
-            static member Decoder : Decoder<InstitutionJson> =
+            static member Decoder : Decoder<Institution> =
                 Decode.object (fun get ->
                     { BlockId         = "blockId"         |> flip get.Optional.Field Decode.string
                       TumorPercentage = "tumorPercentage" |> flip get.Optional.Field Decode.uint32
                     } )
 
-    module TumorSample =
-        module Category =
-            type Input = Input of string
+        module Sample =
+            open System
+            open Domain.Sample
 
-            let validate (Input input) =
-                match input with
-                | "tumor" -> Ok "tumor"
-                | _ -> Error $"Sample category is not tumor: {input}"
+            type Type = Type of string
+            type CollectionDate = CollectionDate of DateTime
+            type ReceivedDate = ReceivedDate of DateTime
+            type Category = Category of string
 
-        open FsToolkit.ErrorHandling
-        open Utilities.StringValidations
+            module SampleType =
+                /// Validate that a sample type is either blood, block, slides, or saliva.
+                let validate (Type sampleType) =
+                    match sampleType with
+                    | "Blood" -> Ok Blood
+                    | "FFPE Block" -> Ok ``FFPE Block``
+                    | "FFPE Slides (Unstained)" -> Ok ``FFPE Slides (Unstained)``
+                    | "Saliva" -> Ok Saliva
+                    | _ -> Error $"Invalid sample type: {sampleType}"
 
-        /// Validate a tumor sample
-        let validate (json: Sample.Json) : Validation<TumorSample, string> =
-            validation {
-                // validate that the sample's listed category is 'tumor'
-                let! tumorCategory = json.SampleCategory |> Category.Input |> Category.validate
-                and! sampleDates   = (json.CollectionDate |> Sample.CollectionDate.Input, json.ReceivedDate |> Sample.ReceivedDate.Input) ||> Sample.SampleDates.validate
-                and! sampleSite    = json.SampleSite |> validateNotBlank |> Result.map SampleSite
-                and! sampleType    = json.SampleType |> Sample.SampleType.Input |> Sample.SampleType.validate
+            module SampleDates =
+                /// Validate that sample's collection date happens before its received date
+                let validate (CollectionDate collectionDate) (ReceivedDate receivedDate) : Result<Domain.Sample.Dates, string> =
+                    if collectionDate < receivedDate then
+                        Ok ({ CollectionDate = Domain.Sample.CollectionDate collectionDate
+                              ReceivedDate   = Domain.Sample.ReceivedDate receivedDate
+                            })
+                    else
+                        Error $"Collection date, {collectionDate}, doesn't happen before received date, {receivedDate}."
 
-                return { SampleId = SampleId json.SampleId
-                         SampleSite = sampleSite
-                         SampleDates = sampleDates
-                         SampleType = sampleType
-                         BlockId = json.Institution.BlockId |> Option.map BlockId
-                         TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
-                       } }
 
-    module NormalSample =
-        module Category =
-            type Input = Input of string
+        module TumorSample =
+            module Category =
+                let validate (Sample.Category category) =
+                    match category with
+                    | "tumor" -> Ok "tumor"
+                    | _ -> Error $"Sample category is not tumor: {category}"
 
-            let validate (Input input) =
-                match input with
-                | "normal" -> Ok "normal"
-                | _ -> Error $"Sample category is not normal: {input}"
+            open FsToolkit.ErrorHandling
+            open Utilities.StringValidations
+            open Domain.Sample
 
-        open FsToolkit.ErrorHandling
-        open Utilities.StringValidations
+            /// Validate a tumor sample
+            let validate (json: Sample) : Validation<Domain.TumorSample, string> =
+                validation {
+                    // validate that the sample's listed category is 'tumor'
+                    let! tumorCategory = json.SampleCategory |> Sample.Category |> Category.validate
+                    and! sampleDates   = (json.CollectionDate |> Sample.CollectionDate, json.ReceivedDate |> Sample.ReceivedDate) ||> Sample.SampleDates.validate
+                    and! sampleSite    = json.SampleSite |> validateNotBlank |> Result.map Domain.Sample.Site
+                    and! sampleType    = json.SampleType |> Sample.Type |> Sample.SampleType.validate
 
-        /// Validate a normal sample
-        let validate (json: Sample.Json) : Validation<NormalSample, string> =
-            validation {
-                // validate that the sample's listed category is 'nromal'
-                let! normalCategory = json.SampleCategory |> Category.Input |> Category.validate
-                and! sampleDates    = (json.CollectionDate |> Sample.CollectionDate.Input, json.ReceivedDate |> Sample.ReceivedDate.Input) ||> Sample.SampleDates.validate
-                and! sampleSite     = json.SampleSite |> validateNotBlank |> Result.map SampleSite
-                and! sampleType     = json.SampleType |> Sample.SampleType.Input |> Sample.SampleType.validate
+                    return ({ SampleId = Identifier json.SampleId
+                              Site = sampleSite
+                              Dates = sampleDates
+                              Type = sampleType
+                              BlockId = json.Institution.BlockId |> Option.map BlockId
+                              TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
+                            } : Domain.TumorSample)
+                }
 
-                return { SampleId = SampleId json.SampleId
-                         SampleSite = sampleSite
-                         SampleDates = sampleDates
-                         SampleType = sampleType
-                         BlockId = json.Institution.BlockId |> Option.map BlockId
-                         TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
-                       } }
+        module NormalSample =
+            module Category =
+                let validate (Sample.Category category) =
+                    match category with
+                    | "normal" -> Ok "normal"
+                    | _ -> Error $"Sample category is not normal: {category}"
 
-        /// Validate normal sample, if it's present
-        let validateOptional  =
-            Optional.validateWith validate
+            open FsToolkit.ErrorHandling
+            open Utilities.StringValidations
+            open Domain.Sample
+
+            /// Validate a normal sample
+            let validate (json: Sample) : Validation<Domain.NormalSample, string> =
+                validation {
+                    // validate that the sample's listed category is 'normal'
+                    let! normalCategory = json.SampleCategory |> Sample.Category |> Category.validate
+                    and! sampleDates    = (json.CollectionDate |> Sample.CollectionDate, json.ReceivedDate |> Sample.ReceivedDate) ||> Sample.SampleDates.validate
+                    and! sampleSite     = json.SampleSite |> validateNotBlank |> Result.map Domain.Sample.Site
+                    and! sampleType     = json.SampleType |> Sample.Type |> Sample.SampleType.validate
+
+                    return ({ SampleId = Identifier json.SampleId
+                              Site = sampleSite
+                              Dates = sampleDates
+                              Type = sampleType
+                              BlockId = json.Institution.BlockId |> Option.map BlockId
+                             } : Domain.NormalSample)
+                }
+
+            /// Validate normal sample, if it's present
+            let validateOptional  =
+                Optional.validateWith validate
 
     module Patient =
         open System
@@ -896,6 +835,66 @@ module Tempus =
                          DiagnosisName = json.Diagnosis |> Diagnosis.Name
                          DiagnosisDate = json.DiagnosisDate |> Option.map DiagnosisDate
                        }}
+
+        /// Represents HGVS reference sequences for proteins and coding DNA
+        type HGVS =
+            { ``HGVS.p``: string // abbreviated protein sequence change
+              ``HGVS.pFull``: string // full protein sequence change
+              ``HGVS.c``: string // coding DNA sequence change
+              Transcript: string // the reference sequence (eg NM_012345.1)
+              MutationEffect: string // will either equal 'HGVS.p' or 'HGVS.c'
+            }
+
+            /// Deserializer for hgvs json object attributes
+            static member Decoder : Decoder<HGVS> =
+                Decode.object (fun get ->
+                    { ``HGVS.p``     = "HGVS.p"         |> flip get.Required.Field Decode.string
+                      ``HGVS.pFull`` = "HGVS.pFull"     |> flip get.Required.Field Decode.string
+                      ``HGVS.c``     = "HGVS.c"         |> flip get.Required.Field Decode.string
+                      Transcript     = "transcript"     |> flip get.Required.Field Decode.string
+                      MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
+                )
+
+        module HGVS =
+            open Utilities.StringValidations
+
+            /// Validate a HGVS reference sequence:
+            ///
+            /// 1. all hgvs fields are blank OR
+            /// 2. if hgvs.c is present and hgvs.p is blank, mutationEffect == hgvs.c OR
+            /// 3. if hgvs.p is present
+            ///    - hgvs.pFull (vice versa) is present
+            ///    - hgvs.p == mutation effect
+            let validate (hgvs: HGVS) : Result<Domain.HGVS.Variant, string> =
+                match (hgvs.``HGVS.p``, hgvs.``HGVS.pFull``, hgvs.``HGVS.c``, hgvs.MutationEffect, hgvs.Transcript) with
+                /// No HGVS protein sequence change present; only a coding DNA sequence is present
+                | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.c`` = hgvs.MutationEffect ->
+                    Ok <| { ProteinChange = None
+                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
+                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
+                /// Both HGVS protein sequence change and coding DNA sequence change are present
+                | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.p`` = hgvs.MutationEffect ->
+                    Ok <| { ProteinChange = Some { Abbreviated =  Domain.HGVS.AbbreviatedProteinChange hgvs.``HGVS.p``
+                                                   Full = Domain.HGVS.FullProteinChange hgvs.``HGVS.pFull`` }
+                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
+                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
+                | _ -> Error $"Invalid HGVS: {hgvs}"
+
+            /// If the HGVS is present, validate it.
+            let validateOptional json =
+                let allPartsMissing =
+                    [ json.``HGVS.p``
+                      json.``HGVS.pFull``
+                      json.``HGVS.c``
+                      json.MutationEffect
+                      json.Transcript
+                    ] |> List.forall String.isBlank
+
+                if allPartsMissing then
+                    Ok None
+                else
+                    validate json
+                    |> Result.map Some
 
     /// General logic for variants
     module Variant =
