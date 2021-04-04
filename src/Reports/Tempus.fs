@@ -392,71 +392,70 @@ module Tempus =
                          EntrezId = Gene.EntrezId gene.EntrezId }
                 | _ -> Error $"Gene missing name, hgnc id, or entrez id: {gene}"
 
-    module Fusion =
-        type Json =
-            { Gene5: Gene.Json
-              Gene3: Gene.Json
+        type Fusion =
+            { Gene5: Gene
+              Gene3: Gene
               VariantDescription: string
               FusionType: string option
               StructuralVariant: string option }
 
             /// Deserializer for a fusion of genes
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<Fusion> =
                 Decode.object (fun get ->
-                    { Gene5 = get.Required.Raw Gene.Json.Gene5Decoder
-                      Gene3 = get.Required.Raw Gene.Json.Gene3Decoder
+                    { Gene5 = get.Required.Raw Gene.Gene5Decoder
+                      Gene3 = get.Required.Raw Gene.Gene3Decoder
                       VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
                       FusionType         = "fusionType"         |> flip get.Required.Field Decoder.Optional.string
                       StructuralVariant  = "structuralVariant"  |> flip get.Required.Field Decoder.Optional.string }
                 )
 
-        open FsToolkit.ErrorHandling
+        module Fusion =
+            type Type = Type of string
+            type VariantDescription = VariantDescription of string
 
-        module FusionType =
-            type Input = Input of string
+            module Type =
+                /// Validate that a fusion type is `gene`, for now.
+                let validate (Type fusionType) =
+                    match fusionType with
+                    | "gene" -> Ok Domain.Fusion.GeneFusion
+                    | _ -> Error $"Invalid fusion type: {fusionType}"
 
-            /// Validate that a fusion type is `gene`, for now.
-            let validate (Input input) =
-                match input with
-                | "gene" -> Ok GeneFusion
-                | _ -> Error $"Invalid fusion type: {input}"
+                /// Validate an optional fusion type if it exists.
+                let validateOptional =
+                    Optional.validateWith validate
 
-            /// Validate an optional fusion type if it exists.
-            let validateOptional =
-                Optional.validateWith validate
+            module VariantDescription =
+                /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
+                let validate (VariantDescription description) =
+                    match description with
+                    | "Chromosomal rearrangement" -> Ok Domain.Fusion.``Chromosomal rearrangement``
+                    | "Deletion (exons 2-7)" -> Ok Domain.Fusion.``Deletion (exons 2-7)``
+                    | _ -> Error $"Invalid fusion variant description: {description}"
 
-        module VariantDescription =
-            type Input = Input of string
+            open FsToolkit.ErrorHandling
 
-            /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
-            let validate (Input input) =
-                match input with
-                | "Chromosomal rearrangement" -> Ok ``Chromosomal rearrangement``
-                | "Deletion (exons 2-7)" -> Ok ``Deletion (exons 2-7)``
-                | _ -> Error $"Invalid fusion variant description: {input}"
+            /// Validate that a fusion has 2 valid genes and a valid fusion type, if present.
+            let validate (fusion: Fusion) : Validation<Domain.Fusion, string> =
+                validation {
+                    let! gene5 = fusion.Gene5 |> Gene.validate
+                    and! gene3 = fusion.Gene3 |> Gene.validate
+                    and! fusionType = fusion.FusionType |> Option.map Type |> Type.validateOptional
+                    and! variantDescription = fusion.VariantDescription |> VariantDescription |> VariantDescription.validate
 
-        /// Validate that a fusion has 2 valid genes and a valid fusion type, if present.
-        let validate (json: Json) =
-            validation {
-                let! gene5 = json.Gene5 |> Gene.Json.validate
-                and! gene3 = json.Gene3 |> Gene.Json.validate
-                and! fusionType = json.FusionType |> Option.map FusionType.Input |> FusionType.validateOptional
-                and! variantDescription = json.VariantDescription |> VariantDescription.Input |> VariantDescription.validate
+                    return ({ ``5' Gene`` = gene5
+                              ``3' Gene`` = gene3
+                              FusionType = fusionType
+                              VariantDescription = variantDescription
+                            } : Domain.Fusion)
+                }
 
-                return { ``5' Gene`` = gene5
-                         ``3' Gene`` = gene3
-                         FusionType = fusionType
-                         VariantDescription = variantDescription
-                       } }
-
-    module Fusions =
-        /// Validate a list of fusions
-        let validate (jsons: Fusion.Json list) =
-            jsons
-            |> Seq.map Fusion.validate
-            |> Seq.toList
-            |> Result.combine
-            |> Result.mapError List.flatten
+        module Fusions =
+            /// Validate a list of fusions
+            let validate (jsons: Fusion list) =
+                jsons
+                |> List.map Fusion.validate
+                |> Result.combine
+                |> Result.mapError List.flatten
 
     module HGVS =
         /// Represents HGVS reference sequences for proteins and coding DNA
