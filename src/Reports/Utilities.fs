@@ -101,7 +101,6 @@ module Utilities =
 
                 Decode.oneOf [ Decode.option Decode.uint32; strDecoder ]
 
-
     module Guid =
         let tryParse(input: string) =
             match System.Guid.TryParse(input) with
