@@ -30,7 +30,7 @@ module Core =
 
         type Lab =
             { Name: Lab.Name
-              CliaNumber: Lab.CliaNumber }
+              CliaNo: Lab.CliaNumber }
 
         module Patient =
             /// The patient's medical record number
