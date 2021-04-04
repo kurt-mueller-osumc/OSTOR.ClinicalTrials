@@ -457,9 +457,8 @@ module Tempus =
                 |> Result.combine
                 |> Result.mapError List.flatten
 
-    module HGVS =
         /// Represents HGVS reference sequences for proteins and coding DNA
-        type Json =
+        type HGVS =
             { ``HGVS.p``: string // abbreviated protein sequence change
               ``HGVS.pFull``: string // full protein sequence change
               ``HGVS.c``: string // coding DNA sequence change
@@ -468,7 +467,7 @@ module Tempus =
             }
 
             /// Deserializer for hgvs json object attributes
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<HGVS> =
                 Decode.object (fun get ->
                     { ``HGVS.p``     = "HGVS.p"         |> flip get.Required.Field Decode.string
                       ``HGVS.pFull`` = "HGVS.pFull"     |> flip get.Required.Field Decode.string
@@ -477,45 +476,46 @@ module Tempus =
                       MutationEffect = "mutationEffect" |> flip get.Required.Field Decode.string }
                 )
 
-        /// Retrieve the mutation effect for HGVS. If the protein change is present, report that. If not, report the coding change.
-        let mutationEffect hgvs =
-            match hgvs.ProteinChange with
-            | Some proteinSequenceChange -> proteinSequenceChange.AbbreviatedChange.Value
-            | _ -> hgvs.CodingChange.Value
+        module HGVS =
+            open Utilities.StringValidations
 
-        open Utilities.StringValidations
+            /// Validate a HGVS reference sequence:
+            ///
+            /// 1. all hgvs fields are blank OR
+            /// 2. if hgvs.c is present and hgvs.p is blank, mutationEffect == hgvs.c OR
+            /// 3. if hgvs.p is present
+            ///    - hgvs.pFull (vice versa) is present
+            ///    - hgvs.p == mutation effect
+            let validate (hgvs: HGVS) : Result<Domain.HGVS.Variant, string> =
+                match (hgvs.``HGVS.p``, hgvs.``HGVS.pFull``, hgvs.``HGVS.c``, hgvs.MutationEffect, hgvs.Transcript) with
+                /// No HGVS protein sequence change present; only a coding DNA sequence is present
+                | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.c`` = hgvs.MutationEffect ->
+                    Ok <| { ProteinChange = None
+                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
+                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
+                /// Both HGVS protein sequence change and coding DNA sequence change are present
+                | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.p`` = hgvs.MutationEffect ->
+                    Ok <| { ProteinChange = Some { Abbreviated =  Domain.HGVS.AbbreviatedProteinChange hgvs.``HGVS.p``
+                                                   Full = Domain.HGVS.FullProteinChange hgvs.``HGVS.pFull`` }
+                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
+                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
+                | _ -> Error $"Invalid HGVS: {hgvs}"
 
-        /// Validate a HGVS reference sequence:
-        ///
-        /// 1. all hgvs fields are blank OR
-        /// 2. if hgvs.c is present and hgvs.p is blank, mutationEffect == hgvs.c OR
-        /// 3. if hgvs.p is present
-        ///    - hgvs.pFull (vice versa) is present
-        ///    - hgvs.p == mutation effect
-        let validate json =
-            match (json.``HGVS.p``, json.``HGVS.pFull``, json.``HGVS.c``, json.MutationEffect, json.Transcript) with
-            /// No HGVS protein sequence change present; only a coding DNA sequence is present
-            | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when json.``HGVS.c`` = json.MutationEffect ->
-                Ok <| { ProteinChange = None
-                        CodingChange = HgvsCodingChange json.``HGVS.c``
-                        ReferenceSequence = ReferenceSequence json.Transcript }
-            /// Both HGVS protein sequence change and coding DNA sequence change are present
-            | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when json.``HGVS.p`` = json.MutationEffect ->
-                Ok <| { ProteinChange = Some { AbbreviatedChange =  HgvsProteinAbbreviatedChange json.``HGVS.p``
-                                               FullChange = HgvsProteinFullChange json.``HGVS.pFull`` }
-                        CodingChange = HgvsCodingChange json.``HGVS.c``
-                        ReferenceSequence = ReferenceSequence json.Transcript }
-            | _ -> Error $"Invalid HGVS: {json}"
+            /// If the HGVS is present, validate it.
+            let validateOptional json =
+                let allPartsMissing =
+                    [ json.``HGVS.p``
+                      json.``HGVS.pFull``
+                      json.``HGVS.c``
+                      json.MutationEffect
+                      json.Transcript
+                    ] |> List.forall String.isBlank
 
-        /// If the HGVS is present, validate it.
-        let validateOptional json =
-            let hgvsMissing = [json.``HGVS.p``; json.``HGVS.pFull``; json.``HGVS.c``; json.MutationEffect; json.Transcript] |> List.forall String.isBlank
-
-            if hgvsMissing then
-                Ok None
-            else
-                validate json
-                |> Result.map Some
+                if allPartsMissing then
+                    Ok None
+                else
+                    validate json
+                    |> Result.map Some
 
     /// Logic for the `order` section of the Tempus report.
     module Order =
