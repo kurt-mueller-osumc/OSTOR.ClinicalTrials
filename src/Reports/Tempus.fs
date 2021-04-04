@@ -1,9 +1,6 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Tempus =
-    open Thoth.Json.Net
-    open Utilities
-
     module Domain =
         open Core.Domain
 
@@ -352,43 +349,48 @@ module Tempus =
               Results: Results
             }
 
+    module Json =
+        open Thoth.Json.Net
+        open Utilities
 
-    module Gene =
         /// Json object attributes that identifies genes
-        type Json =
+        type Gene =
             { GeneId: string // 'gene' attribute
               HgncId: string
               EntrezId: string }
-
             /// Deserializes a gene's json object attributes
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<Gene> =
                 Decode.object (fun get ->
                     { GeneId   = "gene"     |> flip get.Required.Field Decode.string
                       HgncId   = "hgncId"   |> flip get.Required.Field Decode.string
                       EntrezId = "entrezId" |> flip get.Required.Field Decode.string })
 
             /// Deserializes Gene 5 json object attributes
-            static member Gene5Decoder : Decoder<Json> =
+            static member Gene5Decoder : Decoder<Gene> =
                 Decode.object (fun get ->
                     { GeneId   = "gene5"         |> flip get.Required.Field Decode.string
                       HgncId   = "gene5hgncId"   |> flip get.Required.Field Decode.string
                       EntrezId = "gene5entrezId" |> flip get.Required.Field Decode.string })
 
             /// Deserializes Gene 3 json object attributes
-            static member Gene3Decoder : Decoder<Json> =
+            static member Gene3Decoder : Decoder<Gene> =
                 Decode.object (fun get ->
                     { GeneId   = "gene3"         |> flip get.Required.Field Decode.string
                       HgncId   = "gene3hgncId"   |> flip get.Required.Field Decode.string
                       EntrezId = "gene3entrezId" |> flip get.Required.Field Decode.string })
 
-        module Json =
+        module Gene =
+            open Core.Domain
             open StringValidations
 
             /// Validate that a json object representing a gene has a gene name, hgnc id, and entrez id
-            let validate (json: Json) =
-                match (json.GeneId, json.HgncId, json.EntrezId) with
-                | (NotBlank, NotBlank, NotBlank) -> Ok { GeneName = GeneName json.GeneId; HgncId = HgncId json.HgncId; EntrezId = EntrezId json.EntrezId }
-                | _ -> Error $"Gene missing name, hgnc id, or entrez id: {json}"
+            let validate (gene: Gene) : Result<Domain.Gene, string> =
+                match (gene.GeneId, gene.HgncId, gene.EntrezId) with
+                | (NotBlank, NotBlank, NotBlank) ->
+                    Ok { Name = Gene.Name gene.GeneId
+                         HgncId = Gene.HgncId gene.HgncId
+                         EntrezId = Gene.EntrezId gene.EntrezId }
+                | _ -> Error $"Gene missing name, hgnc id, or entrez id: {gene}"
 
     module Fusion =
         type Json =
