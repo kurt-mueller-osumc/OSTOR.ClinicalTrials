@@ -28,9 +28,6 @@ module Core =
                 internal | Name of string
                 member this.Value = this |> fun (Name name) -> name
 
-        type Lab =
-            { Name: Lab.Name
-              CliaNo: Lab.CliaNumber }
 
         module Patient =
             /// The patient's medical record number
@@ -170,21 +167,20 @@ module Core =
                 | _, Some npi -> Error $"NPI must be a 10 digit number: {npi}"
                 | _ -> Error $"NPI is invalid: {npi}"
 
-    module Lab =
-        type CliaNumber = CliaNumber of string
+        module Lab =
+            type CliaNo = CliaNo of string
 
-        module CliaNumber =
-            open System.Text.RegularExpressions
+            module CliaNumber =
+                open System.Text.RegularExpressions
 
-
-            /// Validate that a CLIA # is 10 alphanumerica numbers.
-            ///
-            ///    validate (Input "22D2027531") |> Ok (CliaNumber "22D2027531")
-            ///    validate (Input "12345-7890") |> Error ("Invalid CLIA #: 12345-7890")
-            let validate (CliaNumber cliaNumber) : Result<Domain.Lab.CliaNumber, string> =
-                match Regex("^(\d|[a-zA-Z]){10}$").Match(cliaNumber).Success with
-                | true -> Ok <| Domain.Lab.CliaNumber cliaNumber
-                | _ -> Error $"Invalid CLIA #: {cliaNumber}. CLIA #s consist of 10 alphanumeric characters."
+                /// Validate that a CLIA # is 10 alphanumerica numbers.
+                ///
+                ///    validate (CliaNo "22D2027531") |> Ok (Domain.Lab.CliaNumber "22D2027531")
+                ///    validate (CliaNo "12345-7890") |> Error ("Invalid CLIA #: 12345-7890")
+                let validate (CliaNo cliaNumber) : Result<Domain.Lab.CliaNumber, string> =
+                    match Regex("^(\d|[a-zA-Z]){10}$").Match(cliaNumber).Success with
+                    | true -> Ok <| Domain.Lab.CliaNumber cliaNumber
+                    | _ -> Error $"Invalid CLIA #: {cliaNumber}. CLIA #s consist of 10 alphanumeric characters."
 
     type IcdCode = IcdCode of string
 
