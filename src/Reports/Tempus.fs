@@ -3,23 +3,15 @@ namespace OSTOR.ClinicalTrials.Reports
 module Tempus =
     module Domain =
         open Core.Domain
-        open Core.Domain.Address
-
-        /// the `lab` section of the Tempus report
-        type Lab =
-            { LabName: Lab.Name
-              CliaNumber: Lab.CliaNumber
-              Address: Address }
-
 
         module Report =
             type Identifier =
                 internal | Identifier of System.Guid
                 member this.Value = this |> fun (Identifier id) -> id
 
-            type SigningPathologist =
-                internal | SigningPathologist of string
-                member this.Value = this |> fun (SigningPathologist signingPathologist) -> signingPathologist
+            type Pathologist =
+                internal | Pathologist of string
+                member this.Value = this |> fun (Pathologist pathologist) -> pathologist
 
             type SignoutDate =
                 internal | SignoutDate of System.DateTime
@@ -28,7 +20,7 @@ module Tempus =
         /// the `report` section of the Tempus report
         type Report =
             { ReportId: Report.Identifier
-              SigningPathologist: Report.SigningPathologist
+              SigningPathologist: Report.Pathologist
               SignoutDate: Report.SignoutDate }
 
 
@@ -62,19 +54,14 @@ module Tempus =
                   ReferenceSequence: ReferenceSequence }
 
 
-        module Diagnosis =
-            type Name = internal | Name of string
-            type Date = internal | Date of System.DateTime
-
-        type Diagnosis =
-            { Name: Diagnosis.Name
-              Date: Diagnosis.Date option}
+        type DiagnosisName = internal | DiagnosisName of string
+        type DiagnosisDate = internal | DiagnosisDate of System.DateTime
 
 
         module Patient =
-            type TempusId =
-                internal | TempusId of System.Guid
-                member this.Value = this |> fun (TempusId tempusId) -> tempusId
+            type TempusIdentifier =
+                internal | TempusIdentifier of System.Guid
+                member this.Value = this |> fun (TempusIdentifier tempusId) -> tempusId
 
             type Sex =
                 internal | Male | Female
@@ -87,11 +74,13 @@ module Tempus =
         /// the `patients` section in the Tempus report
         type Patient =
             { MRN: Patient.MRN option
+              TempusId: Patient.TempusIdentifier
               FirstName: Person.FirstName
               LastName: Person.LastName
-              DateOfBirth: Patient.DateOfBirth
+              DateOfBirth: Patient.BirthDate
               Sex: Patient.Sex
-              Diagnosis: Diagnosis }
+              DiagnosisName: DiagnosisName
+              DiagnosisDate: DiagnosisDate option }
 
 
         module Order =
@@ -169,9 +158,6 @@ module Tempus =
 
             type Description = internal | Description of string
 
-        (*
-            Fusions
-        *)
 
         module Fusion =
             type Type = internal | GeneFusion
@@ -188,155 +174,158 @@ module Tempus =
 
             member this.Genes = [this.``5' Gene``; this.``3' Gene``]
 
-        (*
-            Tumor Mutation Burden
-        *)
 
-        module Results =
-            module TumorMutationBurden =
-                type Score =
-                    internal | Score of float
-                    with member this.Value = this |> fun (Score score) -> score
+        module TumorMutationBurden =
+            type Score =
+                internal | Score of float
+                with member this.Value = this |> fun (Score score) -> score
 
-                and Percentile =
-                    internal | Percentile of uint
-                    with member this.Value = this |> fun (Percentile percentile) -> percentile
+            and Percentile =
+                internal | Percentile of uint
+                with member this.Value = this |> fun (Percentile percentile) -> percentile
 
-            /// tumor mutation burden found in the `results` section of the report
-            type TumorMutationBurden =
-                { Score: TumorMutationBurden.Score
-                  Percentile: TumorMutationBurden.Percentile }
+        /// tumor mutation burden found in the `results` section of the report
+        type TumorMutationBurden =
+            { Score: TumorMutationBurden.Score
+              Percentile: TumorMutationBurden.Percentile }
 
-            /// the microsattellite instability status found in the `results` section of the report
-            type MicrosatelliteInstabilityStatus =
-                internal | MicrosatelliteInstabilityStatus of string
-                member this.Value = this |> fun (MicrosatelliteInstabilityStatus msiStatus) -> msiStatus
+        /// the microsattellite instability status found in the `results` section of the report
+        type MicrosatelliteInstabilityStatus =
+            internal | MicrosatelliteInstabilityStatus of string
+            member this.Value = this |> fun (MicrosatelliteInstabilityStatus msiStatus) -> msiStatus
 
+        type VariantCall = internal | SomaticVariant | GermlineVariant
+        type SomaticVariantJudgement =
+            internal
+            | PotentiallyActionable
+            | BiologicallyRelevant
+            | UnknownSignificance
 
-            module ``Somatic Potentially Actionable`` =
-                type Variant =
-                    { HGVS: HGVS.Variant
-                      NucleotideAlteration: Variant.NucleotideAlteration option
-                      AllelicFraction: Variant.AllelicFraction option
-                      Description: Variant.Description }
+        module SomaticPotentiallyActionable =
+            type Variant =
+                { HGVS: HGVS.Variant
+                  NucleotideAlteration: Variant.NucleotideAlteration option
+                  AllelicFraction: Variant.AllelicFraction option
+                  Description: Variant.Description }
 
-                /// represents a mutation found in `results.somaticPotentiallActionableMutations` section of the report
-                type Mutation =
-                    { Gene: Gene
-                      Variants: Variant list }
+            /// represents a mutation found in `results.somaticPotentiallyActionableMutations` section of the report
+            type Mutation =
+                { Gene: Gene
+                  Variants: Variant list }
 
-                module CopyNumberVariant =
-                    type Description =
-                        internal
-                        | ``Copy number gain``
-                        | ``Copy number loss``
-
-                        member this.Value =
-                            match this with
-                            | ``Copy number gain`` -> "copy number gain"
-                            | ``Copy number loss`` -> "copy number loss"
-
-                    type Type =
-                        internal
-                        | Amplification
-                        | Deletion
-
-                        member this.Value =
-                            match this with
-                            | Amplification -> "amplification"
-                            | Deletion -> "deletion"
-
-                type CopyNumberVariant =
-                    { Gene: Gene
-                      Description: CopyNumberVariant.Description
-                      Type: CopyNumberVariant.Type
-                    }
-
-
-            module ``Somatic Biologically Relevant`` =
-                type Mutation =
+            module CopyNumberVariant =
+                type Description =
                     internal
-                    | Gene of Gene | Fusion of Fusion
+                    | ``Copy number gain``
+                    | ``Copy number loss``
 
-                    member this.Genes =
+                    member this.Value =
                         match this with
-                        | Gene gene -> [gene]
-                        | Fusion fusion -> fusion.Genes
+                        | ``Copy number gain`` -> "copy number gain"
+                        | ``Copy number loss`` -> "copy number loss"
 
                 type Type =
                     internal
-                    | CNV
-                    | SNV
-                    | Fusion
+                    | Amplification
+                    | Deletion
 
-                type Variant =
-                    { Mutation: Mutation
-                      HGVS: HGVS.Variant option
-                      AllelicFraction: Variant.AllelicFraction option
-                      NucleotideAlteration: Variant.NucleotideAlteration option
-                      Type: Type }
+                    member this.Value =
+                        match this with
+                        | Amplification -> "amplification"
+                        | Deletion -> "deletion"
 
-            module ``Somatic Variant of Unknown Significance`` =
-                type Type = internal | SNV
-
-            /// an entry found in `results.SomaticVariantsOfUnknownSignificance`
-            type ``Somatic Variant of Unknown Significance`` =
+            type CopyNumberVariant =
                 { Gene: Gene
-                  Hgvs: HGVS.Variant
-                  Type: ``Somatic Variant of Unknown Significance``.Type
-                  Description: Variant.Description
-                  NucleotideAlteration: Variant.NucleotideAlteration
-                  AllelicFraction: Variant.AllelicFraction
+                  Description: CopyNumberVariant.Description
+                  Type: CopyNumberVariant.Type
                 }
 
-            module InheritedVariants =
-                type Note = internal Note of string
-                type Disease = internal Disease of Disease
-                type Chromosome = internal Chromosome of uint
-                type ReferencedNucleotide = ReferencedNucleotide of string
-                type AlteredNucleotide = AlteredNucleotide of string
-                type Position = Position of uint
 
-                type Value<'ClinicalSignificance> =
-                    { Gene: Gene
-                      HGVS: HGVS.Variant
-                      Description: Variant.Description
-                      ClinicalSignificance: 'ClinicalSignificance
-                      Disease: Disease
-                      AllelicFraction: Variant.AllelicFraction
-                      Chromosome: Chromosome
-                      ReferencedNucleotide: ReferencedNucleotide
-                      AlteredNucleotide: AlteredNucleotide }
+        module SomaticBiologicallyRelevant =
+            type Mutation =
+                internal
+                | Gene of Gene | Fusion of Fusion
 
-            type InheritedVariants<'ClinicalSignificance> =
-                { Note: InheritedVariants.Note option
-                  Values: InheritedVariants.Value<'ClinicalSignificance> list }
+                member this.Genes =
+                    match this with
+                    | Gene gene -> [gene]
+                    | Fusion fusion -> fusion.Genes
 
-            module ``Inherited Relevant Variants`` =
-                type ClinicalSignificance =
-                    internal
-                    | ``Likely Pathogenic``
-                    | Pathogenic
-                    | ``Risk Allele``
-                    | ``VUS Favoring Pathogenic``
+            type Type =
+                internal
+                | CNV
+                | SNV
+                | Fusion
 
-            module ``Inherited Variants of Unknown Significance`` =
-                type ClinicalSignificance =
-                    internal | ``Variant of Unknown Significance``
+            type Variant =
+                { Mutation: Mutation
+                  HGVS: HGVS.Variant option
+                  AllelicFraction: Variant.AllelicFraction option
+                  NucleotideAlteration: Variant.NucleotideAlteration option
+                  Type: Type }
 
-            type ``Inherited Relevant Variants`` = InheritedVariants<``Inherited Relevant Variants``.ClinicalSignificance>
-            type ``Inherited Variants of Unknown Significance`` = InheritedVariants<``Inherited Variants of Unknown Significance``.ClinicalSignificance>
+        module SomaticVUS =
+            type Type = internal | SNV
 
+        /// an entry found in `results.SomaticVariantsOfUnknownSignificance`
+        type SomaticVUS =
+            { Gene: Gene
+              Hgvs: HGVS.Variant
+              Type: SomaticVUS.Type
+              Description: Variant.Description
+              NucleotideAlteration: Variant.NucleotideAlteration
+              AllelicFraction: Variant.AllelicFraction
+            }
+
+        module InheritedVariants =
+            type Note = internal Note of string
+            type Disease = internal Disease of Disease
+            type Chromosome = internal Chromosome of uint
+            type ReferencedNucleotide = ReferencedNucleotide of string
+            type AlteredNucleotide = AlteredNucleotide of string
+            type Position = Position of uint
+
+            type Value<'ClinicalSignificance> =
+                { Gene: Gene
+                  HGVS: HGVS.Variant
+                  Description: Variant.Description
+                  ClinicalSignificance: 'ClinicalSignificance
+                  Disease: Disease
+                  AllelicFraction: Variant.AllelicFraction
+                  Chromosome: Chromosome
+                  ReferencedNucleotide: ReferencedNucleotide
+                  AlteredNucleotide: AlteredNucleotide }
+
+        type InheritedVariants<'ClinicalSignificance> =
+            { Note: InheritedVariants.Note option
+              Values: InheritedVariants.Value<'ClinicalSignificance> list }
+
+        module InheritedRelevantVariants =
+            type ClinicalSignificance =
+                internal
+                | ``Likely Pathogenic``
+                | Pathogenic
+                | ``Risk Allele``
+                | ``VUS Favoring Pathogenic``
+
+        module InheritedVUS =
+            type ClinicalSignificance =
+                internal | ``Variant of Unknown Significance``
+
+        type ``Inherited Relevant Variants`` = InheritedVariants<InheritedRelevantVariants.ClinicalSignificance>
+        type ``Inherited Variants of Unknown Significance`` = InheritedVariants<InheritedVUS.ClinicalSignificance>
+
+        /// represents the `results` section of the Tempus report
         type Results =
-            { TumorMutationBurden: Results.TumorMutationBurden option
-              MicrosatelliteInstabilityStatus: Results.MicrosatelliteInstabilityStatus option
-              ``Somatic Potentially Actionable Mutations``: Results.``Somatic Potentially Actionable``.Mutation list
-              ``Somatic Potentially Actionable Copy Number Variants``: Results.``Somatic Potentially Actionable``.CopyNumberVariant list
-              ``Somatic Biologically Relevant Variants``: Results.``Somatic Biologically Relevant``.Variant list
-              ``Somatic Variants of Unknown Significance``: Results.``Somatic Variant of Unknown Significance`` list
+            { TumorMutationBurden: TumorMutationBurden option
+              MicrosatelliteInstabilityStatus: MicrosatelliteInstabilityStatus option
+              ``Somatic Potentially Actionable Mutations``: SomaticPotentiallyActionable.Mutation list
+              ``Somatic Potentially Actionable Copy Number Variants``: SomaticPotentiallyActionable.CopyNumberVariant list
+              ``Somatic Biologically Relevant Variants``: SomaticBiologicallyRelevant.Variant list
+              ``Somatic Variants of Unknown Significance``: SomaticVUS list
               Fusions: Fusion list
-              ``Inherited Relevant Variants``: Results.``Inherited Relevant Variants``
-              ``Inherited Variants of Unknown Significance``: Results.``Inherited Variants of Unknown Significance``
+              ``Inherited Relevant Variants``: ``Inherited Relevant Variants``
+              ``Inherited Variants of Unknown Significance``: ``Inherited Variants of Unknown Significance``
             }
 
         type OverallReport =
@@ -388,30 +377,111 @@ module Tempus =
 
         module Lab =
             open FsToolkit.ErrorHandling
-            open Utilities.StringValidations
-            open Core
-            open Core.Domain.Address
 
-            /// Validate the lab section of the json report
+            open StringValidations
+            open Core
+            open Core.Input
+
+            /// Validate the `lab` section of the json report
             let validate (json: Lab) : Validation<Domain.Lab,string> =
                 validation {
-                    let! labName = json.Name |> validateNotBlank |> Result.map Domain.Lab.Name
-                    and! cliaNumber = json.CliaNumber |> Input.Lab.CliaNo |> Input.Lab.CliaNumber.validate
-                    and! streetAddress = json.StreetAddress |> validateNotBlank |> Result.map StreetAddress
-                    and! city = json.City |> validateNotBlank |> Result.map City
-                    and! state = json.State |> validateNotBlank |> Result.map State
-                    and! zip = json.Zip |> validateNotBlank |> Result.map Zipcode
+                    let! labName = json.Name |> Lab.Name.validate
+                    and! cliaNumber = json.CliaNumber |> Lab.CliaNumber.validate
+                    and! streetAddress = json.StreetAddress |> StreetAddress.validate
+                    and! city = json.City |> validateNotBlank |> Result.map Domain.City
+                    and! state = json.State |> validateNotBlank |> Result.map Domain.State
+                    and! zip = json.Zip |> validateNotBlank |> Result.map Domain.ZipCode
 
-                    return ({ LabName = labName
+                    return ({ Name = labName
                               Address = {
-                                  StreetAddress = streetAddress
+                                  Street = streetAddress
                                   City = city
                                   State = state
-                                  Zipcode = zip
+                                  Zip = zip
                               }
                               CliaNumber = cliaNumber
                             } : Domain.Lab)
                 }
+
+
+        type Patient =
+            { FirstName: string
+              LastName: string
+              TempusId: System.Guid
+              Mrn: string option
+              Sex: string
+              DateOfBirth: System.DateTime
+              Diagnosis: string
+              DiagnosisDate: System.DateTime option }
+
+            /// Deserializer for the 'patient' json object.
+            ///
+            /// The following object attributes can be camel-cased or snake-cased:
+            /// - `emrId` / `emr_id`
+            /// - `dateOfBirth` / `DoB`
+            static member Decoder : Decoder<Patient> =
+                Decode.object (fun get ->
+                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.Optional.dateTime
+                    let mrnDecoder = ["emrId"; "emr_id"] |> List.map (flip Decode.field Decoder.Optional.string) |> Decode.oneOf
+                    let dobDecoder = ["dateOfBirth"; "DoB"] |> List.map (flip Decode.field Decode.datetime) |> Decode.oneOf
+
+                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
+                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
+                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
+                      Mrn           = get.Required.Raw mrnDecoder
+                      Sex           = "sex"       |> flip get.Required.Field Decode.string
+                      DateOfBirth   = get.Required.Raw dobDecoder
+                      Diagnosis     = "diagnosis"   |> flip get.Required.Field Decode.string
+                      DiagnosisDate = diagnosisDate }
+                )
+
+
+        module Patient =
+
+            module Diagnosis =
+                open Utilities.StringValidations.Typed
+
+                module Name =
+                    /// Validate that diagnosis name is not blank
+                    let validate = validateNotBlank Domain.DiagnosisName "Diagnosis name can't be blank"
+
+            module Sex =
+                open Domain.Patient
+
+                /// Validate that sex is either `"(M|m)ale"` or `"(F|f)emale"`
+                let validate (str: string) : Result<Sex, string> =
+                    match str with
+                    | "Male" | "male" -> Ok Male
+                    | "Female" | "female" -> Ok Female
+                    | _ -> Error $"Invalid sex: {str}"
+
+            open FsToolkit.ErrorHandling
+            open Core
+
+            /// Validate a patient input: their name, mrn, and sex
+            let validate (patient: Patient) : Validation<Domain.Patient,string> =
+                validation {
+                    let! firstName = patient.FirstName |> Input.Person.FirstName.validate
+                    and! lastName  = patient.LastName  |> Input.Person.LastName.validate
+                    and! mrn       = patient.Mrn |> Input.Patient.MRN.validateOptional
+                    and! sex       = patient.Sex |> Sex.validate
+                    and! diagnosisName = patient.Diagnosis |> Diagnosis.Name.validate
+
+                    let tempusId  = patient.TempusId |> Domain.Patient.TempusIdentifier
+                    let birthDate = patient.DateOfBirth |> Domain.Patient.BirthDate
+                    let diagnosisDate = patient.DiagnosisDate |> Option.map Domain.DiagnosisDate
+
+                    return ({ MRN = mrn
+                              FirstName = firstName
+                              LastName  = lastName
+                              TempusId  = tempusId
+                              Sex = sex
+                              DateOfBirth   = birthDate
+                              DiagnosisName = diagnosisName
+                              DiagnosisDate = diagnosisDate
+                             } : Domain.Patient)
+                }
+
 
         type Report =
             { ReportId: System.Guid
@@ -430,18 +500,26 @@ module Tempus =
                     } )
 
         module Report =
-            open Utilities.StringValidations
             open FsToolkit.ErrorHandling
             open Domain.Report
 
-            /// Validate that a signing pathologist's name is not blank
+            module Pathologist =
+                open Utilities.StringValidations.Typed
+
+                /// Validate that a signing pathologist's name is not blank
+                let validate = validateNotBlank Pathologist "Report's signing pathologist cannot be blank"
+
+            /// Validate `report` section of the Tempus report
             let validate (report: Report) : Validation<Domain.Report,string> =
                 validation {
-                    let! signingPathologist = report.SigningPathologist |> validateNotBlank |> Result.map SigningPathologist
+                    let! signingPathologist = report.SigningPathologist |> Pathologist.validate
 
-                    return ({ ReportId = Identifier report.ReportId
+                    let reportId    = Identifier report.ReportId
+                    let signoutDate = SignoutDate report.SignoutDate
+
+                    return ({ ReportId = reportId
                               SigningPathologist = signingPathologist
-                              SignoutDate = SignoutDate report.SignoutDate
+                              SignoutDate = signoutDate
                             } : Domain.Report)
                 }
 
@@ -476,7 +554,7 @@ module Tempus =
             open Core.Domain
             open StringValidations
 
-            /// Validate that a json object representing a gene has a gene name, hgnc id, and entrez id
+            /// Validate that a gen's json object representation has a gene name, hgnc id, and entrez id
             let validate (gene: Gene) : Result<Domain.Gene, string> =
                 match (gene.GeneId, gene.HgncId, gene.EntrezId) with
                 | (NotBlank, NotBlank, NotBlank) ->
@@ -503,23 +581,19 @@ module Tempus =
                 )
 
         module Fusion =
-            type Type = Type of string
-            type VariantDescription = VariantDescription of string
-
             module Type =
                 /// Validate that a fusion type is `gene`, for now.
-                let validate (Type fusionType) =
+                let validate fusionType =
                     match fusionType with
                     | "gene" -> Ok Domain.Fusion.GeneFusion
                     | _ -> Error $"Invalid fusion type: {fusionType}"
 
                 /// Validate an optional fusion type if it exists.
-                let validateOptional =
-                    Optional.validateWith validate
+                let validateOptional = Optional.validateWith validate
 
             module VariantDescription =
                 /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
-                let validate (VariantDescription description) =
+                let validate description =
                     match description with
                     | "Chromosomal rearrangement" -> Ok Domain.Fusion.``Chromosomal rearrangement``
                     | "Deletion (exons 2-7)" -> Ok Domain.Fusion.``Deletion (exons 2-7)``
@@ -532,8 +606,8 @@ module Tempus =
                 validation {
                     let! gene5 = fusion.Gene5 |> Gene.validate
                     and! gene3 = fusion.Gene3 |> Gene.validate
-                    and! fusionType = fusion.FusionType |> Option.map Type |> Type.validateOptional
-                    and! variantDescription = fusion.VariantDescription |> VariantDescription |> VariantDescription.validate
+                    and! fusionType = fusion.FusionType |> Type.validateOptional
+                    and! variantDescription = fusion.VariantDescription |> VariantDescription.validate
 
                     return ({ ``5' Gene`` = gene5
                               ``3' Gene`` = gene3
@@ -586,45 +660,51 @@ module Tempus =
                       Name        = "name" |> flip get.Required.Field Decode.string
                       Description = "description" |> flip get.Required.Field Decode.string }
                 )
-        /// Logic for the `order` section of the Tempus report.
+
         module Order =
             module Test =
-                open Utilities.StringValidations
+                open Utilities.StringValidations.Typed
+                open FsToolkit.ErrorHandling
 
-                /// Validate that a test's code, name, and description are not blank
-                let validate (test: Test) : Result<Domain.Order.Test, string> =
-                    match (test.Code, test.Name, test.Description) with
-                    | NotBlank, NotBlank, NotBlank ->
-                        Ok <| { TestCode = Domain.Order.TestCode test.Code
-                                TestName = Domain.Order.TestName test.Name
-                                TestDescription = Domain.Order.TestDescription test.Description }
-                    | _ -> Error $"Either test code, name, or description is blank: {test}"
+                let validateCode = validateNotBlank Domain.Order.TestCode "Order test code can't be blank"
+                let validateName = validateNotBlank Domain.Order.TestName "Order test name can't be blank"
+                let validateDescription = validateNotBlank Domain.Order.TestDescription "Order test description can't be blank"
 
-            type Identifier = Identifier of string
+                /// Validate that a order test's code, name, and description are not blank
+                let validate (test: Test) : Validation<Domain.Order.Test,string> =
+                    validation {
+                        let! testCode = test.Code |> validateCode
+                        and! testName = test.Name |> validateName
+                        and! testDescription = test.Description |> validateDescription
+
+                        return ({
+                            TestName = testName
+                            TestCode = testCode
+                            TestDescription = testDescription
+                        } : Domain.Order.Test)
+                    }
 
             module Identifier =
                 open System.Text.RegularExpressions
 
                 /// Validate that a tempus order id is in the following format where the first character is a 0, 1 or 2, followed by one digit, follwed by four letters: `"(0|1|2)dxxxx"`
                 ///
-                ///    validate (Identifier "20hnyc") = Ok (Domain.Order.Identifier "20hnyc")
-                ///    validate (Identifier "30aaaa") = Error "Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: 30aaaa"
-                let validate (Identifier identifier) : Result<Domain.Order.Identifier, string> =
+                ///    validate "20hnyc" = Ok (Domain.Order.Identifier "20hnyc")
+                ///    validate "30aaaa" = Error "Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: 30aaaa"
+                let validate identifier : Result<Domain.Order.Identifier, string> =
                     if Regex("^(0|1|2){1}\d{1}[a-zA-z]{4}$").Match(identifier).Success then
                         Ok <| Domain.Order.Identifier identifier
                     else
                         Error $"Order id must match format (0|1|2)dxxxx where d is a digit and x is a letter: {identifier}"
-
-            type AccessionId = AccessionId of string
 
             module AccessionId =
                 open System.Text.RegularExpressions
 
                 /// Validate that Tempus order's accession id is the in the following format where d is a digit and x is any alphanumeric character: `"TL-(0|1|2)d-xxxxxx"`
                 ///
-                ///    validate (AccessionId "TL-19-DF60D1") = Ok (Domain.Order.AccessionId "TL-19-DF60D1")
-                //     validate (AccessionId "TL-33-AAAAAA") = Error "Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: TL-33-AAAAAA"
-                let validate (AccessionId accessionId) : Result<Domain.Order.OrderAccessionId, string> =
+                ///    validate "TL-19-DF60D1" = Ok (Domain.Order.AccessionId "TL-19-DF60D1")
+                //     validate "TL-33-AAAAAA" = Error "Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: TL-33-AAAAAA"
+                let validate accessionId : Result<Domain.Order.OrderAccessionId, string> =
                     if Regex("^TL-(0|1|2){1}\d{1}-(\d|[A-Z]|[a-z]){6}$").Match(accessionId).Success then
                         Ok <| Domain.Order.OrderAccessionId accessionId
                     else
@@ -638,8 +718,8 @@ module Tempus =
                 validation {
                     let! institution = order.Institution |> validateNotBlank |> Result.map Domain.Order.Institution
                     and! physician = order.Physician |> validateNotBlank |> Result.map Domain.Order.Physician
-                    and! orderId = order.OrderId |> Identifier |> Identifier.validate
-                    and! accessionId = order.AccessionId |> AccessionId |> AccessionId.validate
+                    and! orderId = order.OrderId |> Identifier.validate
+                    and! accessionId = order.AccessionId |> AccessionId.validate
                     and! orderTest = order.OrderTest |> Test.validate
 
                     return ({ OrderingInstitution = institution
@@ -682,17 +762,11 @@ module Tempus =
                     } )
 
         module Sample =
-            open System
             open Domain.Sample
 
-            type Type = Type of string
-            type CollectionDate = CollectionDate of DateTime
-            type ReceivedDate = ReceivedDate of DateTime
-            type Category = Category of string
-
-            module SampleType =
+            module Type =
                 /// Validate that a sample type is either blood, block, slides, or saliva.
-                let validate (Type sampleType) =
+                let validate sampleType =
                     match sampleType with
                     | "Blood" -> Ok Blood
                     | "FFPE Block" -> Ok ``FFPE Block``
@@ -700,20 +774,31 @@ module Tempus =
                     | "Saliva" -> Ok Saliva
                     | _ -> Error $"Invalid sample type: {sampleType}"
 
-            module SampleDates =
+            module Site =
+                open Utilities.StringValidations.Typed
+
+                let validate = validateNotBlank Site "Sample site cannot be blank"
+
+            type Dates = {
+                CollectionDate: System.DateTime
+                ReceivedDate: System.DateTime
+            }
+
+            module Dates =
                 /// Validate that sample's collection date happens before its received date
-                let validate (CollectionDate collectionDate) (ReceivedDate receivedDate) : Result<Domain.Sample.Dates, string> =
-                    if collectionDate < receivedDate then
-                        Ok ({ CollectionDate = Domain.Sample.CollectionDate collectionDate
-                              ReceivedDate   = Domain.Sample.ReceivedDate receivedDate
+                let validate dates : Result<Domain.Sample.Dates, string> =
+                    if dates.CollectionDate < dates.ReceivedDate then
+                        Ok ({ CollectionDate = CollectionDate dates.CollectionDate
+                              ReceivedDate   = ReceivedDate dates.ReceivedDate
                             })
                     else
-                        Error $"Collection date, {collectionDate}, doesn't happen before received date, {receivedDate}."
+                        Error $"Collection date, {dates.CollectionDate}, doesn't occur before received date, {dates.ReceivedDate}"
 
 
         module TumorSample =
             module Category =
-                let validate (Sample.Category category) =
+                /// Validate that a tumor sample category is 'tumor'
+                let validate category =
                     match category with
                     | "tumor" -> Ok "tumor"
                     | _ -> Error $"Sample category is not tumor: {category}"
@@ -726,39 +811,45 @@ module Tempus =
             let validate (json: Sample) : Validation<Domain.TumorSample, string> =
                 validation {
                     // validate that the sample's listed category is 'tumor'
-                    let! tumorCategory = json.SampleCategory |> Sample.Category |> Category.validate
-                    and! sampleDates   = (json.CollectionDate |> Sample.CollectionDate, json.ReceivedDate |> Sample.ReceivedDate) ||> Sample.SampleDates.validate
-                    and! sampleSite    = json.SampleSite |> validateNotBlank |> Result.map Domain.Sample.Site
-                    and! sampleType    = json.SampleType |> Sample.Type |> Sample.SampleType.validate
+                    let! tumorCategory = json.SampleCategory |> Category.validate
+                    and! sampleDates   = { Sample.Dates.CollectionDate = json.CollectionDate
+                                           Sample.Dates.ReceivedDate   = json.ReceivedDate } |> Sample.Dates.validate
+                    and! sampleSite    = json.SampleSite |> Sample.Site.validate
+                    and! sampleType    = json.SampleType |> Sample.Type.validate
 
-                    return ({ SampleId = Identifier json.SampleId
+                    let sampleId        = Identifier json.SampleId
+                    let blockId         = json.Institution.BlockId |> Option.map BlockId
+                    let tumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
+
+                    return ({ SampleId = sampleId
                               Site = sampleSite
                               Dates = sampleDates
                               Type = sampleType
-                              BlockId = json.Institution.BlockId |> Option.map BlockId
-                              TumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
+                              BlockId = blockId
+                              TumorPercentage = tumorPercentage
                             } : Domain.TumorSample)
                 }
 
         module NormalSample =
             module Category =
-                let validate (Sample.Category category) =
+                /// Validate that a normal sample category is 'normal'
+                let validate category =
                     match category with
                     | "normal" -> Ok "normal"
                     | _ -> Error $"Sample category is not normal: {category}"
 
             open FsToolkit.ErrorHandling
-            open Utilities.StringValidations
             open Domain.Sample
 
             /// Validate a normal sample
             let validate (json: Sample) : Validation<Domain.NormalSample, string> =
                 validation {
                     // validate that the sample's listed category is 'normal'
-                    let! normalCategory = json.SampleCategory |> Sample.Category |> Category.validate
-                    and! sampleDates    = (json.CollectionDate |> Sample.CollectionDate, json.ReceivedDate |> Sample.ReceivedDate) ||> Sample.SampleDates.validate
-                    and! sampleSite     = json.SampleSite |> validateNotBlank |> Result.map Domain.Sample.Site
-                    and! sampleType     = json.SampleType |> Sample.Type |> Sample.SampleType.validate
+                    let! normalCategory = json.SampleCategory |> Category.validate
+                    and! sampleDates    = { Sample.Dates.CollectionDate = json.CollectionDate
+                                            Sample.Dates.ReceivedDate   = json.ReceivedDate } |> Sample.Dates.validate
+                    and! sampleSite     = json.SampleSite |> Sample.Site.validate
+                    and! sampleType     = json.SampleType |> Sample.Type.validate
 
                     return ({ SampleId = Identifier json.SampleId
                               Site = sampleSite
@@ -772,69 +863,6 @@ module Tempus =
             let validateOptional  =
                 Optional.validateWith validate
 
-    module Patient =
-        open System
-
-        module Sex =
-            type Input = Input of string
-
-            /// Validate that sex is either `"(M|m)ale"` or `"(F|f)emale"`
-            let validate (Input input) =
-                match input with
-                | "Male" | "male" -> Ok Male
-                | "Female" | "female" -> Ok Female
-                | _ -> Error $"Invalid sex: {input}"
-
-        type Json =
-            { FirstName: string
-              LastName: string
-              TempusId: Guid
-              MrnJson: string option
-              SexJson: string
-              DateOfBirth: DateTime
-              Diagnosis: string
-              DiagnosisDate: DateTime option }
-
-            /// Deserializer for the 'patient' json object.
-            ///
-            /// The following object attributes can be camel-cased or snake-cased:
-            /// - `emrId` / `emr_id`
-            /// - `dateOfBirth` / `DoB`
-            static member Decoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    let diagnosisDate = "diagnosisDate" |> flip get.Required.Field Decoder.Optional.dateTime
-                    let mrnDecoder = ["emrId"; "emr_id"] |> List.map (flip Decode.field Decoder.Optional.string) |> Decode.oneOf
-                    let dobDecoder = ["dateOfBirth"; "DoB"] |> List.map (flip Decode.field Decode.datetime) |> Decode.oneOf
-
-                    { FirstName     = "firstName" |> flip get.Required.Field Decode.string
-                      LastName      = "lastName"  |> flip get.Required.Field Decode.string
-                      TempusId      = "tempusId"  |> flip get.Required.Field Decode.guid
-                      MrnJson       = get.Required.Raw mrnDecoder
-                      SexJson       = "sex"       |> flip get.Required.Field Decode.string
-                      DateOfBirth   = get.Required.Raw dobDecoder
-                      Diagnosis     = "diagnosis"   |> flip get.Required.Field Decode.string
-                      DiagnosisDate = diagnosisDate }
-                )
-
-        open FsToolkit.ErrorHandling
-
-        /// Validate a patient input: their name, mrn, and sex
-        let validate (json: Json) =
-            validation {
-                let! firstName = json.FirstName |> FirstName.Input |> FirstName.validate
-                and! lastName  = json.LastName  |> LastName.Input |> LastName.validate
-                and! mrn       = json.MrnJson |> Option.map MRN.Input |> MRN.validateOptional
-                and! sex       = json.SexJson |> Sex.Input |> Sex.validate
-
-                return { MRN = mrn
-                         FirstName = firstName
-                         LastName = lastName
-                         TempusId = json.TempusId
-                         Sex = sex
-                         DateOfBirth = json.DateOfBirth |> DateOfBirth
-                         DiagnosisName = json.Diagnosis |> Diagnosis.Name
-                         DiagnosisDate = json.DiagnosisDate |> Option.map DiagnosisDate
-                       }}
 
         /// Represents HGVS reference sequences for proteins and coding DNA
         type HGVS =
@@ -896,180 +924,169 @@ module Tempus =
                     validate json
                     |> Result.map Some
 
-    /// General logic for variants
-    module Variant =
-        module NucleotideAlteration =
-            open Utilities.StringValidations
-
-            type Input = Input of string
-
-            /// Validate that a nucleotide alteration is not blank
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map NucleotideAlteration
-                |> Result.mapError (fun _ -> $"Nucleotide alteration cannot be blank")
-
-            /// Validate a nucleotide alteration, if it exists.
-            let validateOptional  =
-                Optional.validateWith validate
-
-        module AllelicFraction =
-            type Input = Input of string
-
-            let (|ValidFraction|_|) (Input input) =
-                input
-                |> Float.tryParse
-                |> Option.bind (fun num ->
-                    if num >= 0.0 then Some num
-                    else None)
-                |> Option.map AllelicFraction
-
-            /// Validate that an allelic fraction is either not present or is a valid, parseable float.
-            let validate input =
-                match input with
-                | ValidFraction allelicFraction -> Ok allelicFraction
-                | _ -> Error $"Invalid allelic fraction: {input}"
-
-            /// Validate an allelic fraction, if it exists.
-            let validateOptional =
-                Optional.validateWith validate
-
-        module Description =
-            open StringValidations
-            type Input = Input of string
-
-            /// Validate that a variant description is not blank
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map VariantDescription
-                |> Result.mapError (fun _ -> $"Variant description can't be blank: {input}")
-
-    /// Logic for the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
-    module ``Somatic Potentially Actionable Mutation`` =
         module Variant =
+            module NucleotideAlteration =
+                open StringValidations.Typed
+
+                /// Validate that a nucleotide alteration is not blank
+                let validate = validateNotBlank Domain.Variant.NucleotideAlteration "Nucleotide alteration cannot be blank"
+
+                /// Validate a nucleotide alteration, if it exists.
+                let validateOptional = Optional.validateWith validate
+
+            module AllelicFraction =
+                /// Validate that the input for an allelic fraction is a parseable float greater than or equal to 0.0
+                let (|ValidFraction|_|) =
+                    Float.tryParse
+                    >> Option.bind (fun num ->
+                        if num >= 0.0 then Some num
+                        else None)
+                    >> Option.map Domain.Variant.AllelicFraction
+
+                /// Validate that an allelic fraction is a parseable float greater than or equal to 0.
+                ///
+                ///    validate "10.0" = Ok (Domain.Variant.AllelicFraction 10.0)
+                ///    validate "-10.0" = Error "Invalid allelic fraction: -10.0"
+                let validate input =
+                    match input with
+                    | ValidFraction allelicFraction -> Ok allelicFraction
+                    | _ -> Error $"Invalid allelic fraction: {input}"
+
+                /// Validate an allelic fraction, if it exists.
+                let validateOptional = Optional.validateWith validate
+
+            module Description =
+                open StringValidations.Typed
+
+                /// Validate that a variant description is not blank
+                let validate = validateNotBlank Domain.Variant.Description $"Variant description can't be blank"
+
+
+        /// Logic for the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
+        module ``Somatic Potentially Actionable`` =
             /// The json object for the `variants` section in each `somatic potentially actionable mutation`
-            type Json =
-                { HgvsJson: HGVS.Json
+            type Variant =
+                { HgvsJson: HGVS
                   NucleotideAlteration: string option
                   AllelicFraction: string option
                   VariantDescription: string }
 
-                static member Decoder : Decoder<Json> =
+                static member Decoder : Decoder<Variant> =
                     Decode.object (fun get ->
-                        { HgvsJson = get.Required.Raw HGVS.Json.Decoder
+                        { HgvsJson = get.Required.Raw HGVS.Decoder
                           NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decoder.Optional.string
                           AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decoder.Optional.string
                           VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
                         } )
 
-            open FsToolkit.ErrorHandling
+            module Variant =
+                open FsToolkit.ErrorHandling
 
-            /// Validate a somatic, potentially actionable variant's hgvs, nucleotide alteration, allelic fraction, and variant description
-            let validate (json: Json) : Validation<``Somatic Potentially Actionable Variant``,string> =
-                validation {
-                    let! hgvs = json.HgvsJson |> HGVS.validate
-                    and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
-                    and! allelicFraction      = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
-                    and! variantDescription   = json.VariantDescription |> Variant.Description.Input |> Variant.Description.validate
+                /// Validate a somatic, potentially actionable variant's hgvs, nucleotide alteration, allelic fraction, and variant description
+                let validate (json: Variant) : Validation<Domain.Results.SomaticPotentiallyActionable.Variant,string> =
+                    validation {
+                        let! hgvs = json.HgvsJson |> HGVS.validate
+                        and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.validateOptional
+                        and! allelicFraction      = json.AllelicFraction |> Variant.AllelicFraction.validateOptional
+                        and! variantDescription   = json.VariantDescription |> Variant.Description.validate
 
-                    return { HGVS = hgvs
-                             NucleotideAlteration = nucleotideAlteration
-                             AllelicFraction = allelicFraction
-                             VariantDescription = variantDescription
-                           } }
+                        return ({
+                            HGVS = hgvs
+                            NucleotideAlteration = nucleotideAlteration
+                            AllelicFraction = allelicFraction
+                            Description = variantDescription
+                        } : Domain.Results.SomaticPotentiallyActionable.Variant )
+                    }
 
-        module Variants =
-            open FsToolkit.ErrorHandling
+            module Variants =
+                open FsToolkit.ErrorHandling
 
-            /// Validate a list of somatic, potentially actionable variants and return either a list of successfully validated variants or a list of errors
-            let validate (json: Variant.Json list) =
-                json
-                |> Seq.map Variant.validate
-                |> Seq.toList
-                |> Result.combine
-                |> Result.mapError List.flatten
+                /// Validate a list of somatic, potentially actionable variants and return either a list of successfully validated variants or a list of errors
+                let validate =
+                    List.map Variant.validate
+                    >> Result.combine
+                    >> Result.mapError List.flatten
 
-        type Json =
-            { GeneJson: Gene.Json
-              VariantJsons: Variant.Json list }
+            type Mutation =
+                { GeneJson: Gene
+                  VariantJsons: Variant list }
 
-            static member Decoder =
-                Decode.object (fun get ->
-                    { GeneJson = get.Required.Raw Gene.Json.Decoder
-                      VariantJsons = "variants" |> flip get.Required.Field (Decode.list Variant.Json.Decoder)
-                    })
+                static member Decoder =
+                    Decode.object (fun get ->
+                        { GeneJson = get.Required.Raw Gene.Decoder
+                          VariantJsons = "variants" |> flip get.Required.Field (Decode.list Variant.Decoder)
+                        })
 
-        open FsToolkit.ErrorHandling
+            module Mutation =
+                open FsToolkit.ErrorHandling
 
-        /// Validate that somatic, potentially actionable mutation has a valid gene and variants.
-        let validate (json: Json) : Validation<``Somatic Potentially Actionable Mutation``, string> =
-            validation {
-                let! gene = json.GeneJson |> Gene.Json.validate
-                and! variants = json.VariantJsons |> Variants.validate
+                /// Validate that somatic, potentially actionable mutation has a valid gene and variants.
+                let validate (mutation: Mutation) : Validation<Domain.Results.SomaticPotentiallyActionable.Mutation, string> =
+                    validation {
+                        let! gene = mutation.GeneJson |> Gene.validate
+                        and! variants = mutation.VariantJsons |> Variants.validate
 
-                return { Gene = gene
-                         Variants = variants } }
+                        return ({
+                            Gene = gene
+                            Variants = variants
+                        } : Domain.Results.SomaticPotentiallyActionable.Mutation) }
 
-    module ``Somatic Potentially Actionable Mutations`` =
-        open FsToolkit.ErrorHandling
+            module Mutations =
+                open FsToolkit.ErrorHandling
 
-        /// Validate a list of somatic, potentially actionable mutaitons
-        let validate (jsons: ``Somatic Potentially Actionable Mutation``.Json list) =
-            jsons
-            |> Seq.map ``Somatic Potentially Actionable Mutation``.validate
-            |> Seq.toList
-            |> Result.combine
-            |> Result.mapError List.flatten
+                /// Validate a list of somatic, potentially actionable mutations
+                let validate =
+                    List.map Mutation.validate
+                    >> Result.combine
+                    >> Result.mapError List.flatten
 
-    /// logic for `somaticPotentiallyActionableCopyNumberVariants` subsection of the `results` section
-    module ``Somatic Potentially Actionable Copy Number Variant`` =
-        module Description =
-            type Input = Input of string
+            type CopyNumberVariant =
+                { Gene: Gene
+                  VariantDescription: string
+                  VariantType: string }
 
-            /// Validate that a copy number variant description is either 'copy number gain' or 'copy number loss'
-            let validate (Input input) =
-                match input with
-                | "Copy number gain" -> Ok ``Copy number gain``
-                | "Copy number loss" -> Ok ``Copy number loss``
-                | _ -> Error $"Invalid copy number variant description: {input}"
+                static member Decoder : Decoder<CopyNumberVariant> =
+                    Decode.object (fun get ->
+                        { Gene = get.Required.Raw Gene.Decoder
+                          VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
+                          VariantType = "variantType" |> flip get.Required.Field Decode.string
+                        } )
 
-        module Type =
-            type Input = Input of string
+            /// logic for `somaticPotentiallyActionableCopyNumberVariants` subsection of the `results` section
+            module CopyNumberVariant =
+                open Domain.Results.SomaticPotentiallyActionable.CopyNumberVariant
 
-            /// Validate that a copy number variant type is either 'amplification' or 'deletion'
-            let validate (Input input) =
-                match input with
-                | "amplification" -> Ok Amplification
-                | "deletion" -> Ok Deletion
-                | _ -> Error $"Invalid copy number variant type: {input}"
+                module Description =
+                    /// Validate that a copy number variant description is either 'copy number gain' or 'copy number loss'
+                    let validate input =
+                        match input with
+                        | "Copy number gain" -> Ok ``Copy number gain``
+                        | "Copy number loss" -> Ok ``Copy number loss``
+                        | _ -> Error $"Invalid copy number variant description: {input}"
 
-        type Json =
-            { Gene: Gene.Json
-              VariantDescription: string
-              VariantType: string }
+                module Type =
+                    /// Validate that a copy number variant type is either 'amplification' or 'deletion'
+                    let validate input =
+                        match input with
+                        | "amplification" -> Ok Amplification
+                        | "deletion" -> Ok Deletion
+                        | _ -> Error $"Invalid copy number variant type: {input}"
 
-            static member Decoder : Decoder<Json> =
-                Decode.object (fun get ->
-                    { Gene = get.Required.Raw Gene.Json.Decoder
-                      VariantDescription = "variantDescription" |> flip get.Required.Field Decode.string
-                      VariantType = "variantType" |> flip get.Required.Field Decode.string
-                    } )
 
-        open FsToolkit.ErrorHandling
+                open FsToolkit.ErrorHandling
 
-        /// Validate a copy number variant input
-        let validate (json: Json) =
-            validation {
-                let! gene = json.Gene |> Gene.Json.validate
-                and! variantDescription = json.VariantDescription |> Description.Input |> Description.validate
-                and! variantType = json.VariantType |> Type.Input |> Type.validate
+                /// Validate a copy number variant has a valid gene, description, and type
+                let validate (json: CopyNumberVariant) =
+                    validation {
+                        let! gene = json.Gene |> Gene.validate
+                        and! variantDescription = json.VariantDescription |> Description.validate
+                        and! variantType = json.VariantType |> Type.validate
 
-                return { Gene = gene
-                         Description = variantDescription
-                         Type = variantType
-                       } }
+                        return ({
+                            Gene = gene
+                            Description = variantDescription
+                            Type = variantType
+                        } : Domain.Results.SomaticPotentiallyActionable.CopyNumberVariant ) }
 
     module ``Somatic Potentially Actionable Copy Number Variants`` =
         open FsToolkit.ErrorHandling
