@@ -53,10 +53,8 @@ module Tempus =
                   CodingChange: CodingChange
                   ReferenceSequence: ReferenceSequence }
 
-
         type DiagnosisName = internal | DiagnosisName of string
         type DiagnosisDate = internal | DiagnosisDate of System.DateTime
-
 
         module Patient =
             type TempusIdentifier =
@@ -140,12 +138,10 @@ module Tempus =
               Dates: Sample.Dates
               BlockId: Sample.BlockId option }
 
-
         type Gene =
             { Name: Gene.Name
               HgncId: Gene.HgncId
               EntrezId: Gene.EntrezId }
-
 
         module Variant =
             type NucleotideAlteration =
@@ -240,16 +236,15 @@ module Tempus =
                   Type: CopyNumberVariant.Type
                 }
 
-
         module SomaticBiologicallyRelevant =
             type Mutation =
                 internal
-                | Gene of Gene | Fusion of Fusion
+                | RelevantGene of Gene | RelevantFusion of Fusion
 
                 member this.Genes =
                     match this with
-                    | Gene gene -> [gene]
-                    | Fusion fusion -> fusion.Genes
+                    | RelevantGene gene -> [gene]
+                    | RelevantFusion fusion -> fusion.Genes
 
             type Type =
                 internal
@@ -279,7 +274,7 @@ module Tempus =
 
         module InheritedVariants =
             type Note = internal Note of string
-            type Disease = internal Disease of Disease
+            type Disease = internal Disease of string
             type Chromosome = internal Chromosome of uint
             type ReferencedNucleotide = ReferencedNucleotide of string
             type AlteredNucleotide = AlteredNucleotide of string
@@ -294,6 +289,7 @@ module Tempus =
                   AllelicFraction: Variant.AllelicFraction
                   Chromosome: Chromosome
                   ReferencedNucleotide: ReferencedNucleotide
+                  Position: Position
                   AlteredNucleotide: AlteredNucleotide }
 
         type InheritedVariants<'ClinicalSignificance> =
@@ -963,7 +959,7 @@ module Tempus =
 
 
         /// Logic for the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
-        module ``Somatic Potentially Actionable`` =
+        module SomaticPotentiallyActionable =
             /// The json object for the `variants` section in each `somatic potentially actionable mutation`
             type Variant =
                 { HgvsJson: HGVS
@@ -983,7 +979,7 @@ module Tempus =
                 open FsToolkit.ErrorHandling
 
                 /// Validate a somatic, potentially actionable variant's hgvs, nucleotide alteration, allelic fraction, and variant description
-                let validate (json: Variant) : Validation<Domain.Results.SomaticPotentiallyActionable.Variant,string> =
+                let validate (json: Variant) : Validation<Domain.SomaticPotentiallyActionable.Variant,string> =
                     validation {
                         let! hgvs = json.HgvsJson |> HGVS.validate
                         and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.validateOptional
@@ -995,7 +991,7 @@ module Tempus =
                             NucleotideAlteration = nucleotideAlteration
                             AllelicFraction = allelicFraction
                             Description = variantDescription
-                        } : Domain.Results.SomaticPotentiallyActionable.Variant )
+                        } : Domain.SomaticPotentiallyActionable.Variant )
                     }
 
             module Variants =
@@ -1021,7 +1017,7 @@ module Tempus =
                 open FsToolkit.ErrorHandling
 
                 /// Validate that somatic, potentially actionable mutation has a valid gene and variants.
-                let validate (mutation: Mutation) : Validation<Domain.Results.SomaticPotentiallyActionable.Mutation, string> =
+                let validate (mutation: Mutation) : Validation<Domain.SomaticPotentiallyActionable.Mutation, string> =
                     validation {
                         let! gene = mutation.GeneJson |> Gene.validate
                         and! variants = mutation.VariantJsons |> Variants.validate
@@ -1029,7 +1025,7 @@ module Tempus =
                         return ({
                             Gene = gene
                             Variants = variants
-                        } : Domain.Results.SomaticPotentiallyActionable.Mutation) }
+                        } : Domain.SomaticPotentiallyActionable.Mutation) }
 
             module Mutations =
                 open FsToolkit.ErrorHandling
@@ -1054,7 +1050,7 @@ module Tempus =
 
             /// logic for `somaticPotentiallyActionableCopyNumberVariants` subsection of the `results` section
             module CopyNumberVariant =
-                open Domain.Results.SomaticPotentiallyActionable.CopyNumberVariant
+                open Domain.SomaticPotentiallyActionable.CopyNumberVariant
 
                 module Description =
                     /// Validate that a copy number variant description is either 'copy number gain' or 'copy number loss'
@@ -1076,67 +1072,44 @@ module Tempus =
                 open FsToolkit.ErrorHandling
 
                 /// Validate a copy number variant has a valid gene, description, and type
-                let validate (json: CopyNumberVariant) =
+                let validate (cnv: CopyNumberVariant) =
                     validation {
-                        let! gene = json.Gene |> Gene.validate
-                        and! variantDescription = json.VariantDescription |> Description.validate
-                        and! variantType = json.VariantType |> Type.validate
+                        let! gene = cnv.Gene |> Gene.validate
+                        and! variantDescription = cnv.VariantDescription |> Description.validate
+                        and! variantType = cnv.VariantType |> Type.validate
 
                         return ({
                             Gene = gene
                             Description = variantDescription
                             Type = variantType
-                        } : Domain.Results.SomaticPotentiallyActionable.CopyNumberVariant ) }
-
-    module ``Somatic Potentially Actionable Copy Number Variants`` =
-        open FsToolkit.ErrorHandling
-
-        /// Validate a collection of somatic potentially actionable copy number variants
-        let validate (jsons: ``Somatic Potentially Actionable Copy Number Variant``.Json list) =
-            jsons
-            |> Seq.map ``Somatic Potentially Actionable Copy Number Variant``.validate
-            |> Seq.toList
-            |> Result.combine
-            |> Result.mapError List.flatten
+                        } : Domain.SomaticPotentiallyActionable.CopyNumberVariant ) }
 
 
-    module ``Somatic Biologically Relevant Variant`` =
-        module Gene =
-            /// Validate that a gene or a fusion gene is present and valid
-            let validate geneJson fusionGeneJson =
-              match Gene.Json.validate geneJson, Fusion.validate fusionGeneJson with
-              | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
-              | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
-              | (Ok gene, _) -> Ok <| RelevantGene gene
-              | (_, Ok fusion) -> Ok <| RelevantFusion fusion
+            module CopyNumberVariants =
+                open FsToolkit.ErrorHandling
 
-        module Type =
-            type Input = Input of string
-
-            /// Validate that a somatic biologically relevant variant type is either 'CNV', 'SNV', or 'fusion'
-            let validate (Input input) =
-                match input with
-                | "CNV" -> Ok CNV
-                | "SNV" -> Ok RelevantSNV
-                | "fusion" -> Ok Fusion
-                | _ -> Error $"Invalid somatic biologically relevant variant type: {input}"
+                /// Validate a collection of somatic potentially actionable copy number variants
+                let validate =
+                    List.map CopyNumberVariant.validate
+                    >> Result.combine
+                    >> Result.mapError List.flatten
 
         /// Represents a json object found in `results.somaticBiologicallyRelevantVariants`
-        type Json =
-            { GeneJson: Gene.Json
-              FusionJson: Fusion.Json
-              HgvsJson: HGVS.Json
+        type SomaticBiologicallyRelevantVariant =
+            { GeneJson: Gene
+              FusionJson: Fusion
+              HgvsJson: HGVS
               NucleotideAlteration: string option
               AllelicFraction: string option
               VariantType: string
               VariantDescription: string
               StructuralVariant: string option }
 
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<SomaticBiologicallyRelevantVariant> =
                 Decode.object (fun get ->
-                    { GeneJson   = Gene.Json.Decoder   |> get.Required.Raw
-                      FusionJson = Fusion.Json.Decoder |> get.Required.Raw
-                      HgvsJson   = HGVS.Json.Decoder   |> get.Required.Raw
+                    { GeneJson   = Gene.Decoder   |> get.Required.Raw
+                      FusionJson = Fusion.Decoder |> get.Required.Raw
+                      HgvsJson   = HGVS.Decoder   |> get.Required.Raw
                       VariantType          = "variantType"          |> flip get.Required.Field Decode.string
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string
                       StructuralVariant    = "structuralVariant"    |> flip get.Required.Field Decoder.Optional.string
@@ -1144,222 +1117,240 @@ module Tempus =
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decoder.Optional.string
                     } )
 
-        open FsToolkit.ErrorHandling
+        module SomaticBiologicallyRelevantVariant =
+            module Gene =
+                open type Domain.SomaticBiologicallyRelevant.Mutation
 
-        module Json =
-            /// Validate that a somatic, biologically relevant variant has either a gene or a fusion of genese, hgvs, a variant type of cnv, snv, or fusion, and valid nucleotide laterations and allelic fractions.
-            let validate (json: Json) =
+                /// Validate that a gene or a fusion gene is present and valid
+                let validate geneJson fusionGeneJson =
+                  match Gene.validate geneJson, Fusion.validate fusionGeneJson with
+                  | (Ok gene, Ok fusionGene) -> Error $"Both gene and fusion gene json are valid: ({gene}, {fusionGene})"
+                  | (Error geneError, Error fusionError) -> Error $"Both gene and fusion gene are invalid: ({geneError}, {fusionError})"
+                  | (Ok gene, _) -> Ok <| RelevantGene gene
+                  | (_, Ok fusion) -> Ok <| RelevantFusion fusion
+
+            module Type =
+                open type Domain.SomaticBiologicallyRelevant.Type
+
+                /// Validate that a somatic biologically relevant variant type is either 'CNV', 'SNV', or 'fusion'
+                let validate input =
+                    match input with
+                    | "CNV" -> Ok CNV
+                    | "SNV" -> Ok SNV
+                    | "fusion" -> Ok Fusion
+                    | _ -> Error $"Invalid somatic biologically relevant variant type: {input}"
+
+            open FsToolkit.ErrorHandling
+
+            /// Validate that a somatic, biologically relevant variant has either a gene or a fusion of genes, hgvs, a variant type of cnv, snv, or fusion, and a valid nucleotide alteration and allelic fraction.
+            let validate (variant: SomaticBiologicallyRelevantVariant) =
                 validation {
-                    let! fusionOrGene = (json.GeneJson, json.FusionJson) ||> Gene.validate
-                    and! hgvs = json.HgvsJson |> HGVS.validateOptional
-                    and! variantType = json.VariantType |> Type.Input |> Type.validate
-                    and! nucleotideAlteration = json.NucleotideAlteration |> Option.map Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validateOptional
-                    and! allelicFraction = json.AllelicFraction |> Option.map Variant.AllelicFraction.Input |> Variant.AllelicFraction.validateOptional
+                    let! fusionOrGene = (variant.GeneJson, variant.FusionJson) ||> Gene.validate
+                    and! hgvs = variant.HgvsJson |> HGVS.validateOptional
+                    and! variantType = variant.VariantType |> Type.validate
+                    and! nucleotideAlteration = variant.NucleotideAlteration |> Variant.NucleotideAlteration.validateOptional
+                    and! allelicFraction = variant.AllelicFraction |> Variant.AllelicFraction.validateOptional
 
-                    return { Gene = fusionOrGene
-                             HGVS = hgvs
-                             AllelicFraction = allelicFraction
-                             NucleotideAlteration = nucleotideAlteration
-                             Type = variantType
-                    } }
+                    return ({
+                        Mutation = fusionOrGene
+                        HGVS     = hgvs
+                        Type     = variantType
+                        AllelicFraction      = allelicFraction
+                        NucleotideAlteration = nucleotideAlteration
+                    } : Domain.SomaticBiologicallyRelevant.Variant ) }
 
-    module ``Somatic Biologically Relevant Variants`` =
-        /// Validate a list of somatic biologically relevant variant inputs
-        let validate (jsons: ``Somatic Biologically Relevant Variant``.Json list) =
-            jsons
-            |> Seq.map ``Somatic Biologically Relevant Variant``.Json.validate
-            |> Seq.toList
-            |> Result.combine
-            |> Result.mapError List.flatten
+        module SomaticBiologicallyRelevantVariants =
+            /// Validate a list of somatic biologically relevant variant inputs
+            let validate =
+                List.map SomaticBiologicallyRelevantVariant.validate
+                >> Result.combine
+                >> Result.mapError List.flatten
 
-    module ``Somatic Variant of Unknown Significance`` =
-        module Type =
-            type Input = Input of string
-
-            let validate (Input input) =
-                match input with
-                | "SNV" -> Ok SNV
-                | _ -> Error $"Invalid VUS variant type: {input}"
-
-        type Json =
-            { GeneJson: Gene.Json
-              HgvsJson: HGVS.Json
+        type SomaticVUS =
+            { GeneJson: Gene
+              HgvsJson: HGVS
               NucleotideAlteration: string
               AllelicFraction: string
               VariantType: string
               VariantDescription: string }
 
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<SomaticVUS> =
                 Decode.object (fun get ->
-                    { GeneJson = Gene.Json.Decoder |> get.Required.Raw
-                      HgvsJson = HGVS.Json.Decoder |> get.Required.Raw
+                    { GeneJson = Gene.Decoder |> get.Required.Raw
+                      HgvsJson = HGVS.Decoder |> get.Required.Raw
                       NucleotideAlteration = "nucleotideAlteration" |> flip get.Required.Field Decode.string
                       AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
                       VariantType          = "variantType"          |> flip get.Required.Field Decode.string
                       VariantDescription   = "variantDescription"   |> flip get.Required.Field Decode.string }
                 )
 
-        open FsToolkit.ErrorHandling
-        open Utilities.StringValidations
+        module SomaticVUS =
+            module Type =
+                open type Domain.SomaticVUS.Type
 
-        /// Validate that a variant of unknown significance has a valid gene, hgvs, allelic fraction, nucleotide alteration, and variant type and description.
-        let validate (json: Json) : Validation<``Somatic Variant of Unknown Significance``, string> =
-            validation {
-                let! gene = json.GeneJson |> Gene.Json.validate
-                and! hgvs = json.HgvsJson |> HGVS.validate
-                and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.Input |> Variant.AllelicFraction.validate
-                and! variantType = json.VariantType |> Type.Input |> Type.validate
-                and! variantDescription = json.VariantDescription |> validateNotBlank |> Result.map VariantDescription
-                and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.Input |> Variant.NucleotideAlteration.validate
-
-                return { Gene = gene
-                         Hgvs = hgvs
-                         AllelicFraction = allelicFraction
-                         Type = variantType
-                         NucleotideAlteration = nucleotideAlteration
-                         Description = variantDescription
-                       } }
-
-    module ``Somatic Variants of Unknown Significance`` =
-        let validate (jsons: ``Somatic Variant of Unknown Significance``.Json list) =
-            jsons
-            |> Seq.map ``Somatic Variant of Unknown Significance``.validate
-            |> Seq.toList
-            |> Result.combine
-            |> Result.mapError List.flatten
-
-    /// generic logic inherited variant sections: `results.inheritedRelevantVariants`, `results.inheritedVariantsOfUnknownSignficance`
-    module InheritedVariants =
-        open StringValidations.Typed
-
-        module Note =
-            type Input = Input of string
-
-            /// Validate that an inherited variant note is not blank.
-            let validate (Input input) =
-                input |> validateNotBlank Note "Inherited variant note cannot be blank"
-
-            /// Validate that if an inherited variant note exists, it is not blank.
-            let validateOptional =
-                Optional.validateWith validate
-
-        module Value =
-            module ClinicalSignificance =
-                /// placeholder variable for clinical significance inputs
-                type Input = Input of string
-
-            module Disease =
-                type Input = Input of string
-
-                /// Validate that an inherited variant disease is not blank.
-                let validate (Input input) =
-                    input |> validateNotBlank Disease "Inherited variant disease cannot be blank"
-
-            module VariantDescription =
-                type Input = Input of string
-
-                /// Validate that an inherited variant descrption is not blank.
-                let validate (Input input) =
-                    input |> validateNotBlank VariantDescription "Inherited variant description cannot be blank"
-
-            module ReferenceNucleotide =
-                type Input = Input of string
-
-                /// Validate that an inherited variant descrption is not blank.
-                let validate (Input input) =
-                    input |> validateNotBlank ReferencedNucleotide "Reference nucleotide cannot be blank"
-
-            module AlteredNucleotide =
-                type Input = Input of string
-
-                /// Validate that an inherited variant descrption is not blank.
-                let validate (Input input) =
-                    input |> validateNotBlank AlteredNucleotide "Altered nucleotide cannot be blank"
-
-            type Json =
-                { Gene: Gene.Json
-                  Hgvs: HGVS.Json
-                  Description: string
-                  ClinicalSignificance: string
-                  Disease: string
-                  AllelicFraction: string
-                  Chromosome: uint
-                  ReferenceNucleotide: string
-                  AlteredNucleotide: string
-                  Position: uint
-                }
-
-                static member Decoder : Decoder<Json> =
-                    Decode.object (fun get ->
-                      { Gene = get.Required.Raw Gene.Json.Decoder
-                        Hgvs = get.Required.Raw HGVS.Json.Decoder
-                        Description          = "variantDescription"   |> flip get.Required.Field Decode.string
-                        ClinicalSignificance = "clinicalSignificance" |> flip get.Required.Field Decode.string
-                        Disease              = "disease"              |> flip get.Required.Field Decode.string
-                        AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
-                        Chromosome           = "chromosome"           |> flip get.Required.Field Decode.uint32
-                        ReferenceNucleotide  = "ref" |> flip get.Required.Field Decode.string
-                        AlteredNucleotide    = "alt" |> flip get.Required.Field Decode.string
-                        Position             = "pos" |> flip get.Required.Field Decode.uint32
-                      } )
+                let validate input =
+                    match input with
+                    | "SNV" -> Ok SNV
+                    | _ -> Error $"Invalid VUS variant type: {input}"
 
             open FsToolkit.ErrorHandling
 
-            /// a type abbreviation for a function that takes in a clinical significance input and returns either a valid clinical significance or an error message
-            type ClinicalSignificanceValidator<'clinicalSignificance> = (ClinicalSignificance.Input -> Result<'clinicalSignificance, string>)
-
-            /// Validate that an inherited variant value has a valid gene, hgvs, description, clinical significnace, disease, allelic fraction, referenced nucleotide, and altered nucleotide
-            let validate (validateClinicalSignificance: ClinicalSignificanceValidator<'clinicalSignificance>) (json: Json) : Validation<InheritedVariantValue<'clinicalSignificance>, string> =
+            /// Validate that a variant of unknown significance has a valid gene, hgvs, allelic fraction, nucleotide alteration, and variant type and description.
+            let validate (json: SomaticVUS) : Validation<Domain.SomaticVUS, string> =
                 validation {
-                    let! gene = json.Gene |> Gene.Json.validate
-                    and! hgvs = json.Hgvs |> HGVS.validate
-                    and! variantDescription = json.Description |> VariantDescription.Input |> VariantDescription.validate
-                    and! clinicalSignificance = json.ClinicalSignificance |> ClinicalSignificance.Input |> validateClinicalSignificance
-                    and! disease = json.Disease |> Disease.Input |> Disease.validate
-                    and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.Input |> Variant.AllelicFraction.validate
-                    and! referenceNucleotide = json.ReferenceNucleotide |> ReferenceNucleotide.Input |> ReferenceNucleotide.validate
-                    and! alteredNucleotide = json.AlteredNucleotide |> AlteredNucleotide.Input |> AlteredNucleotide.validate
+                    let! gene = json.GeneJson |> Gene.validate
+                    and! hgvs = json.HgvsJson |> HGVS.validate
+                    and! allelicFraction = json.AllelicFraction |> Variant.AllelicFraction.validate
+                    and! variantType = json.VariantType |> Type.validate
+                    and! variantDescription = json.VariantDescription |> Variant.Description.validate
+                    and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.validate
 
-                    return ({ Gene = gene
-                              Hgvs = hgvs
-                              Description = variantDescription
-                              ClinicalSignificance = clinicalSignificance
-                              Disease = disease
-                              AllelicFraction = allelicFraction
-                              ReferencedNucleotide = referenceNucleotide
-                              AlteredNucleotide = alteredNucleotide
-                              Chromosome = Chromosome json.Chromosome
-                              Position = Position json.Position
-                            } )
-                }
+                    return ({
+                        Gene = gene
+                        Hgvs = hgvs
+                        AllelicFraction = allelicFraction
+                        Type = variantType
+                        NucleotideAlteration = nucleotideAlteration
+                        Description = variantDescription
+                    } : Domain.SomaticVUS) }
 
-        module Values =
-            let validate clinicalSignificanceValidator (jsons: Value.Json list) =
-                jsons
-                |> List.map (Value.validate clinicalSignificanceValidator)
-                |> Result.combine
-                |> Result.mapError List.flatten
+        module SomaticVUSes =
+            /// Validate a collection of somatic variants of unknown significance
+            let validate =
+                List.map SomaticVUS.validate
+                >> Result.combine
+                >> Result.mapError List.flatten
 
-        type Json =
-            { NoteJson: string option
-              Values: Value.Json list }
+        type InheritedVariantValue =
+            { Gene: Gene
+              Hgvs: HGVS
+              Description: string
+              ClinicalSignificance: string
+              Disease: string
+              AllelicFraction: string
+              Chromosome: uint
+              ReferenceNucleotide: string
+              AlteredNucleotide: string
+              Position: uint
+            }
 
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<InheritedVariantValue> =
                 Decode.object (fun get ->
-                    { NoteJson  = "note"   |> flip get.Required.Field Decoder.Optional.string
-                      Values = "values" |> flip get.Required.Field (Decode.list Value.Json.Decoder) }
+                  { Gene = get.Required.Raw Gene.Decoder
+                    Hgvs = get.Required.Raw HGVS.Decoder
+                    Description          = "variantDescription"   |> flip get.Required.Field Decode.string
+                    ClinicalSignificance = "clinicalSignificance" |> flip get.Required.Field Decode.string
+                    Disease              = "disease"              |> flip get.Required.Field Decode.string
+                    AllelicFraction      = "allelicFraction"      |> flip get.Required.Field Decode.string
+                    Chromosome           = "chromosome"           |> flip get.Required.Field Decode.uint32
+                    ReferenceNucleotide  = "ref" |> flip get.Required.Field Decode.string
+                    AlteredNucleotide    = "alt" |> flip get.Required.Field Decode.string
+                    Position             = "pos" |> flip get.Required.Field Decode.uint32
+                  } )
+
+        type InheritedVariants =
+            { NoteJson: string option
+              Values: InheritedVariantValue list }
+
+            static member Decoder : Decoder<InheritedVariants> =
+                Decode.object (fun get ->
+                    { NoteJson = "note"   |> flip get.Required.Field Decoder.Optional.string
+                      Values   = "values" |> flip get.Required.Field (Decode.list InheritedVariantValue.Decoder) }
                 )
+        /// generic logic inherited variant sections: `results.inheritedRelevantVariants`, `results.inheritedVariantsOfUnknownSignficance`
+        module InheritedVariants =
+            open StringValidations.Typed
 
-        open FsToolkit.ErrorHandling
+            module Note =
+                open type Domain.InheritedVariants.Note
 
-        /// Validate an inherited relevant variant and any associated inherited relevant variant values
-        let validate (clinicalSignificanceValidator: Value.ClinicalSignificanceValidator<'clinicalSignificance>) (json: Json) : Validation<InheritedVariants<'clinicalSignificance>,string> =
-            validation {
-                let! note = json.NoteJson |> Option.map Note.Input |> Note.validateOptional
-                and! values = json.Values |> Values.validate clinicalSignificanceValidator
+                /// Validate that an inherited variant note is not blank.
+                let validate = validateNotBlank Note "Inherited variant note cannot be blank"
+                /// Validate that if an inherited variant note exists, it is not blank.
+                let validateOptional = Optional.validateWith validate
 
-                return { Note = note
-                         Values = values } }
+
+            module Value =
+                module Disease =
+                    open type Domain.InheritedVariants.Disease
+
+                    /// Validate that an inherited variant disease is not blank.
+                    let validate = validateNotBlank Disease "Inherited variant disease cannot be blank"
+
+                module VariantDescription =
+                    open type Domain.Variant.Description
+
+                    /// Validate that an inherited variant description is not blank.
+                    let validate = validateNotBlank Description "Inherited variant description cannot be blank"
+
+                module ReferenceNucleotide =
+                    open type Domain.InheritedVariants.ReferencedNucleotide
+
+                    /// Validate that an inherited variant referenced nucleotide is not blank.
+                    let validate = validateNotBlank ReferencedNucleotide "Reference nucleotide cannot be blank"
+
+                module AlteredNucleotide =
+                    open type Domain.InheritedVariants.AlteredNucleotide
+
+                    /// Validate that an inherited variant altered nucleotide is not blank.
+                    let validate = validateNotBlank AlteredNucleotide "Altered nucleotide cannot be blank"
+
+
+                open FsToolkit.ErrorHandling
+
+                /// a type abbreviation for a function that takes in a clinical significance input and returns either a valid clinical significance or an error message
+                type ClinicalSignificanceValidator<'clinicalSignificance> = (string -> Result<'clinicalSignificance, string>)
+
+                /// Validate that an inherited variant value has a valid gene, hgvs, description, clinical significnace, disease, allelic fraction, referenced nucleotide, and altered nucleotide
+                let validate (validateClinicalSignificance: ClinicalSignificanceValidator<'clinicalSignificance>) (value: InheritedVariantValue) : Validation<Domain.InheritedVariants.Value<'clinicalSignificance>, string> =
+                    validation {
+                        let! gene = value.Gene |> Gene.validate
+                        and! hgvs = value.Hgvs |> HGVS.validate
+                        and! variantDescription = value.Description |> VariantDescription.validate
+                        and! clinicalSignificance = value.ClinicalSignificance |> validateClinicalSignificance
+                        and! disease = value.Disease |> Disease.validate
+                        and! allelicFraction = value.AllelicFraction |> Variant.AllelicFraction.validate
+                        and! referenceNucleotide = value.ReferenceNucleotide |> ReferenceNucleotide.validate
+                        and! alteredNucleotide = value.AlteredNucleotide |> AlteredNucleotide.validate
+
+                        let chromosome = value.Chromosome |> Domain.InheritedVariants.Chromosome
+                        let position = value.Position |> Domain.InheritedVariants.Position
+
+                        return ({
+                            Gene = gene
+                            HGVS = hgvs
+                            Description = variantDescription
+                            ClinicalSignificance = clinicalSignificance
+                            Disease = disease
+                            AllelicFraction = allelicFraction
+                            ReferencedNucleotide = referenceNucleotide
+                            AlteredNucleotide = alteredNucleotide
+                            Chromosome = chromosome
+                            Position = position
+                        } : Domain.InheritedVariants.Value<'clinicalSignificance> )
+                    }
+
+            module Values =
+                /// Validate a collection of inherited variant values
+                let validate clinicalSignificanceValidator =
+                    List.map (Value.validate clinicalSignificanceValidator)
+                    >> Result.combine
+                    >> Result.mapError List.flatten
+
+
+
+            open FsToolkit.ErrorHandling
+
+            /// Validate an inherited relevant variant and any associated inherited relevant variant values
+            let validate (clinicalSignificanceValidator: Value.ClinicalSignificanceValidator<'clinicalSignificance>) (variants: InheritedVariants) : Validation<Domain.InheritedVariants<'clinicalSignificance>,string> =
+                validation {
+                    let! note = variants.NoteJson |>Note.validateOptional
+                    and! values = variants.Values |> Values.validate clinicalSignificanceValidator
+
+                    return ({
+                        Note = note
+                        Values = values
+                    } : Domain.InheritedVariants<'clinicalSignificance>) }
 
     /// logic `results.inheritedRelevantVariants` section
     module ``Inherited Relevant Variants`` =
