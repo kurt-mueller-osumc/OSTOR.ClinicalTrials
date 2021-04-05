@@ -413,6 +413,7 @@ module Tempus =
 
     module Json =
         open Thoth.Json.Net
+        open FsToolkit.ErrorHandling
         open Utilities
 
         type Lab =
@@ -449,8 +450,6 @@ module Tempus =
                 Decode.oneOf [ Lab.CamelCaseDecoder; Lab.PascalCaseDecoder ]
 
         module Lab =
-            open FsToolkit.ErrorHandling
-
             open StringValidations
             open Core
             open Core.Input
@@ -475,7 +474,6 @@ module Tempus =
                               CliaNumber = cliaNumber
                             } : Domain.Lab)
                 }
-
 
         type Patient =
             { FirstName: string
@@ -510,7 +508,6 @@ module Tempus =
 
 
         module Patient =
-
             module Diagnosis =
                 open Utilities.StringValidations.Typed
 
@@ -528,7 +525,6 @@ module Tempus =
                     | "Female" | "female" -> Ok Female
                     | _ -> Error $"Invalid sex: {str}"
 
-            open FsToolkit.ErrorHandling
             open Core
 
             /// Validate a patient input: their name, mrn, and sex
@@ -555,7 +551,6 @@ module Tempus =
                              } : Domain.Patient)
                 }
 
-
         type Report =
             { ReportId: System.Guid
               SigningPathologist: string
@@ -573,7 +568,6 @@ module Tempus =
                     } )
 
         module Report =
-            open FsToolkit.ErrorHandling
             open Domain.Report
 
             module Pathologist =
@@ -672,8 +666,6 @@ module Tempus =
                     | "Deletion (exons 2-7)" -> Ok Domain.Fusion.``Deletion (exons 2-7)``
                     | _ -> Error $"Invalid fusion variant description: {description}"
 
-            open FsToolkit.ErrorHandling
-
             /// Validate that a fusion has 2 valid genes and a valid fusion type, if present.
             let validate (fusion: Fusion) : Validation<Domain.Fusion, string> =
                 validation {
@@ -737,7 +729,6 @@ module Tempus =
         module Order =
             module Test =
                 open Utilities.StringValidations.Typed
-                open FsToolkit.ErrorHandling
 
                 let validateCode = validateNotBlank Domain.Order.TestCode "Order test code can't be blank"
                 let validateName = validateNotBlank Domain.Order.TestName "Order test name can't be blank"
@@ -794,8 +785,6 @@ module Tempus =
                 open type Domain.Order.Physician
 
                 let validate = validateNotBlank Physician "Order physician cannot be blank"
-
-            open FsToolkit.ErrorHandling
 
             /// Validate the `order` section of the json report
             let validate (order: Order) : Validation<Domain.Order, string> =
@@ -887,7 +876,6 @@ module Tempus =
                     | "tumor" -> Ok "tumor"
                     | _ -> Error $"Sample category is not tumor: {category}"
 
-            open FsToolkit.ErrorHandling
             open Utilities.StringValidations
             open Domain.Sample
 
@@ -922,7 +910,7 @@ module Tempus =
                     | "normal" -> Ok "normal"
                     | _ -> Error $"Sample category is not normal: {category}"
 
-            open FsToolkit.ErrorHandling
+            
             open Domain.Sample
 
             /// Validate a normal sample
@@ -1064,8 +1052,6 @@ module Tempus =
                         } )
 
             module Variant =
-                open FsToolkit.ErrorHandling
-
                 /// Validate a somatic, potentially actionable variant's hgvs, nucleotide alteration, allelic fraction, and variant description
                 let validate (json: Variant) : Validation<Domain.SomaticPotentiallyActionable.Variant,string> =
                     validation {
@@ -1083,8 +1069,6 @@ module Tempus =
                     }
 
             module Variants =
-                open FsToolkit.ErrorHandling
-
                 /// Validate a list of somatic, potentially actionable variants and return either a list of successfully validated variants or a list of errors
                 let validate =
                     List.map Variant.validate
@@ -1102,8 +1086,6 @@ module Tempus =
                         })
 
             module Mutation =
-                open FsToolkit.ErrorHandling
-
                 /// Validate that somatic, potentially actionable mutation has a valid gene and variants.
                 let validate (mutation: Mutation) : Validation<Domain.SomaticPotentiallyActionable.Mutation, string> =
                     validation {
@@ -1116,8 +1098,6 @@ module Tempus =
                         } : Domain.SomaticPotentiallyActionable.Mutation) }
 
             module Mutations =
-                open FsToolkit.ErrorHandling
-
                 /// Validate a list of somatic, potentially actionable mutations
                 let validate =
                     List.map Mutation.validate
@@ -1156,9 +1136,6 @@ module Tempus =
                         | "deletion" -> Ok Deletion
                         | _ -> Error $"Invalid copy number variant type: {input}"
 
-
-                open FsToolkit.ErrorHandling
-
                 /// Validate a copy number variant has a valid gene, description, and type
                 let validate (cnv: CopyNumberVariant) =
                     validation {
@@ -1174,8 +1151,6 @@ module Tempus =
 
 
             module CopyNumberVariants =
-                open FsToolkit.ErrorHandling
-
                 /// Validate a collection of somatic potentially actionable copy number variants
                 let validate =
                     List.map CopyNumberVariant.validate
@@ -1228,8 +1203,6 @@ module Tempus =
                     | "fusion" -> Ok Fusion
                     | _ -> Error $"Invalid somatic biologically relevant variant type: {input}"
 
-            open FsToolkit.ErrorHandling
-
             /// Validate that a somatic, biologically relevant variant has either a gene or a fusion of genes, hgvs, a variant type of cnv, snv, or fusion, and a valid nucleotide alteration and allelic fraction.
             let validate (variant: SomaticBiologicallyRelevantVariant) =
                 validation {
@@ -1280,8 +1253,6 @@ module Tempus =
                     match input with
                     | "SNV" -> Ok SNV
                     | _ -> Error $"Invalid VUS variant type: {input}"
-
-            open FsToolkit.ErrorHandling
 
             /// Validate that a variant of unknown significance has a valid gene, hgvs, allelic fraction, nucleotide alteration, and variant type and description.
             let validate (json: SomaticVUS) : Validation<Domain.SomaticVUS, string> =
@@ -1357,7 +1328,6 @@ module Tempus =
                 /// Validate that if an inherited variant note exists, it is not blank.
                 let validateOptional = Optional.validateWith validate
 
-
             module Value =
                 module Disease =
                     open type Domain.InheritedVariants.Disease
@@ -1382,9 +1352,6 @@ module Tempus =
 
                     /// Validate that an inherited variant altered nucleotide is not blank.
                     let validate = validateNotBlank AlteredNucleotide "Altered nucleotide cannot be blank"
-
-
-                open FsToolkit.ErrorHandling
 
                 /// a type abbreviation for a function that takes in a clinical significance input and returns either a valid clinical significance or an error message
                 type ClinicalSignificanceValidator<'clinicalSignificance> = (string -> Result<'clinicalSignificance, string>)
@@ -1425,10 +1392,6 @@ module Tempus =
                     >> Result.combine
                     >> Result.mapError List.flatten
 
-
-
-            open FsToolkit.ErrorHandling
-
             /// Validate an inherited relevant variant and any associated inherited relevant variant values
             let validate (clinicalSignificanceValidator: Value.ClinicalSignificanceValidator<'clinicalSignificance>) (variants: InheritedVariants) : Validation<Domain.InheritedVariants<'clinicalSignificance>,string> =
                 validation {
@@ -1454,8 +1417,6 @@ module Tempus =
                     | "VUS Favoring Pathogenic" -> Ok ``VUS Favoring Pathogenic``
                     | _ -> Error $"Invalid inherited relevant variant clinical significance: {input}"
 
-            open FsToolkit.ErrorHandling
-
             /// Validate an inherited relevant variant and any associated inherited relevant variant values
             let validate (variant: InheritedVariants) : Validation<Domain.InheritedRelevantVariants,string> =
                 variant |> InheritedVariants.validate ClinicalSignificance.validate
@@ -1470,8 +1431,6 @@ module Tempus =
                     match input with
                     | "Variant of Unknown Significance" -> Ok ``Variant of Unknown Significance``
                     | _ -> Error $"Invalid VUS clinical significance: {input}"
-
-            open FsToolkit.ErrorHandling
 
             /// Validate inherited variants of unknown significance
             let validate (jsons: InheritedVariants) : Validation<Domain.InheritedVUS,string> =
@@ -1545,9 +1504,6 @@ module Tempus =
 
         /// The `results` section in the Tempus report
         module Results =
-
-            open FsToolkit.ErrorHandling
-
             /// Validate the `results` section of the json report
             let validate (results: Results) =
                 validation {
@@ -1608,8 +1564,6 @@ module Tempus =
         let deserializeWithError fileName =
             deserialize
             >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
-
-        open FsToolkit.ErrorHandling
 
         /// Validate an overall report
         let validate (overallReport: OverallReport) =
