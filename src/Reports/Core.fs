@@ -1,7 +1,7 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Core =
-    module Domain =
+    module Types =
         module Person =
             type LastName =
                 internal | LastName of string
@@ -19,14 +19,42 @@ module Core =
                 internal | DateOfBirth of System.DateTime
                 member this.Value = this |> fun (DateOfBirth dob) -> dob
 
+        type City =
+            internal | City of string
+            member this.Value = this |> fun (City city) -> city
+
+        type State =
+            internal | State of string
+            member this.Value = this |> fun (State state) -> state
+
+        module Address =
+            type StreetAddress =
+                internal | StreetAddress of string
+                member this.Value = this |> fun (StreetAddress streetAddress) -> streetAddress
+
+            type ZipCode =
+                internal | ZipCode of string
+                member this.Value = this |> fun (ZipCode zipcode) -> zipcode
+
+        type Address =
+            { Street: Address.StreetAddress
+              City: City
+              State: State
+              Zip: Address.ZipCode }
+
         module Lab =
             type CliaNumber =
                 internal | CliaNumber of string
                 member this.Value = this |> fun (CliaNumber cliaNumber) -> cliaNumber
 
-            type Name =
-                internal | Name of string
-                member this.Value = this |> fun (Name name) -> name
+            type LabName =
+                internal | LabName of string
+                member this.Value = this |> fun (LabName name) -> name
+
+        type Lab =
+            { CliaNumber: Lab.CliaNumber
+              Name: Lab.LabName
+              Address: Address }
 
 
         module Patient =
@@ -39,28 +67,6 @@ module Core =
                 internal | DateOfBirth of System.DateTime
                 member this.Value = this |> fun (DateOfBirth dateOfBirth) -> dateOfBirth
 
-        module Address =
-            type StreetAddress =
-                internal | StreetAddress of string
-                member this.Value = this |> fun (StreetAddress streetAddress) -> streetAddress
-
-            type City =
-                internal | City of string
-                member this.Value = this |> fun (City city) -> city
-
-            type State =
-                internal | State of string
-                member this.Value = this |> fun (State state) -> state
-
-            type Zipcode =
-                internal | Zipcode of string
-                member this.Value = this |> fun (Zipcode zipcode) -> zipcode
-
-        type Address =
-            { StreetAddress: Address.StreetAddress
-              City: Address.City
-              State: Address.State
-              Zipcode: Address.Zipcode }
 
         type NationalProviderId =
             internal | NationalProviderId of int64
@@ -94,122 +100,118 @@ module Core =
                 member this.Value = this |> fun (NucleotideAlteration na) -> na
 
 
-    module Input =
-        module Person =
-            type LastName = LastName of string
+    module Person =
+        open Utilities.StringValidations.Typed
+        open Types.Person
 
-            module LastName =
-                open Utilities.StringValidations
+        module FirstName =
+            type Input = Input of string
 
-                /// Validate that last name is not blank
-                let validate (LastName lastName) =
-                    lastName
-                    |> validateNotBlank
-                    |> Result.map Domain.Person.LastName
-                    |> Result.mapError (fun e -> $"Last name can't be blank")
+            /// Validate that a person's first name is not blank
+            let validate (Input firstName) : Result<FirstName, string> =
+                firstName |> validateNotBlank FirstName "First name can't be blank"
 
-            type FirstName = FirstName of string
+        module LastName =
+            type Input = Input of string
 
-            module FirstName =
-                open Utilities.StringValidations
+            /// Validate that a person's last name is not blank
+            let validate (Input input) : Result<LastName, string>=
+                input |> validateNotBlank LastName "Last name can't be blank"
 
-                /// Validate that a first name is not blank
-                let validate (FirstName firstName) =
-                    firstName
-                    |> validateNotBlank
-                    |> Result.map Domain.Person.FirstName
-                    |> Result.mapError (fun e -> $"First name can't be blank")
+        module FullName =
+            type Input = {
+                FirstName: FirstName.Input
+                LastName: LastName.Input
+            }
 
-            type FullName =
-                { LastName: LastName
-                  FirstName: FirstName }
+            open FsToolkit.ErrorHandling
 
-            module FullName =
-                open FsToolkit.ErrorHandling
+            /// Validate that a person's first and last name is present
+            let validate (input: Input) : Validation<FullName, string> =
+                validation {
+                    let! lastName  = input.LastName  |> LastName.validate
+                    and! firstName = input.FirstName |> FirstName.validate
 
-                /// Validate that a person's first and last name is present
-                let validate fullName : Validation<Domain.Person.FullName, string> =
-                    validation {
-                        let! lastName  = fullName.LastName |> LastName.validate
-                        and! firstName = fullName.FirstName |> FirstName.validate
+                    return ({
+                        LastName = lastName
+                        FirstName = firstName
+                    } : FullName)
+                }
 
-                        return ({ LastName = lastName
-                                  FirstName = firstName } : Domain.Person.FullName)
-                    }
-
-
-        module Patient =
-            type MRN = MRN of string
-
-            module MRN =
-                open Utilities
-
-                /// Validate that a medical record # consists of at least one digit
-                let validate (MRN mrn) : Result<Domain.Patient.MRN, string> =
-                    match Integer64.tryParse mrn with
-                    | Some mrn -> Ok (Domain.Patient.MRN mrn)
-                    | _ -> Error $"Invalid MRN: {mrn}"
-
-                /// Validate an MRN if it is present.
-                let validateOptional (optionalMrn: MRN option) : Result<Domain.Patient.MRN option, string> =
-                    optionalMrn |> Optional.validateWith validate
-
-
-        type NationalProviderId = NationalProviderId of string
-
-        module NationalProviderId =
+    module Patient =
+        module MRN =
             open Utilities
+            open Types.Patient
 
-            /// Validate that an inputed national provider id is a 10 digit number.
-            let validate (NationalProviderId npi) : Result<Domain.NationalProviderId,string> =
-                match (String.length npi, Integer64.tryParse npi) with
-                | 10, Some npi -> Ok (Domain.NationalProviderId npi)
-                | _, Some npi -> Error $"NPI must be a 10 digit number: {npi}"
-                | _ -> Error $"NPI is invalid: {npi}"
+            type Input = Input of string
 
-        module Lab =
-            type CliaNo = CliaNo of string
+            /// Validate that a medical record # consists of at least one digit
+            let validate (Input input) : Result<MRN, string> =
+                match Integer64.tryParse input with
+                | Some mrn -> Ok (MRN mrn)
+                | _ -> Error $"Invalid MRN: {input}"
 
-            module CliaNumber =
-                open System.Text.RegularExpressions
+            /// Validate an MRN if it is present.
+            let validateOptional (optionalInput: Input option) : Result<MRN option, string> =
+                optionalInput |> Optional.validateWith validate
 
-                /// Validate that a CLIA # is 10 alphanumerica numbers.
-                ///
-                ///    validate (CliaNo "22D2027531") |> Ok (Domain.Lab.CliaNumber "22D2027531")
-                ///    validate (CliaNo "12345-7890") |> Error ("Invalid CLIA #: 12345-7890")
-                let validate (CliaNo cliaNumber) : Result<Domain.Lab.CliaNumber, string> =
-                    match Regex("^(\d|[a-zA-Z]){10}$").Match(cliaNumber).Success with
-                    | true -> Ok <| Domain.Lab.CliaNumber cliaNumber
-                    | _ -> Error $"Invalid CLIA #: {cliaNumber}. CLIA #s consist of 10 alphanumeric characters."
+    module NationalProviderId =
+        open Utilities
+        open Types
 
-    type IcdCode = IcdCode of string
+        type Input = Input of string
+
+        /// Validate that an national provider id is a 10 digit integer
+        let validate (Input input) : Result<NationalProviderId,string> =
+            match (String.length input, Integer64.tryParse input) with
+            | 10, Some npi -> Ok (NationalProviderId npi)
+            | _, Some npi -> Error $"NPI must be a 10 digit number: {npi}"
+            | _ -> Error $"NPI is invalid: {input}"
+
+    module Lab =
+        module CliaNumber =
+            open Types.Lab
+            open System.Text.RegularExpressions
+
+            type Input = Input of string
+
+            /// Validate that a CLIA # is 10 alphanumeric characters.
+            ///
+            ///    validate (Input "22D2027531") |> Ok (CliaNumber "22D2027531")
+            ///    validate (Input "12345-7890") |> Error ("Invalid CLIA #: 12345-7890")
+            let validate (Input input) : Result<CliaNumber, string> =
+                match Regex("^(\d|[a-zA-Z]){10}$").Match(input).Success with
+                | true -> Ok <| CliaNumber input
+                | _ -> Error $"Invalid CLIA #: {input}. CLIA #s consist of 10 alphanumeric characters."
 
     module IcdCode =
         open System.Text.RegularExpressions
+        open Types
+
+        type Input = Input of string
 
         /// Validate that an icd code is in the following format where 'A' is any letter and 'd' is a digit: `Add.d` or `Add.dd`
         ///
         ///     validate (Input "C34.31") = Ok (IcdCode "C34.31")
         ///     validate (Input "C11.1") = Ok (IcdCode "C11.1")
         ///     validate (Input "foobar") = Error "Icd Code is invalid: foobar"
-        let validate (IcdCode icdCode) : Result<Domain.IcdCode, string> =
-            if Regex("^[A-Z]\d{2}\.\d{1,2}$").Match(icdCode).Success then
-                Ok (Domain.IcdCode icdCode)
+        let validate (Input input) : Result<IcdCode, string> =
+            if Regex("^[A-Z]\d{2}\.\d{1,2}$").Match(input).Success then
+                Ok <| IcdCode input
             else
-                Error $"Icd Code is invalid: {icdCode}"
+                Error $"Icd Code is invalid: {input}"
 
     module Gene =
-        type Name = Name of string
         module Name =
-            open Utilities.StringValidations
+            open Utilities.StringValidations.Typed
+            open Types.Gene
 
-            let (|ValidGeneName|_|) (Name name) =
-                if name <> "" then Some (Name name)
+            type Input = Input of string
+
+            let (|ValidGeneName|_|) (Input input) =
+                if input <> "" then Some (Name input)
                 else None
 
             /// Validate that a gene name is not blank
-            let validate (Name name) : Result<Domain.Gene.Name, string> =
-                name
-                |> validateNotBlank
-                |> Result.map Domain.Gene.Name
-                |> Result.mapError (fun _ -> $"Gene name can't be blank")
+            let validate (Input input) : Result<Name, string> =
+                input |> validateNotBlank Name "Gene name can't be blank"
