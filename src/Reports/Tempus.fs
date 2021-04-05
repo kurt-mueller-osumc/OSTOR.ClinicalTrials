@@ -308,8 +308,8 @@ module Tempus =
             type ClinicalSignificance =
                 internal | ``Variant of Unknown Significance``
 
-        type ``Inherited Relevant Variants`` = InheritedVariants<InheritedRelevantVariants.ClinicalSignificance>
-        type ``Inherited Variants of Unknown Significance`` = InheritedVariants<InheritedVUS.ClinicalSignificance>
+        type InheritedRelevantVariants = InheritedVariants<InheritedRelevantVariants.ClinicalSignificance>
+        type InheritedVUS = InheritedVariants<InheritedVUS.ClinicalSignificance>
 
         /// represents the `results` section of the Tempus report
         type Results =
@@ -320,8 +320,8 @@ module Tempus =
               ``Somatic Biologically Relevant Variants``: SomaticBiologicallyRelevant.Variant list
               ``Somatic Variants of Unknown Significance``: SomaticVUS list
               Fusions: Fusion list
-              ``Inherited Relevant Variants``: ``Inherited Relevant Variants``
-              ``Inherited Variants of Unknown Significance``: ``Inherited Variants of Unknown Significance``
+              ``Inherited Relevant Variants``: InheritedRelevantVariants
+              ``Inherited Variants of Unknown Significance``: InheritedVUS
             }
 
         type OverallReport =
@@ -1352,48 +1352,42 @@ module Tempus =
                         Values = values
                     } : Domain.InheritedVariants<'clinicalSignificance>) }
 
-    /// logic `results.inheritedRelevantVariants` section
-    module ``Inherited Relevant Variants`` =
-        module ClinicalSignificance =
-            open InheritedVariants.Value.ClinicalSignificance
+        /// logic `results.inheritedRelevantVariants` section
+        module InheritedRelevantVariants =
+            module ClinicalSignificance =
+                open type Domain.InheritedRelevantVariants.ClinicalSignificance
 
-            /// Validate that an inherited relevant variant's clinical signficance is either "Likely Pathogenic", "Pathogenic", "Risk Allele", or "VUS Favoring Pathogenic"
-            let validate (Input input) =
-                match input with
-                | "Likely Pathogenic" -> Ok ``Likely Pathogenic``
-                | "Pathogenic" -> Ok Pathogenic
-                | "Risk Allele" -> Ok ``Risk Allele``
-                | "VUS Favoring Pathogenic" -> Ok ``VUS Favoring Pathogenic``
-                | _ -> Error $"Invalid inherited relevant variant clinical significance: {input}"
+                /// Validate that an inherited relevant variant's clinical signficance is either "Likely Pathogenic", "Pathogenic", "Risk Allele", or "VUS Favoring Pathogenic"
+                let validate input =
+                    match input with
+                    | "Likely Pathogenic" -> Ok ``Likely Pathogenic``
+                    | "Pathogenic" -> Ok Pathogenic
+                    | "Risk Allele" -> Ok ``Risk Allele``
+                    | "VUS Favoring Pathogenic" -> Ok ``VUS Favoring Pathogenic``
+                    | _ -> Error $"Invalid inherited relevant variant clinical significance: {input}"
 
-        open FsToolkit.ErrorHandling
-
-        /// Validate an inherited relevant variant and any associated inherited relevant variant values
-        let validate (jsons: InheritedVariants.Json) : Validation<``Inherited Relevant Variants``,string> =
-            jsons |> InheritedVariants.validate ClinicalSignificance.validate
-
-    /// logic for `results.InheritedVariantsOfUnknownSignficance` section
-    module ``Inherited Variants Of Unknown Significance`` =
-        module ClinicalSignificance =
-            open InheritedVariants.Value.ClinicalSignificance
-
-            /// Validate that a VUS clinical signficance is "Variant of Unknown Significance"
-            let validate (Input input) =
-                match input with
-                | "Variant of Unknown Significance" -> Ok ``Variant of Unknown Significance``
-                | _ -> Error $"Invalid VUS clinical significance: {input}"
-
-        module Value =
             open FsToolkit.ErrorHandling
 
-            let validate (json: InheritedVariants.Value.Json) : Validation<``Inherited Variant of Unknown Significance Value``, string> =
-                InheritedVariants.Value.validate ClinicalSignificance.validate json
+            /// Validate an inherited relevant variant and any associated inherited relevant variant values
+            let validate (variant: InheritedVariants) : Validation<Domain.InheritedRelevantVariants,string> =
+                variant |> InheritedVariants.validate ClinicalSignificance.validate
 
-        open FsToolkit.ErrorHandling
+        /// logic for `results.InheritedVariantsOfUnknownSignficance` section
+        module InheritedVUS =
+            module ClinicalSignificance =
+                open type Domain.InheritedVUS.ClinicalSignificance
 
-        /// Validate inheerited variants of unknown significance
-        let validate (jsons: InheritedVariants.Json) : Validation<``Inherited Variants of Unknown Significance``,string> =
-            jsons |> InheritedVariants.validate ClinicalSignificance.validate
+                /// Validate that a VUS clinical signficance is "Variant of Unknown Significance"
+                let validate input =
+                    match input with
+                    | "Variant of Unknown Significance" -> Ok ``Variant of Unknown Significance``
+                    | _ -> Error $"Invalid VUS clinical significance: {input}"
+
+            open FsToolkit.ErrorHandling
+
+            /// Validate inherited variants of unknown significance
+            let validate (jsons: InheritedVariants) : Validation<Domain.InheritedVUS,string> =
+                jsons |> InheritedVariants.validate ClinicalSignificance.validate
 
 
     /// The `results` section in the Tempus report
