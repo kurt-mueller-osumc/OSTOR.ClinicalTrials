@@ -93,7 +93,7 @@ module Tempus =
               TempusId: Patient.TempusIdentifier
               FirstName: Person.FirstName
               LastName: Person.LastName
-              DateOfBirth: Patient.BirthDate
+              DateOfBirth: Person.DateOfBirth
               Sex: Patient.Sex
               DiagnosisName: DiagnosisName
               DiagnosisDate: DiagnosisDate option }
@@ -537,7 +537,7 @@ module Tempus =
                     and! diagnosisName = patient.Diagnosis |> Diagnosis.Name.validate
 
                     let tempusId  = patient.TempusId |> Domain.Patient.TempusIdentifier
-                    let birthDate = patient.DateOfBirth |> Domain.Patient.BirthDate
+                    let birthDate = patient.DateOfBirth |> Domain.Person.DateOfBirth
                     let diagnosisDate = patient.DiagnosisDate |> Option.map Domain.DiagnosisDate
 
                     return ({ MRN = mrn
