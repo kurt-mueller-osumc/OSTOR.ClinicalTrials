@@ -1,545 +1,590 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module FoundationMedicine =
-    /// The sample for each FMI report.
-    /// FMI only reports tumor samples.
-    type Sample =
-        { SampleId: SampleId
-          ReceivedDate: ReceivedDate
-          BlockId: BlockId
-          SampleFormat: SampleFormat }
-    and SampleId = internal | SampleId of string
-    and ReceivedDate = internal | ReceivedDate of System.DateTime
-    and BlockId = internal | BlockId of string
-    and SampleFormat = internal | SlideDeck | Block | TubeSet
+    module Domain =
+        open Core.Domain
 
-    /// Patient medical information
-    type PMI =
-        { MRN: MRN option
-          LastName: LastName
-          FirstName: FirstName
-          SubmittedDiagnosis: Diagnosis.Name
-          Gender: Gender
-          DateOfBirth: DateOfBirth
-          SpecimenSite: SpecimenSite
-          CollectionDate: CollectionDate
-          OrderingMd: OrderingMd
-          Pathologist: Pathologist }
-    and Gender = internal Male | Female
-    and DateOfBirth = internal DateOfBirth of System.DateTime
-    and SpecimenSite = internal SpecimenSite of string
-    and CollectionDate = internal CollectionDate of System.DateTime
-    and OrderingMd =
-        { MdName: OrderingMdName
-          MdId: OrderingMdId }
-    and OrderingMdName = internal OrderingMdName of string
-    and OrderingMdId = internal OrderingMdId of string
-    and Pathologist = internal | PathologistNotProvided | PathologistName of string
+        module Sample =
+            type Identifier = internal Identifier of string
+            type ReceivedDate = internal | ReceivedDate of System.DateTime
+            type BlockId = internal | BlockId of string
+            type Format = internal | SlideDeck | Block | TubeSet
 
-    type Variant =
-        | VariantOfUnknownSignificance of VariantInfo
-        | VariantOfKnownSignificance of VariantInfo
-    and VariantInfo =
-        { GeneName: GeneName
-          VariantNames: VariantName list }
-    and VariantName = internal VariantName of string
+        /// The sample for each FMI report.
+        /// FMI only reports tumor samples.
+        type Sample =
+            { SampleId: Sample.Identifier
+              ReceivedDate: Sample.ReceivedDate
+              BlockId: Sample.BlockId
+              Format: Sample.Format }
 
-    type Fusion =
-        { TargetedGene: GeneName
-          OtherGene: GeneName
-          Description: FusionDescription
-          Type: FusionType }
-    and FusionDescription = FusionDescription of string
-    and FusionType = FusionType of string
+        module OrderingMd =
+            type Name = internal Name of string
+            type Identifier = internal Identifier of string
 
-    type Gene =
-        { GeneName: GeneName
-          GeneAlterations: GeneAlteration list }
-    and GeneAlteration = internal GeneAlteration of alternationName : string
+        type OrderingMd =
+            { Name: OrderingMd.Name
+              Identifier: OrderingMd.Identifier }
 
-    type MicrosatelliteStatus =
-        internal
-        | ``Cannot Be Determined``
-        | Stable
-        | ``High Instability``
-
-    type TumorMutationBurden =
-        { Score : TmbScore
-          Status: TmbStatus }
-    and TmbScore = internal TmbScore of score: float<mutation/megabase>
-    and TmbStatus = internal Low | Intermediate | High | UnknownStatus
-
-    type Lab =
-        { Address: Address
-          CliaNumber: LabCliaNumber }
-
-    type Report =
-        { ReportId: ReportId
-          IssuedDate: IssuedDate
-          Sample: Sample
-          PMI: PMI
-          MicrosatelliteStatus: MicrosatelliteStatus option
-          TumorMutationBurden: TumorMutationBurden option
-          Lab: Lab
-          Genes: Gene list
-          Variants: Variant list
-          Fusions: Fusion list }
-    and IssuedDate = IssuedDate of System.DateTime
-
-    module ReportId =
-        open System.Text.RegularExpressions
-
-        /// Validate that a report id is in the following format where 'd' is a digit: `ORD-ddddddd-dd`
-        ///
-        ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
-        ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
-        let validate (ReportId.Input reportId) =
-            if Regex("ORD-\d{7,}-\d{2,}").Match(reportId).Success then
-                Ok <| ReportId reportId
-            else
-                Error <| $"Invalid report id: {reportId}"
-
-    module IssuedDate =
-        open Utilities
-
-        type Input = Input of string
-
-        /// Validate that a report has a valid issued date.
-        let validate (Input input) =
-            match DateTime.tryParse input with
-            | Some issuedDate -> Ok <| IssuedDate issuedDate
-            | None -> Error $"Invalid issued date: {input}"
-
-    /// A report's sample
-    module Sample =
-        open FsToolkit.ErrorHandling
-
-        module SampleId =
-            open System.Text.RegularExpressions
-
-            type Input = Input of string
-
-            /// Validate that a sample's id is in the following format where 'd' is a digit: `USddddddd.dd`
-            ///
-            ///    validate (SampleId "US0123456.78") = Ok (SampleId "US0123456.78")
-            ///    validate (SampleId "invalidId") = Error "Invalid sample id: invalidId"
-            let validate (Input input) =
-                if Regex("US\d{7,}.\d{2,}").Match(input).Success then
-                    Ok <| SampleId input
-                else
-                    Error <| $"Invalid sample id: {input}"
-
-        module BlockId =
-            type Input = Input of string
-
-            /// Validate that a sample's block id is not blank.
-            let validate (Input input) =
-                if input <> "" then
-                    Ok <| BlockId input
-                else
-                    Error $"Invalid block id: {input}"
-
-        module SampleFormat =
-            type Input = Input of string
-
-            /// Validate that a sample's format is either a 'Slide Deck', 'Block', and 'Tube Set'.
-            let validate (Input input) =
-                match input with
-                | "Slide Deck" -> Ok SlideDeck
-                | "Block" -> Ok Block
-                | "Tube Set" -> Ok TubeSet
-                | _ -> Error $"Unknown sample format: {input}"
-
-        type Input =
-            { SampleIdInput: SampleId.Input
-              ReceivedDate: ReceivedDate
-              BlockId: BlockId.Input
-              SampleFormat: SampleFormat.Input }
-
-        /// Validate the FMI report's sample
-        let validate (sampleInput: Input) =
-            validation {
-                let! sampleId = SampleId.validate sampleInput.SampleIdInput
-                and! blockId = BlockId.validate sampleInput.BlockId
-                and! specimenFormat = SampleFormat.validate sampleInput.SampleFormat
-
-                return { SampleId = sampleId
-                         ReceivedDate = sampleInput.ReceivedDate
-                         BlockId = blockId
-                         SampleFormat = specimenFormat }
-            }
-
-    /// The Patient Medical Information section of an FMI report
-    module PMI =
-        open FsToolkit.ErrorHandling
-
-        module MRN =
-            /// Validate that a patient's MRN is in the correct format or that the MRN is not provided at all.
-            let validate (MRN.Input input) =
-                if input = "" then
-                    Ok None
-                else
-                    MRN.Input input
-                    |> MRN.validate
-                    |> Result.map Some
-
-        module Gender =
-            type Input = Input of string
-
-            let validate (Input input) =
-                match input with
-                | "male" | "Male" -> Ok Male
-                | "female" | "Female" -> Ok Female
-                | _ -> Error $"Invalid gender: {input}"
-
-            let toString (gender: Gender) =
-                match gender with
-                | Male -> "male"
-                | Female -> "female"
-
-        open Utilities.StringValidations
-
-        module LastName =
-            type Input = Input of string
-
-            /// Validate that a patient's last name is not blank
-            let validate (Input input) =
-                validateNotBlank input
-                |> Result.map LastName
-                |> Result.mapError (fun e -> $"LastName: {e}")
-
-        module FirstName =
-            type Input = Input of string
-
-            /// Validate that a patient's first name is not blank
-            let validate (Input input) =
-                validateNotBlank input
-                |> Result.map FirstName
-                |> Result.mapError (fun e -> $"FirstName: {e}")
-
-        module SubmittedDiagnosis =
-            type Input = Input of string
-
-            let validate (Input input) =
-                validateNotBlank input
-                |> Result.map Diagnosis.Name
-                |> Result.mapError (fun e -> $"SubmittedDiagnosis: {e}")
-
-        module Pathologist =
-            type Input = Input of string
-
-            /// Validate that a pathologist's name is provided or is explicitly not provided
-            let validate (Input input) =
-                match input with
-                | "Provided, Not" -> Ok PathologistNotProvided
-                | NotBlank -> Ok (PathologistName input)
-                | _ -> Error "Pathologist cannot be blank"
-
-        type Input =
-            { MrnInput: MRN.Input
-              GenderInput: Gender.Input
-              LastName: LastName.Input
-              FirstName: FirstName.Input
-              SubmittedDiagnosis: SubmittedDiagnosis.Input
-              DateOfBirth: DateOfBirth
+        /// Patient medical information
+        type PMI =
+            { MRN: Patient.MRN option
+              LastName: Person.LastName
+              FirstName: Person.FirstName
+              SubmittedDiagnosis: DiagnosisName
+              Gender: Gender
+              DateOfBirth: Person.DateOfBirth
               SpecimenSite: SpecimenSite
               CollectionDate: CollectionDate
               OrderingMd: OrderingMd
-              Pathologist: Pathologist.Input }
+              Pathologist: Pathologist }
+        and DiagnosisName = internal DiagnosisName of string
+        and Gender = internal Male | Female
+        and SpecimenSite = internal SpecimenSite of string
+        and CollectionDate = internal CollectionDate of System.DateTime
+        and Pathologist = internal | PathologistNotProvided | PathologistName of string
 
-        let validate (pmiInput: Input) =
-            validation {
-                let! mrn = MRN.validate pmiInput.MrnInput
-                and! gender = Gender.validate pmiInput.GenderInput
-                and! lastName = LastName.validate pmiInput.LastName
-                and! firstName = FirstName.validate pmiInput.FirstName
-                and! submittedDiagnosis = SubmittedDiagnosis.validate pmiInput.SubmittedDiagnosis
-                and! pathologist = Pathologist.validate pmiInput.Pathologist
+        type Variant =
+            | VariantOfUnknownSignificance of VariantInfo
+            | VariantOfKnownSignificance of VariantInfo
+        and VariantInfo =
+            { GeneName: Gene.Name
+              VariantNames: VariantName list }
+        and VariantName = internal VariantName of string
 
-                return { MRN = mrn
-                         Gender = gender
-                         LastName = lastName
-                         FirstName = firstName
-                         SubmittedDiagnosis = submittedDiagnosis
-                         DateOfBirth = pmiInput.DateOfBirth
-                         SpecimenSite = pmiInput.SpecimenSite
-                         CollectionDate = pmiInput.CollectionDate
-                         OrderingMd = pmiInput.OrderingMd
-                         Pathologist = pathologist }
-            }
+        type Fusion =
+            { TargetedGene: Gene.Name
+              OtherGene: Gene.Name
+              Description: FusionDescription
+              Type: FusionType }
+        and FusionDescription = FusionDescription of string
+        and FusionType = FusionType of string
 
-    module Variant =
-        /// A variant in an FMI report only has the gene name, whether or not it's a variant of unknown significance, and the variant name.
-        type Input =
-            { GeneName: GeneName
-              IsVus: IsVus
-              VariantName: VariantName }
-        and IsVus = IsVus of bool
+        module Gene =
+            type Alteration = internal Alteration of alternationName : string
 
-        module Input =
-            open Utilities
+        type Gene =
+            { Name: Gene.Name
+              Alterations: Gene.Alteration list }
 
-            /// Convert variant names from a comma-separated string to a list
-            let (|ValidVariantNames|_|) (VariantName variantName) =
-                if variantName <> "" then
-                    variantName
-                    |> String.split ','
-                    |> List.map VariantName
-                    |> Some
+        type MicrosatelliteStatus =
+            internal
+            | ``Cannot Be Determined``
+            | Stable
+            | ``High Instability``
 
-                else None
+        module TumorMutationBurden =
+            type Score = internal Score of score: float<mutation/megabase>
+            type Status = internal Low | Intermediate | High | UnknownStatus
 
-            let (|ValidGeneName|_|) (GeneName geneName) =
-                if geneName <> "" then Some (GeneName geneName)
-                else None
+        type TumorMutationBurden =
+            { Score : TumorMutationBurden.Score
+              Status: TumorMutationBurden.Status }
 
-            /// Validate that a variant input has a gene name and at least one variant name.
-            let validate (variantInput: Input) =
-                let (IsVus isVus) = variantInput.IsVus
+        type Lab =
+            { Address: Address
+              CliaNumber: CliaNumber }
 
-                match (variantInput.GeneName, isVus, variantInput.VariantName) with
-                | ValidGeneName geneName, true, ValidVariantNames variantNames -> Ok <| VariantOfUnknownSignificance { GeneName = geneName; VariantNames = variantNames }
-                | ValidGeneName geneName, false, ValidVariantNames variantNames -> Ok <| VariantOfKnownSignificance { GeneName = geneName; VariantNames = variantNames }
-                | _, _, ValidVariantNames _ -> Error $"Invalid gene name: {variantInput.GeneName}"
-                | ValidGeneName _, _, _ -> Error $"Invalid variant names: {variantInput.VariantName}"
-                | _ -> Error $"Invalid variant: {variantInput}"
+        type Report =
+            { ReportId: ReportId
+              IssuedDate: IssuedDate
+              Sample: Sample
+              PMI: PMI
+              MicrosatelliteStatus: MicrosatelliteStatus option
+              TumorMutationBurden: TumorMutationBurden option
+              Lab: Lab
+              Genes: Gene list
+              Variants: Variant list
+              Fusions: Fusion list }
+        and ReportId = internal ReportId of string
+        and IssuedDate = IssuedDate of System.DateTime
 
-    module Variants =
-        open Utilities
-
-        /// Validate a list of variant inputs
-        let validate =
-            List.map Variant.Input.validate
-            >> Result.combine
-
-    module Fusion =
-        module OtherGene =
-            type Input = Input of string
-
-            let validate (Input input) =
-                match input with
-                | "N/A" | "" -> Error $"Invalid other gene for fusion: {input}"
-                | _ -> Ok (GeneName input)
-
-        module TargetedGene =
-            open Utilities.StringValidations
-
-            type Input = Input of string
-
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map GeneName
-                |> Result.mapError (fun _ -> $"Invalid fusion targeted gene: {input}")
-
-        module Description =
-            type Input = Input of string
-
-            let validate (Input input) =
-                if input.Contains("fusion") then
-                    Ok (FusionDescription input)
-                else
-                    Error $"Fusion description is invalid: {input}"
-
-        module FusionType =
-            open Utilities.StringValidations
-
-            type Input = Input of string
-
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map FusionType
-                |> Result.mapError (fun _ -> $"Fusion type cannot be blank")
-
-        type Input =
-            { TargetedGeneInput: TargetedGene.Input
-              OtherGeneInput: OtherGene.Input
-              DescriptionInput: Description.Input
-              TypeInput: FusionType.Input }
-
-        open FsToolkit.ErrorHandling
-
-        let validate (input: Input) =
-            validation {
-                let! targetedGene = input.TargetedGeneInput |> TargetedGene.validate
-                and! otherGene = input.OtherGeneInput |> OtherGene.validate
-                and! description = input.DescriptionInput |> Description.validate
-                and! fusionType = input.TypeInput |> FusionType.validate
-
-                return { TargetedGene = targetedGene
-                         OtherGene = otherGene
-                         Description = description
-                         Type = fusionType }
-            }
-
-    module Fusions =
-        open Utilities
-
-        /// Validate a list of variant inputs
-        let validate =
-            List.map Fusion.validate
-            >> Result.combine
-            >> Result.mapError List.flatten
-
-    module MicrosatelliteStatus =
-        type MsInput = MsInput of string
-
-        module Input =
-            /// Validate that if a microsatellite input exists: it either cannot be determined, is stable, or has high instability. If not, result in an error.
-            let validate (msInput: MsInput option) =
-                match msInput with
-                | None -> Ok None
-                | Some (MsInput "Cannot Be Determined") -> Ok <| Some MicrosatelliteStatus.``Cannot Be Determined``
-                | Some (MsInput "MS-Stable") -> Ok <| Some Stable
-                | Some (MsInput "MSI-High") -> Ok <| Some ``High Instability``
-                | Some _ -> Error $"Invalid MicrosatelliteStatusInput: {msInput}"
-
-    module TumorMutationBurden =
-        open FsToolkit.ErrorHandling
-
-        type ScoreInput = ScoreInput of float
-        type StatusInput = StatusInput of string
-
-        type Input =
-            { ScoreInput: ScoreInput
-              StatusInput: StatusInput}
-
-        module Score =
-            /// Validate that a tumor mutation burden score is greater than or equal to 0.0
-            let validate (ScoreInput input) =
-                if input >= 0.0 then Ok <| TmbScore (input * 1.0<mutation/megabase>)
-                else Error $"Invalid score: {input}"
-
-        module Status =
-            /// Validate that a tumor mutation burden status is either low, intermediate, high, or unknown.
-            let validate (StatusInput input) =
-                match input with
-                | "low" -> Ok Low
-                | "intermediate" -> Ok Intermediate
-                | "high" -> Ok High
-                | "unknown" -> Ok UnknownStatus
-                | _ -> Error $"Invalid tmb status: {input}"
-
-        let validate tmbInput =
-            validation {
-                let! score = Score.validate tmbInput.ScoreInput
-                and! status = Status.validate tmbInput.StatusInput
-
-                return { Score = score
-                         Status = status }
-            }
-
-        let validateOptional tmbInput =
-            match tmbInput with
-            | Some tmbI -> validate tmbI |> Result.map Some
-            | None -> Ok None
-
-    module Lab =
-        module Address =
+    module Input =
+        module ReportId =
             open System.Text.RegularExpressions
 
-            type Input = Input of string
+            /// Validate that a report id is in the following format where 'd' is a digit: `ORD-ddddddd-dd`
+            ///
+            ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
+            ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
+            let validate input =
+                if Regex("ORD-\d{7,}-\d{2,}").Match(input).Success then
+                    Ok <| Domain.ReportId input
+                else
+                    Error <| $"Invalid report id: {input}"
 
-            /// Validate a FMI lab address is valid
-            let validate (Input input) =
-                let regex = Regex("(?<street_address>(.)+), (?<city>[a-zA-Z]+), (?<state>[a-zA-Z]{2}) (?<zip_code>\d+)$").Match(input)
+        module IssuedDate =
+            open Utilities
 
-                if regex.Success then
-                    Ok <| { StreetAddress = (StreetAddress regex.Groups.["streetAddress"].Value)
+            /// Validate that a report has a valid issued date.
+            let validate input =
+                match DateTime.tryParse input with
+                | Some issuedDate -> Ok <| Domain.IssuedDate issuedDate
+                | None -> Error $"Invalid issued date: {input}"
+
+        type Sample =
+            { SampleId: string
+              BlockId: string
+              ReceivedDate: System.DateTime
+              Format: string }
+
+        /// A report's sample
+        module Sample =
+            open FsToolkit.ErrorHandling
+
+            module SampleId =
+                open System.Text.RegularExpressions
+
+                /// Validate that a sample's id is in the following format where 'd' is a digit: `USddddddd.dd`
+                ///
+                ///    validate "US0123456.78" = Ok (SampleId "US0123456.78")
+                ///    validate "invalidId" = Error "Invalid sample id: invalidId"
+                let validate input =
+                    if Regex("US\d{7,}.\d{2,}").Match(input).Success then
+                        Ok <| Domain.Sample.Identifier input
+                    else
+                        Error <| $"Invalid sample id: {input}"
+
+            module BlockId =
+                open Utilities.StringValidations.Typed
+                open type Domain.Sample.BlockId
+
+                /// Validate that a sample's block id is not blank
+                let validate = validateNotBlank BlockId "Block id can't be blank"
+
+
+            module Format =
+                open type Domain.Sample.Format
+
+                /// Validate that a sample's format is either a 'Slide Deck', 'Block', and 'Tube Set'.
+                let validate input =
+                    match input with
+                    | "Slide Deck" -> Ok SlideDeck
+                    | "Block" -> Ok Block
+                    | "Tube Set" -> Ok TubeSet
+                    | _ -> Error $"Unknown sample format: {input}"
+
+            open type Domain.Sample.ReceivedDate
+
+            /// Validate the FMI report's sample
+            let validate (sample: Sample) =
+                validation {
+                    let! sampleId = SampleId.validate sample.SampleId
+                    and! blockId = BlockId.validate sample.BlockId
+                    and! specimenFormat = Format.validate sample.Format
+
+                    return ({
+                        SampleId = sampleId
+                        ReceivedDate = ReceivedDate sample.ReceivedDate
+                        BlockId = blockId
+                        Format = specimenFormat } : Domain.Sample)
+                }
+
+        type OrderingMd =
+            { Name: string
+              Identifier: string }
+
+        type PMI =
+            { MRN: string
+              Gender: string
+              LastName: string
+              FirstName: string
+              SubmittedDiagnosis: string
+              DateOfBirth: System.DateTime
+              SpecimenSite: string
+              CollectionDate: System.DateTime
+              OrderingMd: OrderingMd
+              Pathologist: string }
+
+        /// The Patient Medical Information section of an FMI report
+        module PMI =
+            open FsToolkit.ErrorHandling
+
+            module MRN =
+                open Core.Input
+
+                /// Validate that a patient's MRN is in the correct format or that the MRN is not provided at all.
+                let validateOptional input =
+                    if input = "" then
+                        Ok None
+                    else
+                        match Patient.MRN.validate input with
+                        | Ok mrn -> Ok <| Some mrn
+                        | Error e -> Error e
+
+            module Gender =
+                open type Domain.Gender
+
+                /// Validate a patient's "gender" is `(M|m)ale` or `(F|f)emale`
+                let validate input =
+                    match input with
+                    | "male" | "Male" -> Ok Male
+                    | "female" | "Female" -> Ok Female
+                    | _ -> Error $"Invalid gender: {input}"
+
+            module SubmittedDiagnosis =
+                open Utilities.StringValidations.Typed
+                /// Validate that submitted diagnosis name is not blank
+                let validate = validateNotBlank Domain.DiagnosisName "Diagnosis name can't be blank"
+
+            module SpecimenSite =
+                open Utilities.StringValidations.Typed
+                /// Validate that submitted diagnosis name is not blank
+                let validate = validateNotBlank Domain.SpecimenSite "Diagnosis name can't be blank"
+
+            module Pathologist =
+                open Utilities.StringValidations
+
+                /// Validate that a pathologist's name is provided or is explicitly not provided
+                let validate input =
+                    match input with
+                    | "Provided, Not" -> Ok Domain.PathologistNotProvided
+                    | NotBlank -> Ok <| Domain.PathologistName input
+                    | _ -> Error "Pathologist cannot be blank"
+
+            module OrderingMd =
+                open Utilities.StringValidations
+                open type Domain.OrderingMd.Name
+                open type Domain.OrderingMd.Identifier
+
+                let validate (orderingMd: OrderingMd) =
+                    match orderingMd.Name, orderingMd.Identifier with
+                    | NotBlank, NotBlank ->
+                        Ok <| ({ Name = Name orderingMd.Name
+                                 Identifier = Identifier orderingMd.Identifier } : Domain.OrderingMd)
+                    | _, NotBlank -> Error "Ordering MD name can't be blank"
+                    | NotBlank, _ -> Error "Ordering MD id can't be blank"
+                    | _ -> Error $"Invalid ordering md: {orderingMd}"
+
+            open Core.Domain
+            open Core.Input
+
+            /// Validate that a patient's medical information is valid
+            let validate (pmi: PMI) =
+                validation {
+                    let! mrn = MRN.validateOptional pmi.MRN
+                    and! gender = Gender.validate pmi.Gender
+                    and! lastName = Person.LastName.validate pmi.LastName
+                    and! firstName = Person.FirstName.validate pmi.FirstName
+                    and! submittedDiagnosis = SubmittedDiagnosis.validate pmi.SubmittedDiagnosis
+                    and! pathologist = Pathologist.validate pmi.Pathologist
+                    and! specimenSite = SpecimenSite.validate pmi.SpecimenSite
+                    and! orderingMd = OrderingMd.validate pmi.OrderingMd
+
+                    let dob = Person.DateOfBirth pmi.DateOfBirth
+                    let collectionDate = Domain.CollectionDate pmi.CollectionDate
+
+                    return ({
+                        MRN = mrn
+                        Gender = gender
+                        LastName = lastName
+                        FirstName = firstName
+                        SubmittedDiagnosis = submittedDiagnosis
+                        DateOfBirth = dob
+                        SpecimenSite = specimenSite
+                        CollectionDate = collectionDate
+                        OrderingMd = orderingMd
+                        Pathologist = pathologist } : Domain.PMI)
+                }
+
+
+        /// A variant in an FMI report only has the gene name, whether or not it's a variant of unknown significance, and the variant name.
+        type Variant =
+            { GeneName: string
+              IsVus: bool
+              VariantName: string }
+
+        module Variant =
+            open Utilities
+            open Core.Domain
+
+            /// Convert variant names from a comma-separated string to a list
+            let (|ValidVariantNames|_|) variantNames =
+                if variantNames <> "" then
+                    variantNames
+                    |> String.split ','
+                    |> List.map Domain.VariantName
+                    |> Some
+                else None
+
+            let (|ValidGeneName|_|) geneName =
+                if geneName <> "" then Some (Gene.Name geneName)
+                else None
+
+            open type Domain.Variant
+
+            /// Validate that a variant input has a gene name and at least one variant name.
+            let validate (variant: Variant) =
+
+                match (variant.GeneName, variant.IsVus, variant.VariantName) with
+                | ValidGeneName geneName, true, ValidVariantNames variantNames ->
+                    Ok <| VariantOfUnknownSignificance { GeneName = geneName
+                                                         VariantNames = variantNames }
+                | ValidGeneName geneName, false, ValidVariantNames variantNames ->
+                    Ok <| VariantOfKnownSignificance { GeneName = geneName
+                                                       VariantNames = variantNames }
+                | _, _, ValidVariantNames _ -> Error $"Invalid gene name: {variant.GeneName}"
+                | ValidGeneName _, _, _ -> Error $"Invalid variant names: {variant.VariantName}"
+                | _ -> Error $"Invalid variant: {variant}"
+
+        module Variants =
+            open Utilities
+
+            /// Validate a list of variant inputs
+            let validate =
+                List.map Variant.validate
+                >> Result.combine
+
+        type Fusion =
+            { TargetedGene: string
+              OtherGene: string
+              Description: string
+              Type: string }
+
+        module Fusion =
+            module OtherGene =
+                open Core.Domain
+
+                let validate input =
+                    match input with
+                    | "N/A" | "" -> Error $"Invalid other gene for fusion: {input}"
+                    | _ -> Ok (Gene.Name input)
+
+            module TargetedGene =
+                open Core.Domain
+                open Utilities.StringValidations.Typed
+
+                /// Validate that a gene name is not blank
+                let validate = validateNotBlank Gene.Name $"Targeted fusion gene can't be blank"
+
+            module Description =
+                let validate (input: string) =
+                    if input.Contains("fusion") then
+                        Ok (Domain.FusionDescription input)
+                    else
+                        Error $"Invalid fusion description: {input}"
+
+            module FusionType =
+                open Utilities.StringValidations.Typed
+
+                /// Validate that fusion type is not blank
+                let validate = validateNotBlank Domain.FusionType "Fusion type cannot be blank"
+
+            open FsToolkit.ErrorHandling
+
+            /// Validate that a fusion has a valid targeted gene, other gene, description, and type.
+            let validate (fusion: Fusion) =
+                validation {
+                    let! targetedGene = fusion.TargetedGene |> TargetedGene.validate
+                    and! otherGene = fusion.OtherGene |> OtherGene.validate
+                    and! description = fusion.Description |> Description.validate
+                    and! fusionType = fusion.Type |> FusionType.validate
+
+                    return ({
+                        TargetedGene = targetedGene
+                        OtherGene = otherGene
+                        Description = description
+                        Type = fusionType } : Domain.Fusion )
+                }
+
+        module Fusions =
+            open Utilities
+
+            /// Validate a list of variant inputs
+            let validate =
+                List.map Fusion.validate
+                >> Result.combine
+                >> Result.mapError List.flatten
+
+        module MicrosatelliteStatus =
+            open type Domain.MicrosatelliteStatus
+            open Utilities
+
+            /// Validate that if a microsatellite status cannot be determined, is stable, oor high.
+            let validate input =
+                match input with
+                | "Cannot Be Determined" -> Ok ``Cannot Be Determined``
+                | "MS-Stable" -> Ok Stable
+                | "MSI-High" -> Ok ``High Instability``
+                | _ -> Error $"Invalid MicrosatelliteStatus: {input}"
+
+            /// Validate that if a microsatellite status exists, it either cannot be determined, is stable, or has high instability
+            let validateOptional = Optional.validateWith validate
+
+        type TumorMutationBurden =
+            { Score: float
+              Status: string }
+
+        module TumorMutationBurden =
+            open FsToolkit.ErrorHandling
+
+            module Score =
+                open Core.Domain
+                open type Domain.TumorMutationBurden.Score
+
+                /// Validate that a tumor mutation burden score is greater than or equal to 0.0
+                let validate input =
+                    if input >= 0.0 then Ok <| Score (input * 1.0<mutation/megabase>)
+                    else Error $"Invalid score: {input}"
+
+            module Status =
+                open type Domain.TumorMutationBurden.Status
+
+                /// Validate that a tumor mutation burden status is either low, intermediate, high, or unknown.
+                let validate input =
+                    match input with
+                    | "low" -> Ok Low
+                    | "intermediate" -> Ok Intermediate
+                    | "high" -> Ok High
+                    | "unknown" -> Ok UnknownStatus
+                    | _ -> Error $"Invalid tmb status: {input}"
+
+            /// Validate that a tumor mutation burden has a valid score and status
+            let validate tumorMutationBurden =
+                validation {
+                    let! score = Score.validate tumorMutationBurden.Score
+                    and! status = Status.validate tumorMutationBurden.Status
+
+                    return ({
+                        Score = score
+                        Status = status } : Domain.TumorMutationBurden)
+                }
+
+            open Utilities
+
+            /// Validate a tumor mutation burden, if it exists
+            let validateOptional = Optional.validateWith validate
+
+        type Lab =
+            { Address: string
+              CliaNumber: string }
+
+        module Lab =
+            module Address =
+                open Core.Domain
+                open System.Text.RegularExpressions
+
+                /// Validate a FMI lab address is valid
+                let validate input =
+                    let regex = Regex("(?<street_address>(.)+), (?<city>[a-zA-Z]+), (?<state>[a-zA-Z]{2}) (?<zip_code>\d+)$").Match(input)
+
+                    if regex.Success then
+                        Ok ({
+                            Street = (StreetAddress regex.Groups.["streetAddress"].Value)
                             City = City regex.Groups.["city"].Value
                             State = State regex.Groups.["state"].Value
-                            Zipcode = Zipcode regex.Groups.["zip_code"].Value }
-                else Error $"Invalid lab address: {input}"
+                            Zip = ZipCode regex.Groups.["zip_code"].Value
+                        } : Address)
+                    else Error $"Invalid lab address: {input}"
 
-        type Input =
-            { AddressInput: Address.Input
-              CliaNumber: Lab.CliaNumber.Input }
+            open FsToolkit.ErrorHandling
+            open Core.Input
 
-        open FsToolkit.ErrorHandling
+            /// Validate the report's lab address and clia number
+            let validate input =
+                validation {
+                    let! address = Address.validate input.Address
+                    and! cliaNumber = Lab.CliaNumber.validate input.CliaNumber
 
-        /// Validate the report's lab address and clia number
-        let validate input =
-            validation {
-                let! address = Address.validate input.AddressInput
-                and! cliaNumber = Lab.CliaNumber.validate input.CliaNumber
+                    return ({
+                        Address = address
+                        CliaNumber = cliaNumber
+                    } : Domain.Lab)
+                }
 
-                return { Address = address
-                         CliaNumber = cliaNumber }
-            }
+        type Gene =
+            { Name: string
+              Alterations: string list }
 
-    module Gene =
-        open FsToolkit.ErrorHandling
-        open Utilities
-        open Utilities.StringValidations
+        module Gene =
+            open FsToolkit.ErrorHandling
+            open Utilities
 
-        module Name =
-            type Input = Input of string
+            module Alteration =
+                open Utilities.StringValidations.Typed
 
-            /// Validate a gene name is not blank
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map GeneName
-                |> Result.mapError (fun e -> $"Gene Name: {e}")
+                /// Validate a gene alteration is not blank
+                let validate = validateNotBlank Domain.Gene.Alteration "Gene alteration can't be blank"
 
-        module Alteration =
-            type Input = Input of string
 
-            /// Validate a gene alteration is not blank
-            let validate (Input input) =
-                input
-                |> validateNotBlank
-                |> Result.map GeneAlteration
-                |> Result.mapError (fun e -> $"Gene Alteration: {e}")
+            module Alterations =
+                /// Validate a list of gene alteration inputs. Combine all alteration validations into either a list of:
+                /// - valid alterations OR
+                /// - validation errors
+                let validate =
+                    List.map Alteration.validate >> Result.combine
 
-        module Alterations =
-            /// Validate a list of gene alteration inputs. Combine all alteration validations into either a list of:
-            /// - valid alterations OR
+            open Core.Input
+
+            let validate gene =
+                validation {
+                    let! geneName = Gene.Name.validate gene.Name
+                    and! geneAlterations = Alterations.validate gene.Alterations
+
+                    return ({
+                        Name = geneName
+                        Alterations = geneAlterations
+                    } : Domain.Gene)
+                }
+
+        module Genes =
+            open Utilities
+
+            /// Validate a list of gene inputs. Combine all gene input validations into either a list of:
+            /// - valid genes OR
             /// - validation errors
             let validate =
-                List.map Alteration.validate >> Result.combine
+                List.map Gene.validate
+                >> Result.combine
+                >> Result.mapError List.flatten
 
-        type Input =
-            { NameInput: Name.Input
-              AlterationInputs: Alteration.Input list }
+        type Report =
+            { ReportId: string
+              IssuedDate: string
+              Lab: Lab
+              Sample: Sample
+              PMI: PMI
+              MicrosatelliteStatus: string option
+              TumorMutationBurden: TumorMutationBurden option
+              Genes: Gene list
+              Variants: Variant list
+              Fusions: Fusion list }
 
-        let validate geneInput =
-            validation {
-                let! geneName = Name.validate geneInput.NameInput
-                and! geneAlterations = Alterations.validate geneInput.AlterationInputs
+        module Report =
+            open FsToolkit.ErrorHandling
 
-                return { GeneName = geneName
-                         GeneAlterations = geneAlterations }
-            }
+            let validate report =
+                validation {
+                    let! reportId = ReportId.validate report.ReportId
+                    and! sample = Sample.validate report.Sample
+                    and! pmi = PMI.validate report.PMI
+                    and! lab = Lab.validate report.Lab
+                    and! msStatus = MicrosatelliteStatus.validateOptional report.MicrosatelliteStatus
+                    and! tmb = TumorMutationBurden.validateOptional report.TumorMutationBurden
+                    and! variants = Variants.validate report.Variants
+                    and! issuedDate = IssuedDate.validate report.IssuedDate
+                    and! genes = Genes.validate report.Genes
+                    and! fusions = Fusions.validate report.Fusions
 
-    module Genes =
-        open Utilities
+                    return ({
+                        ReportId = reportId
+                        Sample = sample
+                        PMI = pmi
+                        IssuedDate = issuedDate
+                        MicrosatelliteStatus = msStatus
+                        TumorMutationBurden = tmb
+                        Lab = lab
+                        Genes = genes
+                        Variants = variants
+                        Fusions = fusions
+                    } : Domain.Report)
+                }
 
-        /// Validate a list of gene inputs. Combine all gene input validations into either a list of:
-        /// - valid genes OR
-        /// - validation errors
-        let validate =
-            List.map Gene.validate
-            >> Result.combine
-            >> Result.mapError List.flatten
-
-    module Report =
+    module XML =
         open FSharp.Data
         open System.IO
         open System.Xml.Linq
-
-        type Input =
-            { ReportIdInput: ReportId.Input
-              IssuedDateInput: IssuedDate.Input
-              LabInput: Lab.Input
-              SampleInput: Sample.Input
-              PmiInput: PMI.Input
-              MsStatusInput: MicrosatelliteStatus.MsInput option
-              TmbInput: TumorMutationBurden.Input option
-              GeneInputs: Gene.Input list
-              VariantsInput: Variant.Input list
-              FusionsInput: Fusion.Input list }
+        open Input
 
         [<Literal>]
         let ClinicalReportXsdPath = __SOURCE_DIRECTORY__ + "/data/FMI/clinicalReport.xsd"
@@ -550,7 +595,7 @@ module FoundationMedicine =
         type VariantReportProvider = XmlProvider<Schema=VariantReportXsdPath, EmbeddedResource="OSTOR.ClinicalTrials.Reports, OSTOR.ClinicalTrials.Reports.variantReport.xsd">
 
         /// A Foundation Report XML
-        type Xml(filePath: string) =
+        type Report(filePath: string) =
             let filePath = filePath
             let xmlText = File.ReadAllText(filePath)
             let xml = XDocument.Parse(xmlText)
@@ -578,132 +623,87 @@ module FoundationMedicine =
                 this.ClinicalReport.Signature.ServerTime
 
             /// The `Genes` section of the XML report. Each `Gene` has a `Name` and  many `Alterations`, with their own `Name`s.
-            member this.Genes = this.ClinicalReport.Genes
+            member this.Genes : Gene list =
+                this.ClinicalReport.Genes
+                |> Seq.map (fun gene ->
+                    { Name = gene.Name
+                      Alterations = gene.Alterations |> Array.toList |> List.map (fun alteration -> alteration.Name)
+                    }
+                ) |> Seq.toList
+
 
             /// Retrieve the report's microsatellite status, if it exists.
-            member this.MicrosatelliteStatus =
+            member this.MicroSatelliteStatus =
                 this.Genes
                 |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
-                |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations).Name)
+                |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations))
 
             member this.Biomarkers =
                 this.VariantReport.Biomarkers
 
-            /// The tumor mutation burden as a tuple where the `Score` is the first element and the `Status` the second.
-            member this.TumorMutationBurden =
+            member this.TumorMutationBurden : TumorMutationBurden option =
                 this.Biomarkers.TumorMutationBurden
-                |> Option.map (fun tmb -> (tmb.Score, tmb.Status))
+                |> Option.map (fun tmb ->
+                    { Score = float tmb.Score
+                      Status = tmb.Status })
 
-            member this.FusionRearrangements =
+            member this.Fusions =
                 this.VariantReport.Rearrangements
-                |> Seq.filter (fun rearrangement ->
-                    rearrangement.Description.Contains("fusion")
+                |> Seq.filter (fun rearrangement -> rearrangement.Description.Contains("fusion"))
+                |> Seq.map (fun fusion ->
+                    { TargetedGene = fusion.TargetedGene
+                      OtherGene = fusion.OtherGene
+                      Description = fusion.Description
+                      Type = fusion.Type }
                 )
 
-            (* Read in XML to report input *)
-
-            member this.ReportIdInput = ReportId.Input this.ClinicalReport.ReportId
+            member this.ReportId = this.ClinicalReport.ReportId
 
             /// Retrieve the lab's address and clia number
-            member this.LabInput: Lab.Input =
+            member this.Lab : Lab =
                 let processSite = this.ReportSample.ProcessSites.[0]
 
-                { AddressInput = Lab.Address.Input processSite.Address
-                  CliaNumber = Lab.CliaNumber.Input processSite.CliaNumber }
+                { Address = processSite.Address
+                  CliaNumber = processSite.CliaNumber }
 
             /// Retrieve the report's sample
-            member this.SampleInput : Sample.Input =
-                { SampleIdInput = Sample.SampleId.Input this.ReportSample.SampleId
-                  BlockId = Sample.BlockId.Input this.ReportSample.BlockId
-                  ReceivedDate = ReceivedDate this.ReportSample.ReceivedDate
-                  SampleFormat = Sample.SampleFormat.Input this.ReportSample.SpecFormat }
+            member this.Sample : Sample =
+                { SampleId = this.ReportSample.SampleId
+                  BlockId = this.ReportSample.BlockId
+                  ReceivedDate = this.ReportSample.ReceivedDate
+                  Format = this.ReportSample.SpecFormat }
 
             /// Retrieve the report's patient medical information
-            member this.PmiInput : PMI.Input =
+            member this.PMI : PMI =
                 let pmi = this.ClinicalReport.Pmi
 
-                { MrnInput = MRN.Input pmi.Mrn
-                  LastName = PMI.LastName.Input pmi.LastName
-                  FirstName = PMI.FirstName.Input pmi.FirstName
-                  SubmittedDiagnosis = PMI.SubmittedDiagnosis.Input pmi.SubmittedDiagnosis
-                  GenderInput = PMI.Gender.Input pmi.Gender
-                  DateOfBirth = DateOfBirth pmi.Dob
-                  SpecimenSite = SpecimenSite pmi.SpecSite
-                  CollectionDate = CollectionDate pmi.CollDate
-                  OrderingMd = { MdName = OrderingMdName pmi.OrderingMd; MdId = OrderingMdId pmi.OrderingMdId }
-                  Pathologist = PMI.Pathologist.Input pmi.Pathologist }
+                { MRN = pmi.Mrn
+                  LastName = pmi.LastName
+                  FirstName = pmi.FirstName
+                  SubmittedDiagnosis = pmi.SubmittedDiagnosis
+                  Gender = pmi.Gender
+                  DateOfBirth = pmi.Dob
+                  SpecimenSite = pmi.SpecSite
+                  CollectionDate = pmi.CollDate
+                  OrderingMd = { OrderingMd.Name = pmi.OrderingMd; OrderingMd.Identifier = pmi.OrderingMdId }
+                  Pathologist = pmi.Pathologist }
 
             /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
-            member this.VariantInputs : Variant.Input seq =
+            member this.Variants : Variant seq =
                 this.ClinicalReport.VariantProperties
                 |> Seq.map (fun variantProperty ->
-                    { GeneName = GeneName variantProperty.GeneName
-                      IsVus = Variant.IsVus variantProperty.IsVus
-                      VariantName = VariantName variantProperty.VariantName })
+                    { GeneName = variantProperty.GeneName
+                      IsVus = variantProperty.IsVus
+                      VariantName = variantProperty.VariantName })
 
-            member this.FusionInputs : Fusion.Input seq =
-                this.FusionRearrangements
-                |> Seq.map (fun r ->
-                    { TargetedGeneInput = (Fusion.TargetedGene.Input r.TargetedGene)
-                      OtherGeneInput = (Fusion.OtherGene.Input r.OtherGene)
-                      DescriptionInput = (Fusion.Description.Input r.Description)
-                      TypeInput = (Fusion.FusionType.Input r.Type) }
-                )
-
-            member this.MicrosatelliteStatusInput =
-                this.MicrosatelliteStatus
-                |> Option.map MicrosatelliteStatus.MsInput
-
-            member this.TmbInput : TumorMutationBurden.Input option =
-                this.TumorMutationBurden
-                |> Option.map (fun (score, status) ->
-                    { ScoreInput = TumorMutationBurden.ScoreInput (float score)
-                      StatusInput = TumorMutationBurden.StatusInput status })
-
-            member this.GeneInputs =
-                this.Genes
-                |> Seq.map (fun gene ->
-                    { Gene.NameInput = Gene.Name.Input gene.Name
-                      Gene.AlterationInputs = gene.Alterations |> Seq.map (fun alteration -> Gene.Alteration.Input alteration.Name) |> Seq.toList
-                    }
-                ) |> Seq.toList
-
-            member this.ReportInput =
-                { ReportIdInput = this.ReportIdInput
-                  IssuedDateInput = IssuedDate.Input this.ServerTime
-                  LabInput = this.LabInput
-                  SampleInput = this.SampleInput
-                  PmiInput = this.PmiInput
-                  MsStatusInput = this.MicrosatelliteStatusInput
-                  TmbInput = this.TmbInput
-                  GeneInputs = this.GeneInputs
-                  VariantsInput = this.VariantInputs |> Seq.toList
-                  FusionsInput = this.FusionInputs |> Seq.toList }
-
-
-        open FsToolkit.ErrorHandling
-
-        let validate input =
-            validation {
-                let! reportId = ReportId.validate input.ReportIdInput
-                and! sample = Sample.validate input.SampleInput
-                and! pmi = PMI.validate input.PmiInput
-                and! lab = Lab.validate input.LabInput
-                and! msStatus = MicrosatelliteStatus.Input.validate input.MsStatusInput
-                and! tmb = TumorMutationBurden.validateOptional input.TmbInput
-                and! variants = Variants.validate input.VariantsInput
-                and! issuedDate = IssuedDate.validate input.IssuedDateInput
-                and! genes = Genes.validate input.GeneInputs
-                and! fusions = Fusions.validate input.FusionsInput
-
-                return { ReportId = reportId
-                         Sample = sample
-                         PMI = pmi
-                         IssuedDate = issuedDate
-                         MicrosatelliteStatus = msStatus
-                         TumorMutationBurden = tmb
-                         Lab = lab
-                         Genes = genes
-                         Variants = variants
-                         Fusions = fusions }
-            }
+            member this.Report =
+                { ReportId = this.ReportId
+                  IssuedDate = this.ServerTime
+                  Lab = this.Lab
+                  Sample = this.Sample
+                  PMI = this.PMI
+                  MicrosatelliteStatus = this.MicroSatelliteStatus
+                  TumorMutationBurden = this.TumorMutationBurden
+                  Genes = this.Genes
+                  Variants = this.Variants |> Seq.toList
+                  Fusions = this.Fusions |> Seq.toList }
