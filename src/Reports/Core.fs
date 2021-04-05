@@ -60,10 +60,6 @@ module Core =
                 internal | MRN of int64
                 member this.Value = this |> fun (MRN mrn) -> mrn
 
-            type BirthDate =
-                internal | BirthDate of System.DateTime
-                member this.Value = this |> fun (BirthDate birthDate) -> birthDate
-
         type NationalProviderId =
             internal | NationalProviderId of int64
             member this.Value = this |> fun (NationalProviderId npi) -> npi
