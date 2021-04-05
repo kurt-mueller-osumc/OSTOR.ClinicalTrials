@@ -53,8 +53,26 @@ module Tempus =
                   CodingChange: CodingChange
                   ReferenceSequence: ReferenceSequence }
 
-        type DiagnosisName = internal | DiagnosisName of string
-        type DiagnosisDate = internal | DiagnosisDate of System.DateTime
+                member this.TryAbbreviatedProteinChangeValue =
+                    this.ProteinChange |> Option.map (fun proteinChange -> proteinChange.Abbreviated.Value)
+
+                member this.TryFullProteinChangeValue =
+                    this.ProteinChange |> Option.map (fun proteinChange -> proteinChange.Full.Value)
+
+                member this.MutationEffect =
+                    this.ProteinChange
+                    |> Option.map (fun proteinChange -> proteinChange.Abbreviated.Value)
+                    |> Option.defaultValue this.CodingChange.Value
+
+
+
+        type DiagnosisName =
+            internal | DiagnosisName of string
+            member this.Value = this |> fun (DiagnosisName diagnosisName) -> diagnosisName
+
+        type DiagnosisDate =
+            internal | DiagnosisDate of System.DateTime
+            member this.Value = this |> fun (DiagnosisDate diagnosisDate) -> diagnosisDate
 
         module Patient =
             type TempusIdentifier =
@@ -80,11 +98,19 @@ module Tempus =
               DiagnosisName: DiagnosisName
               DiagnosisDate: DiagnosisDate option }
 
+            member this.TryMrnValue =
+                this.MRN |> Option.map (fun mrn -> mrn.Value)
+
+            member this.TryDiagnosisDateValue =
+                this.DiagnosisDate |> Option.map (fun diagnosisDate -> diagnosisDate.Value)
+
 
         module Order =
             type Identifier  = internal Identifier of string
             type OrderAccessionId = internal OrderAccessionId of string
-            type Physician = internal Physician of string // ordering md
+            type Physician =
+                internal | Physician of string // ordering md
+                member this.Value = this |> fun (Physician physician) -> physician
             type Institution = internal Institution of string
 
             /// The `test` subsection of the `order` section in the Tempus report
@@ -98,28 +124,55 @@ module Tempus =
 
         /// The `order` section of the Tempus report.
         type Order =
-            { OrderingInstitution: Order.Institution
-              OrderingPhysician: Order.Physician
+            { Institution: Order.Institution
+              Physician: Order.Physician
               OrderId: Order.Identifier
               AccessionId: Order.OrderAccessionId
               Test: Order.Test }
 
 
         module Sample =
-            type Identifier = internal Identifier of System.Guid
-            type Site = internal Site of string
+            type Identifier =
+                internal | Identifier of System.Guid
+                member this.Value = this |> fun (Identifier identifier) -> identifier
+
+            type Site =
+                internal | Site of string
+                member this.Value = this |> fun (Site site) -> site
+
             type Type =
                 internal
-                | Blood | ``FFPE Block`` | ``FFPE Slides (Unstained)`` | Saliva
+                | Blood
+                | ``FFPE Block``
+                | ``FFPE Slides (Unstained)``
+                | Saliva
+
+                member this.Value =
+                    match this with
+                    | Blood -> "blood"
+                    | ``FFPE Block`` -> "FFPE Block"
+                    | ``FFPE Slides (Unstained)`` -> "FFPE Slides (Unstained)"
+                    | Saliva -> "Saliva"
 
             type Dates =
                 { CollectionDate: CollectionDate
                   ReceivedDate: ReceivedDate }
-            and CollectionDate = internal CollectionDate of System.DateTime
-            and ReceivedDate = internal ReceivedDate of System.DateTime
 
-            type BlockId = BlockId of string
-            type TumorPercentage = internal TumorPercentage of uint
+            and CollectionDate =
+                internal | CollectionDate of System.DateTime
+                member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
+
+            and ReceivedDate =
+                internal | ReceivedDate of System.DateTime
+                member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
+
+            type BlockId =
+                internal | BlockId of string
+                member this.Value = this |> fun (BlockId blockId) -> blockId
+
+            type TumorPercentage =
+                internal |  TumorPercentage of uint
+                member this.Value = this |> fun (TumorPercentage tumorPercentage) -> tumorPercentage
 
         /// the tumor sample that will be present in the `specimens` section of the report
         type TumorSample =
@@ -130,6 +183,12 @@ module Tempus =
               BlockId: Sample.BlockId option
               TumorPercentage: Sample.TumorPercentage option }
 
+            member this.TryBlockIdValue =
+                this.BlockId |> Option.map (fun blockId -> blockId.Value)
+
+            member this.TryTumorPercentageValue =
+                this.TumorPercentage |> Option.map (fun tumorPercentage -> tumorPercentage.Value)
+
         /// the normal sample that might or might not exist in the `specimens` section of the report
         type NormalSample =
             { SampleId: Sample.Identifier
@@ -137,6 +196,9 @@ module Tempus =
               Type: Sample.Type
               Dates: Sample.Dates
               BlockId: Sample.BlockId option }
+
+            member this.TryBlockIdValue =
+                this.BlockId |> Option.map (fun blockId -> blockId.Value)
 
         type Gene =
             { Name: Gene.Name
@@ -152,7 +214,9 @@ module Tempus =
                 internal | AllelicFraction of float
                 member this.Value = this |> fun (AllelicFraction allelicFraction) -> allelicFraction
 
-            type Description = internal | Description of string
+            type Description =
+                internal | Description of string
+                member this.Value = this |> fun (Description description) -> description
 
 
         module Fusion =
@@ -203,6 +267,12 @@ module Tempus =
                   NucleotideAlteration: Variant.NucleotideAlteration option
                   AllelicFraction: Variant.AllelicFraction option
                   Description: Variant.Description }
+
+                member this.TryNucleotideAlterationValue =
+                    this.NucleotideAlteration |> Option.map (fun nucleotideAlteration -> nucleotideAlteration.Value)
+
+                member this.TryAllelicFractionValue =
+                    this.AllelicFraction |> Option.map (fun allelicFraction -> allelicFraction.Value)
 
             /// represents a mutation found in `results.somaticPotentiallyActionableMutations` section of the report
             type Mutation =
@@ -324,6 +394,10 @@ module Tempus =
               ``Inherited Variants of Unknown Significance``: InheritedVUS
             }
 
+            member this.TryTmbScoreValue = this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Score.Value)
+            member this.TryTmbPercentileValue = this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Percentile.Value)
+            member this.TryMsiValue = this.MicrosatelliteInstabilityStatus |> Option.map (fun msi -> msi.Value)
+
         type OverallReport =
             { Lab: Lab
               Patient: Patient
@@ -333,6 +407,9 @@ module Tempus =
               NormalSample: NormalSample option
               Results: Results
             }
+
+            member this.TryPatientMrnValue =
+                this.Patient.MRN |> Option.map (fun mrn -> mrn.Value)
 
     module Json =
         open Thoth.Json.Net
@@ -706,20 +783,31 @@ module Tempus =
                     else
                         Error $"Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: {accessionId}"
 
-            open Utilities.StringValidations
+            module Institution =
+                open StringValidations.Typed
+                open type Domain.Order.Institution
+
+                let validate = validateNotBlank Institution "Order institution cannot be blank"
+
+            module Physician =
+                open StringValidations.Typed
+                open type Domain.Order.Physician
+
+                let validate = validateNotBlank Physician "Order physician cannot be blank"
+
             open FsToolkit.ErrorHandling
 
             /// Validate the `order` section of the json report
             let validate (order: Order) : Validation<Domain.Order, string> =
                 validation {
-                    let! institution = order.Institution |> validateNotBlank |> Result.map Domain.Order.Institution
-                    and! physician = order.Physician |> validateNotBlank |> Result.map Domain.Order.Physician
+                    let! institution = order.Institution |> Institution.validate
+                    and! physician = order.Physician |> Physician.validate
                     and! orderId = order.OrderId |> Identifier.validate
                     and! accessionId = order.AccessionId |> AccessionId.validate
                     and! orderTest = order.OrderTest |> Test.validate
 
-                    return ({ OrderingInstitution = institution
-                              OrderingPhysician = physician
+                    return ({ Institution = institution
+                              Physician = physician
                               OrderId = orderId
                               AccessionId = accessionId
                               Test = orderTest
@@ -1389,116 +1477,120 @@ module Tempus =
             let validate (jsons: InheritedVariants) : Validation<Domain.InheritedVUS,string> =
                 jsons |> InheritedVariants.validate ClinicalSignificance.validate
 
+        type TumorMutationBurden =
+            { Score: float option
+              Percentile: uint option }
 
-    /// The `results` section in the Tempus report
-    module Results =
+            static member Decoder : Decoder<TumorMutationBurden> =
+                Decode.object (fun get ->
+                    { Score      = "tumorMutationalBurden"         |> flip get.Required.Field Decoder.Optional.float // can either be a float, blank string (i.e. ""), or null
+                      Percentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.Optional.unsignedInteger // can either be an integer, blank string, or null
+                    })
+
         module TumorMutationBurden =
-            type Input =
-                { ScoreInput: ScoreInput
-                  PercentileInput: PercentileInput }
-            and ScoreInput = ScoreInput of float
-            and PercentileInput = PercentileInput of uint
+            open type Domain.TumorMutationBurden.Score
+            open type Domain.TumorMutationBurden.Percentile
 
             /// Validate that tmb score and percentile are both present or absent.
             ///
             ///    validateOptional None None = Ok None
-            ///    validateOptional (Some (ScoreInput 1.0)) (Some (PercentileInput 34)) = Ok
-            let validateOptional (scoreInput: ScoreInput option) (percentileInput: PercentileInput option) =
-                match scoreInput, percentileInput with
-                | Some (ScoreInput score), Some (PercentileInput percentile) -> Ok <| Some { Score = TumorMutationBurdenScore score; Percentile = TumorMutationBurdenPercentile percentile }
+            ///    validateOptional (Some 1.0) (Some 34) = Ok { Score = (Score 1.0); Percentile = (Percentile 34)}
+            let validateOptional (tumorMutationBurden: TumorMutationBurden) =
+                match tumorMutationBurden.Score, tumorMutationBurden.Percentile with
+                | Some score, Some percentile ->
+                    Ok <| Some ({ Score = Score score
+                                  Percentile = Percentile percentile } : Domain.TumorMutationBurden)
                 | None, None -> Ok None
-                | Some _, None -> Error $"TMB percentile is missing: {scoreInput}"
-                | None, Some _ -> Error $"TMB score is missing: {scoreInput}"
+                | Some _, None -> Error $"TMB percentile is missing: {tumorMutationBurden}"
+                | None, Some _ -> Error $"TMB score is missing: {tumorMutationBurden}"
 
         module MicrosatelliteInstabilityStatus =
-            type Input = Input of string
-
+            open type Domain.MicrosatelliteInstabilityStatus
             open StringValidations.Typed
 
             /// Validate that msi status is not blank
-            let validate (Input input) =
-                input |> validateNotBlank MicrosatelliteInstabilityStatus "MSI status can't be blank"
+            let validate = validateNotBlank MicrosatelliteInstabilityStatus "MSI status can't be blank"
 
             /// Validate that if an msi status, if it exists, is not blank
-            let validateOptional (input: Input option) =
-                input |> Optional.validateWith validate
+            let validateOptional = Optional.validateWith validate
 
-        type Json =
-            { TumorMutationBurden: float option
-              TumorMutationBurdenPercentile: uint option
-              MsiStatus: string option
-              ``Somatic Potentially Actionable Mutations``: ``Somatic Potentially Actionable Mutation``.Json list
-              ``Somatic Potentially Actionable Copy Number Variants``: ``Somatic Potentially Actionable Copy Number Variant``.Json list
-              ``Somatic Biologically Relevant Variants``: ``Somatic Biologically Relevant Variant``.Json list
-              ``Somatic Variants of Unknown Significance``: ``Somatic Variant of Unknown Significance``.Json list
-              Fusions: Fusion.Json list
-              ``Inherited Relevant Variants``: InheritedVariants.Json
-              ``Inherited Variants Of Unknown Significance``: InheritedVariants.Json }
+        type Results = {
+            TumorMutationBurden: TumorMutationBurden
+            MsiStatus: string option
+            ``Somatic Potentially Actionable Mutations``: SomaticPotentiallyActionable.Mutation list
+            ``Somatic Potentially Actionable Copy Number Variants``: SomaticPotentiallyActionable.CopyNumberVariant list
+            ``Somatic Biologically Relevant Variants``: SomaticBiologicallyRelevantVariant list
+            ``Somatic Variants of Unknown Significance``: SomaticVUS list
+            Fusions: Fusion list
+            ``Inherited Relevant Variants``: InheritedVariants
+            ``Inherited Variants Of Unknown Significance``: InheritedVariants } with
 
-            static member Decoder : Decoder<Json> =
+            static member Decoder : Decoder<Results> =
                 Decode.object (fun get ->
                     // microsatellite instability status will either be a string field or an object that might have a 'Status' field
                     let msiObject = ["microsatelliteInstability"; "status"] |> flip get.Optional.At Decoder.Optional.string // object with optional "status" field
                     let msiStringField = "msiStatus" |> flip get.Optional.Field Decoder.Optional.string // field could be null, blank string, or actual value
                     let msiStatus = msiStringField |> Option.orElse msiObject |> Option.flatten
 
-                    { TumorMutationBurden           = "tumorMutationalBurden"         |> flip get.Required.Field Decoder.Optional.float // can either be a float, blank string (i.e. ""), or null
-                      TumorMutationBurdenPercentile = "tumorMutationBurdenPercentile" |> flip get.Required.Field Decoder.Optional.unsignedInteger // can either be an integer, blank string, or null
-                      MsiStatus                     = msiStatus
-                      ``Somatic Potentially Actionable Mutations`` = "somaticPotentiallyActionableMutations" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Mutation``.Json.Decoder)
-                      ``Somatic Potentially Actionable Copy Number Variants`` = "somaticPotentiallyActionableCopyNumberVariants" |> flip get.Required.Field (Decode.list ``Somatic Potentially Actionable Copy Number Variant``.Json.Decoder)
-                      ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list ``Somatic Biologically Relevant Variant``.Json.Decoder)
-                      ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list ``Somatic Variant of Unknown Significance``.Json.Decoder)
-                      Fusions = "fusionVariants" |> flip get.Required.Field (Decode.list Fusion.Json.Decoder)
-                      ``Inherited Relevant Variants`` = "inheritedRelevantVariants" |> flip get.Required.Field InheritedVariants.Json.Decoder
-                      ``Inherited Variants Of Unknown Significance`` = "inheritedVariantsOfUnknownSignificance" |> flip get.Required.Field InheritedVariants.Json.Decoder
+                    { TumorMutationBurden = get.Required.Raw TumorMutationBurden.Decoder
+                      MsiStatus           = msiStatus
+                      ``Somatic Potentially Actionable Mutations`` = "somaticPotentiallyActionableMutations" |> flip get.Required.Field (Decode.list SomaticPotentiallyActionable.Mutation.Decoder)
+                      ``Somatic Potentially Actionable Copy Number Variants`` = "somaticPotentiallyActionableCopyNumberVariants" |> flip get.Required.Field (Decode.list SomaticPotentiallyActionable.CopyNumberVariant.Decoder)
+                      ``Somatic Biologically Relevant Variants``   = "somaticBiologicallyRelevantVariants"  |> flip get.Required.Field (Decode.list SomaticBiologicallyRelevantVariant.Decoder)
+                      ``Somatic Variants of Unknown Significance`` = "somaticVariantsOfUnknownSignificance" |> flip get.Required.Field (Decode.list SomaticVUS.Decoder)
+                      Fusions = "fusionVariants" |> flip get.Required.Field (Decode.list Fusion.Decoder)
+                      ``Inherited Relevant Variants`` = "inheritedRelevantVariants" |> flip get.Required.Field InheritedVariants.Decoder
+                      ``Inherited Variants Of Unknown Significance`` = "inheritedVariantsOfUnknownSignificance" |> flip get.Required.Field InheritedVariants.Decoder
                     } )
 
-        open FsToolkit.ErrorHandling
+        /// The `results` section in the Tempus report
+        module Results =
 
-        /// Validate the `results` section of the json report
-        let validate (json: Json) =
-            validation {
-                let! tmb = (json.TumorMutationBurden           |> Option.map TumorMutationBurden.ScoreInput,
-                            json.TumorMutationBurdenPercentile |> Option.map TumorMutationBurden.PercentileInput) ||> TumorMutationBurden.validateOptional
-                and! msiStatus = json.MsiStatus |> Option.map MicrosatelliteInstabilityStatus.Input |> MicrosatelliteInstabilityStatus.validateOptional
-                and! somaticPotentiallyActionableMutations = json.``Somatic Potentially Actionable Mutations`` |> ``Somatic Potentially Actionable Mutations``.validate
-                and! somaticPotentiallyActionableCopyNumberVariants = json.``Somatic Potentially Actionable Copy Number Variants`` |> ``Somatic Potentially Actionable Copy Number Variants``.validate
-                and! somaticPotentiallyRelevantVariants = json.``Somatic Biologically Relevant Variants`` |> ``Somatic Biologically Relevant Variants``.validate
-                and! somaticVariantsOfUnknownSignificance = json.``Somatic Variants of Unknown Significance`` |> ``Somatic Variants of Unknown Significance``.validate
-                and! fusions = json.Fusions |> Fusions.validate
-                and! inheritedRelevantVariants = json.``Inherited Relevant Variants`` |> ``Inherited Relevant Variants``.validate
-                and! inheritedVUS = json.``Inherited Variants Of Unknown Significance`` |> ``Inherited Variants Of Unknown Significance``.validate
+            open FsToolkit.ErrorHandling
 
-                return { TumorMutationBurden = tmb
-                         MicrosatelliteInstabilityStatus = msiStatus
-                         ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
-                         ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
-                         ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
-                         ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
-                         Fusions = fusions
-                         ``Inherited Relevant Variants`` = inheritedRelevantVariants
-                         ``Inherited Variants of Unknown Significance`` = inheritedVUS
-                       } }
+            /// Validate the `results` section of the json report
+            let validate (results: Results) =
+                validation {
+                    let! tmb = results.TumorMutationBurden |> TumorMutationBurden.validateOptional
+                    and! msiStatus = results.MsiStatus |> MicrosatelliteInstabilityStatus.validateOptional
+                    and! somaticPotentiallyActionableMutations = results.``Somatic Potentially Actionable Mutations`` |> SomaticPotentiallyActionable.Mutations.validate
+                    and! somaticPotentiallyActionableCopyNumberVariants = results.``Somatic Potentially Actionable Copy Number Variants`` |> SomaticPotentiallyActionable.CopyNumberVariants.validate
+                    and! somaticPotentiallyRelevantVariants = results.``Somatic Biologically Relevant Variants`` |> SomaticBiologicallyRelevantVariants.validate
+                    and! somaticVariantsOfUnknownSignificance = results.``Somatic Variants of Unknown Significance`` |> SomaticVUSes.validate
+                    and! fusions = results.Fusions |> Fusions.validate
+                    and! inheritedRelevantVariants = results.``Inherited Relevant Variants`` |> InheritedRelevantVariants.validate
+                    and! inheritedVUS = results.``Inherited Variants Of Unknown Significance`` |> InheritedVUS.validate
 
-    type Json =
-        { Order: Order.Json
-          Lab: Lab.Json
-          Report: Report.Json
-          Patient: Patient.Json
-          Samples: Sample.Json list
-          Results: Results.Json }
+                    return ({
+                        TumorMutationBurden = tmb
+                        MicrosatelliteInstabilityStatus = msiStatus
+                        ``Somatic Potentially Actionable Mutations`` = somaticPotentiallyActionableMutations
+                        ``Somatic Potentially Actionable Copy Number Variants`` = somaticPotentiallyActionableCopyNumberVariants
+                        ``Somatic Biologically Relevant Variants`` = somaticPotentiallyRelevantVariants
+                        ``Somatic Variants of Unknown Significance`` = somaticVariantsOfUnknownSignificance
+                        Fusions = fusions
+                        ``Inherited Relevant Variants`` = inheritedRelevantVariants
+                        ``Inherited Variants of Unknown Significance`` = inheritedVUS
+                    } : Domain.Results) }
 
-          /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
-          static member Decoder : Decoder<Json> =
-              Decode.object (fun get ->
-                  { Lab     = "lab"       |> flip get.Required.Field Lab.Json.Decoder
-                    Report  = "report"    |> flip get.Required.Field Report.Json.Decoder
-                    Patient = "patient"   |> flip get.Required.Field Patient.Json.Decoder
-                    Order   = "order"     |> flip get.Required.Field Order.Json.Decoder
-                    Samples = "specimens" |> flip get.Required.Field (Decode.list Sample.Json.Decoder)
-                    Results = "results"   |> flip get.Required.Field Results.Json.Decoder
-                  } )
+        type OverallReport =
+            { Order: Order
+              Lab: Lab
+              Report: Report
+              Patient: Patient
+              Samples: Sample list
+              Results: Results }
+
+            /// deserialize the json file as a whole: the lab, report, patient, order, and specimens object
+            static member Decoder : Decoder<OverallReport> =
+                  Decode.object (fun get ->
+                      { Lab     = "lab"       |> flip get.Required.Field Lab.Decoder
+                        Report  = "report"    |> flip get.Required.Field Report.Decoder
+                        Patient = "patient"   |> flip get.Required.Field Patient.Decoder
+                        Order   = "order"     |> flip get.Required.Field Order.Decoder
+                        Samples = "specimens" |> flip get.Required.Field (Decode.list Sample.Decoder)
+                        Results = "results"   |> flip get.Required.Field Results.Decoder
+                      } )
 
             member this.TumorSample =
                 this.Samples |> Seq.find (fun sample -> sample.SampleCategory = "tumor")
@@ -1506,17 +1598,12 @@ module Tempus =
             member this.TryNormalSample =
                 this.Samples |> Seq.tryFind (fun sample -> sample.SampleCategory = "normal")
 
-    module OverallReport =
-        let patientHasMrn (overallReport: OverallReport) =
-            overallReport.Patient.MRN.IsSome
-
-    module Json =
         type Error =
           { FileName: string
             Error: string }
 
         let deserialize =
-            Decode.fromString Json.Decoder
+            Decode.fromString OverallReport.Decoder
 
         let deserializeWithError fileName =
             deserialize
@@ -1525,30 +1612,31 @@ module Tempus =
         open FsToolkit.ErrorHandling
 
         /// Validate an overall report
-        let validate (json: Json) =
+        let validate (overallReport: OverallReport) =
             validation {
-                let! lab     = json.Lab     |> Lab.validate
-                and! report  = json.Report  |> Report.validate
-                and! patient = json.Patient |> Patient.validate
-                and! order   = json.Order   |> Order.Json.validate
-                and! tumorSample  = json.TumorSample     |> TumorSample.validate
-                and! normalSample = json.TryNormalSample |> NormalSample.validateOptional
-                and! results = json.Results |> Results.validate
+                let! lab     = overallReport.Lab     |> Lab.validate
+                and! report  = overallReport.Report  |> Report.validate
+                and! patient = overallReport.Patient |> Patient.validate
+                and! order   = overallReport.Order   |> Order.validate
+                and! tumorSample  = overallReport.TumorSample     |> TumorSample.validate
+                and! normalSample = overallReport.TryNormalSample |> NormalSample.validateOptional
+                and! results = overallReport.Results |> Results.validate
 
-                return { Lab     = lab
-                         Report  = report
-                         Patient = patient
-                         Order   = order
-                         TumorSample  = tumorSample
-                         NormalSample = normalSample
-                         Results = results
-                       } }
+                return ({
+                    Lab     = lab
+                    Report  = report
+                    Patient = patient
+                    Order   = order
+                    TumorSample  = tumorSample
+                    NormalSample = normalSample
+                    Results = results
+                } : Domain.OverallReport) }
 
-    module Database =
+    module DTO =
         open Database
 
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
-        let tryPatientRow (overallReport: OverallReport) =
+        let tryPatientRow (overallReport: Domain.OverallReport) =
             let row = context.Public.Patients.Create()
             let patient = overallReport.Patient
 
@@ -1565,21 +1653,21 @@ module Tempus =
             )
 
         /// Build a row to be inserted into the `vendors` database table.
-        let toVendorRow (overallReport: OverallReport) =
+        let toVendorRow (overallReport: Domain.OverallReport) =
             let row = context.Public.Vendors.Create()
             let lab = overallReport.Lab
 
-            row.Name          <- lab.LabName.Value
+            row.Name          <- lab.Name.Value
             row.CliaNumber    <- lab.CliaNumber.Value
-            row.StreetAddress <- lab.Address.StreetAddress.Value
+            row.StreetAddress <- lab.Address.Street.Value
             row.City          <- lab.Address.City.Value
             row.State         <- lab.Address.State.Value
-            row.ZipCode       <- lab.Address.Zipcode.Value
+            row.ZipCode       <- lab.Address.Zip.Value
 
             row
 
         /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
-        let tryReportRow (overallReport: OverallReport) =
+        let tryReportRow (overallReport: Domain.OverallReport) =
             let patient = overallReport.Patient
 
             patient.TryMrnValue
@@ -1599,7 +1687,7 @@ module Tempus =
 
                 row.TumorMutationalBurden <- results.TryTmbScoreValue
                 row.TumorMutationalBurdenPercentile <- results.TryTmbPercentileValue |> Option.map int
-                row.MsiStatus <- results.TryMsiStatusValue
+                row.MsiStatus <- results.TryMsiValue
 
                 row.DiagnosisName <- patient.DiagnosisName.Value
                 row.DiagnosisDate <- patient.TryDiagnosisDateValue
@@ -1608,33 +1696,33 @@ module Tempus =
             )
 
         /// Build a row for the tumor sample to be inserted into the `samples` database table.
-        let toTumorSampleRow (overallReport: OverallReport) =
+        let toTumorSampleRow (overallReport: Domain.OverallReport) =
             let tumorSample = overallReport.TumorSample
             let row = context.Public.Samples.Create()
 
             row.Category   <- "tumor"
             row.SampleId   <- tumorSample.SampleId.Value.ToString()
-            row.BiopsySite <- tumorSample.SampleSite.Value
-            row.SampleType <- tumorSample.SampleType.Value
+            row.BiopsySite <- tumorSample.Site.Value
+            row.SampleType <- tumorSample.Type.Value
 
             row
 
         /// Build a row for the normal sample, if it exists, to be inserted into the `samples` database table.
-        let tryNormalSampleRow (overallReport: OverallReport) =
+        let tryNormalSampleRow (overallReport: Domain.OverallReport) =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
                 let row = context.Public.Samples.Create()
 
                 row.Category   <- "normal"
                 row.SampleId   <- normalSample.SampleId.Value.ToString()
-                row.BiopsySite <- normalSample.SampleSite.Value
-                row.SampleType <- normalSample.SampleType.Value
+                row.BiopsySite <- normalSample.Site.Value
+                row.SampleType <- normalSample.Type.Value
 
                 row
             )
 
         /// Build a row for the tumor sample to be inserted into the `sample_reports` database table
-        let toTumorSampleReportRow (overallReport: OverallReport) =
+        let toTumorSampleReportRow (overallReport: Domain.OverallReport) =
             let tumorSample = overallReport.TumorSample
             let report = overallReport.Report
             let row = context.Public.SampleReports.Create()
@@ -1643,15 +1731,15 @@ module Tempus =
             row.ReportId <- report.ReportId.Value.ToString()
             row.BlockId  <- tumorSample.TryBlockIdValue
 
-            row.CollectionDate <- tumorSample.SampleDates.CollectionDate.Value
-            row.ReceiptDate    <- tumorSample.SampleDates.ReceivedDate.Value
+            row.CollectionDate <- tumorSample.Dates.CollectionDate.Value
+            row.ReceiptDate    <- tumorSample.Dates.ReceivedDate.Value
 
             row.TumorPercentage <- tumorSample.TryTumorPercentageValue |> Option.map int
 
             row
 
         /// Build a row for the normal sample, if it exists, to be insterested into the `sample_reports` database table
-        let tryNormalSampleReportRow (overallReport: OverallReport) =
+        let tryNormalSampleReportRow (overallReport: Domain.OverallReport) =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
 
@@ -1662,15 +1750,13 @@ module Tempus =
                 row.ReportId <- report.ReportId.Value.ToString()
                 row.BlockId  <- normalSample.TryBlockIdValue
 
-                row.CollectionDate <- normalSample.SampleDates.CollectionDate.Value
-                row.ReceiptDate    <- normalSample.SampleDates.ReceivedDate.Value
-
-                row.TumorPercentage <- normalSample.TryTumorPercentageValue |> Option.map int
+                row.CollectionDate <- normalSample.Dates.CollectionDate.Value
+                row.ReceiptDate    <- normalSample.Dates.ReceivedDate.Value
 
                 row
             )
 
-        let toGeneRows (overallReport: OverallReport) =
+        let toGeneRows (overallReport: Domain.OverallReport) =
             let results = overallReport.Results
             let somaticPotentiallyActionableGenes = results.``Somatic Potentially Actionable Mutations`` |> List.map (fun mutation -> mutation.Gene)
             let somaticPotentiallyActionableCopyNumberGenes = results.``Somatic Potentially Actionable Copy Number Variants`` |> List.map (fun variant -> variant.Gene)
@@ -1690,14 +1776,14 @@ module Tempus =
             |> List.map (fun gene ->
                 let row = context.Public.Genes.Create()
 
-                row.Name <- gene.GeneName.Value
+                row.Name <- gene.Name.Value
                 row.HgncId <- Some gene.HgncId.Value
 
                 row
             )
 
         /// Build variant rows to be inserted into the `variants` database table. This function assumes that an existing sample report exists in the dtabase.
-        let toVariantRows (overallReport: OverallReport) =
+        let toVariantRows (overallReport: Domain.OverallReport) =
             let results = overallReport.Results
             let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
             let reportId = overallReport.Report.ReportId.Value.ToString()
@@ -1710,17 +1796,27 @@ module Tempus =
                     exactlyOne
                 }
 
-            results.``Somatic Potentially Actionable Mutations`` |> Seq.collect (fun mutation ->
+            results.``Somatic Potentially Actionable Mutations``
+            |> Seq.collect (fun mutation ->
                 let row = context.Public.Variants.Create()
 
-                row.GeneName <- mutation.Gene.GeneName.Value
+                row.GeneName <- mutation.Gene.Name.Value
                 row.SampleReportId <- sampleReportId
+                row.Category <- "somatic"
+                row.Assessment <- "potentially_actionable" |> Some
 
                 mutation.Variants
                 |> Seq.map (fun variant ->
+                    row.Description <- variant.Description.Value |> Some
+                    row.Name <- variant.HGVS.MutationEffect
+
                     row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
+                    row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
+                    row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
+                    row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
+                    row.Transcript <- variant.HGVS.ReferenceSequence.Value |> Some
+
                     row.AllelicFraction <- variant.TryAllelicFractionValue
-                    row.HgvsProtein <- variant.HGVS.ProteinChange
 
                     row
                 )
