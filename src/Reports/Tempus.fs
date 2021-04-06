@@ -64,8 +64,6 @@ module Tempus =
                     |> Option.map (fun proteinChange -> proteinChange.Abbreviated.Value)
                     |> Option.defaultValue this.CodingChange.Value
 
-
-
         type DiagnosisName =
             internal | DiagnosisName of string
             member this.Value = this |> fun (DiagnosisName diagnosisName) -> diagnosisName
@@ -86,7 +84,6 @@ module Tempus =
                     | Male -> "male"
                     | Female -> "female"
 
-
         /// the `patients` section in the Tempus report
         type Patient =
             { MRN: Patient.MRN option
@@ -103,7 +100,6 @@ module Tempus =
 
             member this.TryDiagnosisDateValue =
                 this.DiagnosisDate |> Option.map (fun diagnosisDate -> diagnosisDate.Value)
-
 
         module Order =
             type Identifier  = internal Identifier of string
@@ -129,7 +125,6 @@ module Tempus =
               OrderId: Order.Identifier
               AccessionId: Order.OrderAccessionId
               Test: Order.Test }
-
 
         module Sample =
             type Identifier =
@@ -316,11 +311,27 @@ module Tempus =
                     | RelevantGene gene -> [gene]
                     | RelevantFusion fusion -> fusion.Genes
 
+                member this.IsFusion =
+                    match this with
+                    | RelevantFusion _ -> true
+                    | _ -> false
+
+                member this.IsGene =
+                    match this with
+                    | RelevantGene _ -> true
+                    | _ -> false
+
             type Type =
                 internal
                 | CNV
                 | SNV
                 | Fusion
+
+                member this.Value =
+                    match this with
+                    | CNV -> "CNV"
+                    | SNV -> "SNV"
+                    | Fusion -> "Fusion"
 
             type Variant =
                 { Mutation: Mutation
@@ -329,8 +340,34 @@ module Tempus =
                   NucleotideAlteration: Variant.NucleotideAlteration option
                   Type: Type }
 
+                member this.IsFusion = this.Mutation.IsFusion
+                member this.IsGene = this.Mutation.IsGene
+
+                member this.TryHgvsMutationEffect =
+                    this.HGVS |> Option.map (fun hgvs -> hgvs.MutationEffect)
+
+                member this.TryAllelicFractionValue =
+                    this.AllelicFraction |> Option.map (fun af -> af.Value)
+
+                member this.TryNucleotideAlterationValue =
+                    this.NucleotideAlteration |> Option.map (fun na -> na.Value)
+
+                member this.TryRelevantGene =
+                    match this.Mutation with
+                    | RelevantGene gene -> Some gene
+                    | _ -> None
+
+                member this.TryRelevantFusion =
+                    match this.Mutation with
+                    | RelevantFusion fusion -> Some fusion
+                    | _ -> None
+
         module SomaticVUS =
-            type Type = internal | SNV
+            type Type =
+                internal | SNV
+                member this.Value =
+                    match this with
+                    | SNV -> "SNV"
 
         /// an entry found in `results.SomaticVariantsOfUnknownSignificance`
         type SomaticVUS =
@@ -910,7 +947,7 @@ module Tempus =
                     | "normal" -> Ok "normal"
                     | _ -> Error $"Sample category is not normal: {category}"
 
-            
+
             open Domain.Sample
 
             /// Validate a normal sample
@@ -1589,6 +1626,112 @@ module Tempus =
     module DTO =
         open Database
 
+        module SomaticPotentiallyActionable =
+            open Domain.SomaticPotentiallyActionable
+
+            module Mutation =
+                /// Convert a somatic, potentially actionable mutation to rows in the `variants` database table
+                /// Sample report must already exist.
+                let toVariantRows (sampleReportId: System.Guid) (mutation: Mutation) =
+                    mutation.Variants
+                    |> List.map (fun variant ->
+                        let row = context.Public.Variants.Create()
+
+                        row.GeneName <- mutation.Gene.Name.Value
+                        row.SampleReportId <- sampleReportId
+                        row.Name <- variant.HGVS.MutationEffect
+
+                        row.Category <- "somatic"
+                        row.Description <- variant.Description.Value |> Some
+                        row.Assessment <- "potentially_actionable" |> Some
+
+                        row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
+                        row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
+                        row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
+                        row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
+                        row.Transcript <- variant.HGVS.ReferenceSequence.Value |> Some
+
+                        row.AllelicFraction <- variant.TryAllelicFractionValue
+
+                        row
+                    )
+
+            module CopyNumberVariant =
+                /// Convert a somatic, potentially actionable copy number variant to a row in the `variants` database table
+                /// Sample report must already exist.
+                let toVariantRows (sampleReportId: System.Guid) (copyNumberVariant: CopyNumberVariant) =
+                    let row = context.Public.Variants.Create()
+
+                    row.GeneName <- copyNumberVariant.Gene.Name.Value
+                    row.SampleReportId <- sampleReportId
+                    row.Name <- copyNumberVariant.Gene.Name.Value
+
+                    row.Category <- "somatic"
+                    row.Description <- copyNumberVariant.Description.Value |> Some
+                    row.Assessment <- "potentially_actionable" |> Some
+                    row.Type <- copyNumberVariant.Type.Value |> Some
+
+                    row
+
+        module SomaticBiologicallyRelevantVariant =
+            open Domain.SomaticBiologicallyRelevant
+
+            /// Try to convert a somatic, biologically relevant variant to a row in the `variants` database table
+            let tryVariantRow (sampleReportId: System.Guid) (variant: Variant) =
+                variant.TryRelevantGene |> Option.map (fun relevantGene ->
+                    let row = context.Public.Variants.Create()
+
+                    row.GeneName       <- relevantGene.Name.Value
+                    row.SampleReportId <- sampleReportId
+                    row.Name <- variant.TryHgvsMutationEffect |> Option.defaultValue relevantGene.Name.Value
+
+                    row.Category   <- "somatic"
+                    row.Assessment <- "biologically_relevant"    |> Some
+                    row.Type       <- variant.Type.Value |> Some
+                    row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
+
+                    row.AllelicFraction <- variant.TryAllelicFractionValue
+
+                    row
+                )
+
+            /// Try to convert a somatic, biologically relevant variant to a row in the `fusions` database table
+            let tryFusionRow (sampleReportId: System.Guid) (variant: Variant) =
+                variant.TryRelevantFusion |> Option.map (fun fusion ->
+                    let row = context.Public.Fusions.Create()
+
+                    row.SampleReportId <- sampleReportId
+                    row.FirstGeneName  <- fusion.``3' Gene``.Name.Value
+                    row.SecondGeneName <- fusion.``5' Gene``.Name.Value
+                    row.FusionType     <- variant.Type.Value
+
+                    row
+                )
+
+        module SomaticVUS =
+            /// convert a somatic variant of unknown significance to a row in the `variants` database table
+            let toVariantRow (sampleReportId: System.Guid) (vus: Domain.SomaticVUS) =
+                let row = context.Public.Variants.Create()
+
+                row.GeneName <- vus.Gene.Name.Value
+                row.SampleReportId <- sampleReportId
+                row.Name <- vus.Hgvs.MutationEffect
+
+                row.Category <- "somatic"
+                row.Type <- vus.Type.Value |> Some
+                row.Description <- vus.Description.Value |> Some
+                row.NucleotideAlteration <- vus.NucleotideAlteration.Value |> Some
+
+                row.HgvsProtein <- vus.Hgvs.TryAbbreviatedProteinChangeValue
+                row.HgvsProteinFull <- vus.Hgvs.TryFullProteinChangeValue
+                row.HgvsC <- vus.Hgvs.CodingChange.Value |> Some
+                row.Transcript <- vus.Hgvs.ReferenceSequence.Value |> Some
+
+                row.AllelicFraction <- vus.AllelicFraction.Value |> Some
+
+                row
+
+
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
         let tryPatientRow (overallReport: Domain.OverallReport) =
             let row = context.Public.Patients.Create()
@@ -1750,28 +1893,42 @@ module Tempus =
                     exactlyOne
                 }
 
-            results.``Somatic Potentially Actionable Mutations``
-            |> Seq.collect (fun mutation ->
-                let row = context.Public.Variants.Create()
+            let somaticActionableMutationRows =
+                results.``Somatic Potentially Actionable Mutations``
+                |> List.collect (SomaticPotentiallyActionable.Mutation.toVariantRows sampleReportId)
 
-                row.GeneName <- mutation.Gene.Name.Value
-                row.SampleReportId <- sampleReportId
-                row.Category <- "somatic"
-                row.Assessment <- "potentially_actionable" |> Some
+            let somaticActionableCopyNumberRows =
+                results.``Somatic Potentially Actionable Copy Number Variants``
+                |> List.map (SomaticPotentiallyActionable.CopyNumberVariant.toVariantRows sampleReportId)
 
-                mutation.Variants
-                |> Seq.map (fun variant ->
-                    row.Description <- variant.Description.Value |> Some
-                    row.Name <- variant.HGVS.MutationEffect
+            let somaticRelevantRows =
+                results.``Somatic Biologically Relevant Variants``
+                |> List.choose (SomaticBiologicallyRelevantVariant.tryVariantRow sampleReportId)
 
-                    row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
-                    row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
-                    row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
-                    row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
-                    row.Transcript <- variant.HGVS.ReferenceSequence.Value |> Some
+            let somaticVusRows =
+                results.``Somatic Variants of Unknown Significance``
+                |> List.map (SomaticVUS.toVariantRow sampleReportId)
 
-                    row.AllelicFraction <- variant.TryAllelicFractionValue
+            somaticActionableMutationRows
+            @ somaticActionableCopyNumberRows
+            @ somaticRelevantRows
+            @ somaticVusRows
 
-                    row
-                )
-            )
+
+        let toFusionRows (overallReport: Domain.OverallReport) =
+            let results = overallReport.Results
+            let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
+            let reportId = overallReport.Report.ReportId.Value.ToString()
+
+            let sampleReportId =
+                query {
+                    for sampleReport in context.Public.SampleReports do
+                    where (sampleReport.ReportId = reportId && sampleReport.SampleId = sampleId)
+                    select sampleReport.Id
+                    exactlyOne
+                }
+
+            results.``Somatic Biologically Relevant Variants``
+            |> List.choose (SomaticBiologicallyRelevantVariant.tryFusionRow sampleReportId)
+
+
