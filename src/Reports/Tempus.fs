@@ -426,11 +426,14 @@ module Tempus =
                     | ``Likely Pathogenic`` -> "likely pathogenic"
                     | Pathogenic -> "pathogenic"
                     | ``Risk Allele`` -> "risk allele"
-                    | ``VUS Favoring Pathogenic`` -> "VUS favoring pathogenic"
+                    | ``VUS Favoring Pathogenic`` -> "variant of unknown significance favoring pathogenic"
 
         module InheritedVUS =
             type ClinicalSignificance =
                 internal | ``Variant of Unknown Significance``
+                member this.Value =
+                    match this with
+                    | ``Variant of Unknown Significance`` -> "variant of unknown signficance"
 
         type InheritedRelevantVariants = InheritedVariants<InheritedRelevantVariants.ClinicalSignificance>
         type InheritedVUS = InheritedVariants<InheritedVUS.ClinicalSignificance>
@@ -1784,6 +1787,28 @@ module Tempus =
                     row
                 )
 
+        module InheritedVUS =
+            let toVariantRows (sampleReportId: System.Guid) (vus: Domain.InheritedVUS) =
+                vus.Values |> List.map (fun variant ->
+                    let row = context.Public.Variants.Create()
+
+                    row.SampleReportId <- sampleReportId
+                    row.GeneName <- variant.Gene.Name.Value
+                    row.Name <- variant.HGVS.MutationEffect
+
+                    row.Category <- "germline"
+                    row.Assessment <- variant.ClinicalSignificance.Value |> Some
+                    row.Description <- variant.Description.Value |> Some
+
+                    row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
+                    row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
+                    row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
+
+                    row.AllelicFraction <- variant.AllelicFraction.Value |> Some
+
+                    row
+                )
+
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
         let tryPatientRow (overallReport: Domain.OverallReport) =
             let row = context.Public.Patients.Create()
@@ -1965,11 +1990,16 @@ module Tempus =
                 results.``Inherited Relevant Variants``
                 |> InheritedRelevantVariant.toVariantRows sampleReportId
 
+            let inheritedVusRows =
+                results.``Inherited Variants of Unknown Significance``
+                |> InheritedVUS.toVariantRows sampleReportId
+
             somaticActionableMutationRows
             @ somaticActionableCopyNumberRows
             @ somaticRelevantRows
             @ somaticVusRows
             @ inheritedRelevantVariantRows
+            @ inheritedVusRows
 
 
         let toFusionRows (overallReport: Domain.OverallReport) =
