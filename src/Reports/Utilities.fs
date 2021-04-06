@@ -204,6 +204,16 @@ module Utilities =
             | NotBlank -> Ok str
             | _ -> Error "Can't be blank"
 
+        let validateUnsignedInteger str =
+            str
+            |> UnsignedInteger.tryParse
+            |> Option.toResult $"Invalid unsigned integer: {str}"
+
+        let validateUnsignedInteger64 str =
+            str
+            |> UnsignedInteger64.tryParse
+            |> Option.toResult $"Invalid unsigned integer 64: {str}"
+
         let validateDateTime str =
             str
             |> DateTime.tryParse
@@ -221,6 +231,24 @@ module Utilities =
             let validateNotBlank (createValidType: string -> 'validType) errorMessage input =
                 input
                 |> validateNotBlank
+                |> Result.map createValidType
+                |> Result.mapError (fun _ -> errorMessage)
+
+            let validateDateTime (createValidType: System.DateTime -> 'validType) errorMessage input =
+                input
+                |> validateDateTime
+                |> Result.map createValidType
+                |> Result.mapError (fun _ -> errorMessage)
+
+            let validateUnsignedInteger (createValidType: uint -> 'validType) errorMessage input =
+                input
+                |> validateUnsignedInteger
+                |> Result.map createValidType
+                |> Result.mapError (fun _ -> errorMessage)
+
+            let validateUnsignedInteger64 (createValidType: uint64 -> 'validType) errorMessage input =
+                input
+                |> validateUnsignedInteger64
                 |> Result.map createValidType
                 |> Result.mapError (fun _ -> errorMessage)
 
