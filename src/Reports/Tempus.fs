@@ -213,13 +213,23 @@ module Tempus =
                 internal | Description of string
                 member this.Value = this |> fun (Description description) -> description
 
-
         module Fusion =
-            type Type = internal | GeneFusion
+            type Type =
+                internal | GeneFusion
+
+                member this.Value =
+                    match this with
+                    | GeneFusion -> "GeneFusion"
+
             type VariantDescription =
                 internal
                 | ``Chromosomal rearrangement``
                 | ``Deletion (exons 2-7)``
+
+                member this.Value =
+                    match this with
+                    | ``Chromosomal rearrangement`` -> "Chromosomal rearrangement"
+                    | ``Deletion (exons 2-7)`` -> "Deletion (exons 2-7)"
 
         type Fusion =
             { ``5' Gene``: Gene
@@ -228,7 +238,7 @@ module Tempus =
               VariantDescription: Fusion.VariantDescription }
 
             member this.Genes = [this.``5' Gene``; this.``3' Gene``]
-
+            member this.TryTypeValue = this.FusionType |> Option.map (fun fusionType -> fusionType.Value)
 
         module TumorMutationBurden =
             type Score =
@@ -1731,6 +1741,18 @@ module Tempus =
 
                 row
 
+        module Fusion =
+            let toFusionRow (sampleReportId: System.Guid) (fusion: Domain.Fusion) =
+                let row = context.Public.Fusions.Create()
+
+                row.FirstGeneName <- fusion.``5' Gene``.Name.Value
+                row.SecondGeneName <- fusion.``3' Gene``.Name.Value
+                row.SampleReportId <- sampleReportId
+
+                row.FusionType <- fusion.TryTypeValue |> Option.defaultValue ""
+                row.Description <- fusion.VariantDescription.Value |> Some
+
+                row
 
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
         let tryPatientRow (overallReport: Domain.OverallReport) =
@@ -1928,7 +1950,15 @@ module Tempus =
                     exactlyOne
                 }
 
-            results.``Somatic Biologically Relevant Variants``
-            |> List.choose (SomaticBiologicallyRelevantVariant.tryFusionRow sampleReportId)
+            let relevantFusionRows =
+                results.``Somatic Biologically Relevant Variants``
+                |> List.choose (SomaticBiologicallyRelevantVariant.tryFusionRow sampleReportId)
+
+            let fusionRows =
+                results.Fusions
+                |> List.map (Fusion.toFusionRow sampleReportId)
+
+            relevantFusionRows
+            @ fusionRows
 
 
