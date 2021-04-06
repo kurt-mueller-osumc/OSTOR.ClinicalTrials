@@ -421,6 +421,13 @@ module Tempus =
                 | ``Risk Allele``
                 | ``VUS Favoring Pathogenic``
 
+                member this.Value =
+                    match this with
+                    | ``Likely Pathogenic`` -> "likely pathogenic"
+                    | Pathogenic -> "pathogenic"
+                    | ``Risk Allele`` -> "risk allele"
+                    | ``VUS Favoring Pathogenic`` -> "VUS favoring pathogenic"
+
         module InheritedVUS =
             type ClinicalSignificance =
                 internal | ``Variant of Unknown Significance``
@@ -1653,7 +1660,7 @@ module Tempus =
 
                         row.Category <- "somatic"
                         row.Description <- variant.Description.Value |> Some
-                        row.Assessment <- "potentially_actionable" |> Some
+                        row.Assessment <- "potentially actionable" |> Some
 
                         row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
                         row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
@@ -1678,7 +1685,7 @@ module Tempus =
 
                     row.Category <- "somatic"
                     row.Description <- copyNumberVariant.Description.Value |> Some
-                    row.Assessment <- "potentially_actionable" |> Some
+                    row.Assessment <- "potentially actionable" |> Some
                     row.Type <- copyNumberVariant.Type.Value |> Some
 
                     row
@@ -1696,7 +1703,7 @@ module Tempus =
                     row.Name <- variant.TryHgvsMutationEffect |> Option.defaultValue relevantGene.Name.Value
 
                     row.Category   <- "somatic"
-                    row.Assessment <- "biologically_relevant"    |> Some
+                    row.Assessment <- "biologically relevant"    |> Some
                     row.Type       <- variant.Type.Value |> Some
                     row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
 
@@ -1728,10 +1735,11 @@ module Tempus =
                 row.Name <- vus.Hgvs.MutationEffect
 
                 row.Category <- "somatic"
+                row.Assessment <- "unknown significance" |> Some
                 row.Type <- vus.Type.Value |> Some
                 row.Description <- vus.Description.Value |> Some
-                row.NucleotideAlteration <- vus.NucleotideAlteration.Value |> Some
 
+                row.NucleotideAlteration <- vus.NucleotideAlteration.Value |> Some
                 row.HgvsProtein <- vus.Hgvs.TryAbbreviatedProteinChangeValue
                 row.HgvsProteinFull <- vus.Hgvs.TryFullProteinChangeValue
                 row.HgvsC <- vus.Hgvs.CodingChange.Value |> Some
@@ -1753,6 +1761,28 @@ module Tempus =
                 row.Description <- fusion.VariantDescription.Value |> Some
 
                 row
+
+        module InheritedRelevantVariant =
+            let toVariantRows (sampleReportId: System.Guid) (variants: Domain.InheritedRelevantVariants) =
+                variants.Values |> List.map (fun variant ->
+                    let row = context.Public.Variants.Create()
+
+                    row.SampleReportId <- sampleReportId
+                    row.GeneName <- variant.Gene.Name.Value
+                    row.Name <- variant.HGVS.MutationEffect
+
+                    row.Category <- "germline"
+                    row.Assessment <- variant.ClinicalSignificance.Value |> Some
+                    row.Description <- variant.Description.Value |> Some
+
+                    row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
+                    row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
+                    row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
+
+                    row.AllelicFraction <- variant.AllelicFraction.Value |> Some
+
+                    row
+                )
 
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
         let tryPatientRow (overallReport: Domain.OverallReport) =
@@ -1931,10 +1961,15 @@ module Tempus =
                 results.``Somatic Variants of Unknown Significance``
                 |> List.map (SomaticVUS.toVariantRow sampleReportId)
 
+            let inheritedRelevantVariantRows =
+                results.``Inherited Relevant Variants``
+                |> InheritedRelevantVariant.toVariantRows sampleReportId
+
             somaticActionableMutationRows
             @ somaticActionableCopyNumberRows
             @ somaticRelevantRows
             @ somaticVusRows
+            @ inheritedRelevantVariantRows
 
 
         let toFusionRows (overallReport: Domain.OverallReport) =
@@ -1960,5 +1995,3 @@ module Tempus =
 
             relevantFusionRows
             @ fusionRows
-
-
