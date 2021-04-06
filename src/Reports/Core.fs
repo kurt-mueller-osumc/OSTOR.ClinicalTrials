@@ -14,6 +14,8 @@ module Core =
             type FullName =
                 { LastName: LastName
                   FirstName: FirstName }
+                member this.Value =
+                    $"{this.LastName.Value}, {this.FirstName.Value}"
 
             type DateOfBirth =
                 internal | DateOfBirth of System.DateTime
