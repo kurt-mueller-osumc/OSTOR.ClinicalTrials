@@ -254,6 +254,8 @@ module Caris =
               Interpretation: Fusion.Interpretation
               Result: Fusion.Result }
 
+            member this.GeneNames = [this.Gene1Name; this.Gene2Name]
+
         module TumorMutationBurden =
             type Score =
                 internal
@@ -1172,9 +1174,10 @@ module Caris =
 
     module DTO =
         open Database
+        open Domain
 
         /// Convert report's patient information to a patient database row.
-        let toPatientRow (report: Domain.Report) =
+        let toPatientRow (report: Report) =
             let patient = report.Patient
             let row = context.Public.Patients.Create()
 
@@ -1200,7 +1203,7 @@ module Caris =
             row
 
         /// Prepare a database row in the "reports" table
-        let toReportRow (report: Domain.Report) =
+        let toReportRow (report: Report) =
             let row = context.Public.Reports.Create()
             let test = report.Test
             let patient = report.Patient
@@ -1234,7 +1237,7 @@ module Caris =
         /// Each report lists a sample that may be referred to across reports. Therefore, samples are given their own table and listings of a sample in a report are givne their own table.
         ///
         /// Only tumor samplesa are listed in Caris reports.
-        let toSampleRow (report: Domain.Report) =
+        let toSampleRow (report: Report) =
             let specimen = report.Specimen
             let row = context.Public.Samples.Create()
 
@@ -1246,7 +1249,7 @@ module Caris =
             row
 
         /// The parent sample and report must exist in the datbase.
-        let toSampleReportRow (report: Domain.Report) =
+        let toSampleReportRow (report: Report) =
             let specimen = report.Specimen
             let test = report.Test
             let row = context.Public.SampleReports.Create()
@@ -1258,13 +1261,14 @@ module Caris =
             row
 
         /// Convert all genomic alterations with molecular consequences to 'gene' database rows
-        let toGeneRows (report: Domain.Report) =
-            report.GenomicAlterationsWithMolecularConsequence
-            |> Seq.map (fun ga ->
+        let toGeneRows (report: Report) =
+            let geneNames   = report.GenomicAlterationsWithMolecularConsequence |> Seq.toList |> List.map (fun ga -> ga.GeneName)
+            let fusionGenes = report.Fusions |> Seq.toList |> List.collect (fun fusion -> fusion.GeneNames)
+
+            geneNames @ fusionGenes
+            |> List.map (fun geneName ->
                 let row = context.Public.Genes.Create()
-
-                row.Name <- ga.GeneName.Value
-
+                row.Name <- geneName.Value
                 row
             )
 
@@ -1272,15 +1276,8 @@ module Caris =
         /// Each genomic alteration with a "molecular consequence" will also have an hgvs coding change and protein change.
         ///
         /// Each variant row has a parent sample report and a parent gene. The parent sample report and gene must already exist in the database.
-        let toVariantRows (report: Domain.Report) =
-            // Find the existing sample report based on this report's report id and sample id
-            let sampleReportId =
-                query {
-                    for sampleReport in context.Public.SampleReports do
-                    where (sampleReport.ReportId = report.Test.ReportId.Value && sampleReport.SampleId = report.Specimen.SpecimenId.Value)
-                    select sampleReport.Id
-                    exactlyOne
-                }
+        let toVariantRows (sampleReportId: System.Guid) (report: Report) =
+
 
             report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
@@ -1299,33 +1296,50 @@ module Caris =
                 row.HgvsProtein <- ga.TryHgvsProteinChangeValue
                 row.Transcript <- ga.TryTranscriptIdValue
 
-                row
-            )
+                row)
 
-        let toFusionGeneRows (report: Domain.Report) =
-            report.Fusions
-            |> Seq.collect (fun fusion ->
-                let gene1Row = context.Public.Genes.Create()
-                let gene2Row = context.Public.Genes.Create()
-
-                gene1Row.Name <- fusion.Gene1Name.Value
-                gene2Row.Name <- fusion.Gene2Name.Value
-
-                [gene1Row; gene2Row]
-            )
-
-        let toFusionRows (report: Domain.Report) =
-            let reportId = report.Test.ReportId.Value
-
+        /// Assumes that fusion genes already exist in the database
+        let toFusionRows (sampleReportId: System.Guid) (report: Report) =
             report.Fusions
             |> Seq.map (fun fusion ->
                 let row = context.Public.Fusions.Create()
 
-                row.ReportId <- reportId
+                row.SampleReportId <- sampleReportId
+                // reow.SampleReportId
                 row.FirstGeneName  <- fusion.Gene1Name.Value
                 row.SecondGeneName <- fusion.Gene2Name.Value
-                row.Description    <- fusion.Interpretation.Value
+                row.Description    <- fusion.Interpretation.Value |> Some
                 row.FusionType <- "mutation"
 
                 row
             )
+
+        // Find the existing sample report based on this report's report id and sample id
+        let querySampleReportId (reportId: ReportId) (specimenId: Specimen.Identifier) =
+            query {
+                for sampleReport in context.Public.SampleReports do
+                where (sampleReport.ReportId = reportId.Value && sampleReport.SampleId = specimenId.Value)
+                select sampleReport.Id
+                exactlyOne
+            }
+
+        let toDatabase (report: Report) =
+            toVendorRow |> ignore
+
+            context.SubmitUpdates()
+
+            report |> toPatientRow |> ignore
+            report |> toReportRow |> ignore
+            report |> toSampleRow |> ignore
+            report |> toGeneRows |> ignore
+
+            context.SubmitUpdates()
+
+            report |> toSampleReportRow |> ignore
+
+            context.SubmitUpdates()
+
+            let sampleReportId = querySampleReportId report.Test.ReportId report.Specimen.SpecimenId
+
+            report |> toFusionRows sampleReportId |> ignore
+            report |> toVariantRows sampleReportId |> ignore
