@@ -1,14 +1,31 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module FoundationMedicine =
+    [<AutoOpen>]
     module Domain =
-        open Core.Domain
+        open Core
 
         module Sample =
-            type Identifier = internal Identifier of string
-            type ReceivedDate = internal | ReceivedDate of System.DateTime
-            type BlockId = internal | BlockId of string
-            type Format = internal | SlideDeck | Block | TubeSet
+            type Identifier =
+                internal | Identifier of string
+                member this.Value = this |> fun (Identifier identifier) -> identifier
+
+            type ReceivedDate =
+                internal | ReceivedDate of System.DateTime
+                member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
+
+            type BlockId =
+                internal | BlockId of string
+                member this.Value = this |> fun (BlockId blockId) -> blockId
+
+            type Format =
+                internal | SlideDeck | Block | TubeSet
+                member this.Value =
+                    match this with
+                    | SlideDeck -> "slide deck"
+                    | Block -> "block"
+                    | TubeSet -> "tube set"
+
 
         /// The sample for each FMI report.
         /// FMI only reports tumor samples.
@@ -19,7 +36,10 @@ module FoundationMedicine =
               Format: Sample.Format }
 
         module OrderingMd =
-            type Name = internal Name of string
+            type Name =
+                internal | Name of string
+                member this.Value = this |> fun (Name name) -> name
+
             type Identifier = internal Identifier of string
 
         type OrderingMd =
@@ -31,18 +51,31 @@ module FoundationMedicine =
             { MRN: Patient.MRN option
               LastName: Person.LastName
               FirstName: Person.FirstName
-              SubmittedDiagnosis: DiagnosisName
+              SubmittedDiagnosis: Diagnosis.Name
               Gender: Gender
               DateOfBirth: Person.DateOfBirth
               SpecimenSite: SpecimenSite
               CollectionDate: CollectionDate
               OrderingMd: OrderingMd
               Pathologist: Pathologist }
-        and DiagnosisName = internal DiagnosisName of string
-        and Gender = internal Male | Female
+
+            member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
+
+        and Gender =
+            internal Male | Female
+            member this.Value =
+                match this with
+                | Male -> "male"
+                | Female -> "female"
         and SpecimenSite = internal SpecimenSite of string
         and CollectionDate = internal CollectionDate of System.DateTime
-        and Pathologist = internal | PathologistNotProvided | PathologistName of string
+        and Pathologist =
+            internal | PathologistNotProvided | PathologistName of string
+
+            member this.Value =
+                match this with
+                | PathologistNotProvided -> "not provided"
+                | PathologistName name -> name
 
         type Variant =
             | VariantOfUnknownSignificance of VariantInfo
@@ -73,17 +106,32 @@ module FoundationMedicine =
             | Stable
             | ``High Instability``
 
+            member this.Value =
+                match this with
+                | ``Cannot Be Determined`` -> "cannot be determined"
+                | Stable -> "stable"
+                | ``High Instability`` -> "high instability"
+
         module TumorMutationBurden =
-            type Score = internal Score of score: float<mutation/megabase>
-            type Status = internal Low | Intermediate | High | UnknownStatus
+            type Score =
+                internal | Score of score: float<mutation/megabase>
+
+                member this.Value = this |> fun (Score score) -> score
+                member this.Float = float this.Value
+
+            type Status =
+                internal Low | Intermediate | High | Unknown
+
+                member this.Value =
+                    match this with
+                    | Low -> "low"
+                    | Intermediate -> "intermediate"
+                    | High -> "high"
+                    | Unknown -> "unknown"
 
         type TumorMutationBurden =
             { Score : TumorMutationBurden.Score
               Status: TumorMutationBurden.Status }
-
-        type Lab =
-            { Address: Address
-              CliaNumber: CliaNumber }
 
         type Report =
             { ReportId: ReportId
@@ -96,10 +144,27 @@ module FoundationMedicine =
               Genes: Gene list
               Variants: Variant list
               Fusions: Fusion list }
-        and ReportId = internal ReportId of string
-        and IssuedDate = IssuedDate of System.DateTime
+
+            member this.TryMicrosatelliteStatusValue =
+                this.MicrosatelliteStatus |> Option.map (fun ms -> ms.Value)
+
+            member this.TryTmbStatusValue =
+                this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Status.Value)
+
+            member this.TryTmbScoreFloat =
+                this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Score.Float)
+
+        and ReportId =
+            internal | ReportId of string
+            member this.Value = this |> fun (ReportId reportId) -> reportId
+
+        and IssuedDate =
+            internal | IssuedDate of System.DateTime
+            member this.Value = this |> fun (IssuedDate issuedDate) -> issuedDate
 
     module Input =
+        open Core
+
         module ReportId =
             open System.Text.RegularExpressions
 
@@ -225,7 +290,7 @@ module FoundationMedicine =
             module SubmittedDiagnosis =
                 open Utilities.StringValidations.Typed
                 /// Validate that submitted diagnosis name is not blank
-                let validate = validateNotBlank Domain.DiagnosisName "Diagnosis name can't be blank"
+                let validate = validateNotBlank Diagnosis.Name "Diagnosis name can't be blank"
 
             module SpecimenSite =
                 open Utilities.StringValidations.Typed
@@ -436,7 +501,7 @@ module FoundationMedicine =
                     | "low" -> Ok Low
                     | "intermediate" -> Ok Intermediate
                     | "high" -> Ok High
-                    | "unknown" -> Ok UnknownStatus
+                    | "unknown" -> Ok Unknown
                     | _ -> Error $"Invalid tmb status: {input}"
 
             /// Validate that a tumor mutation burden has a valid score and status
@@ -461,7 +526,6 @@ module FoundationMedicine =
 
         module Lab =
             module Address =
-                open Core.Domain
                 open System.Text.RegularExpressions
 
                 /// Validate a FMI lab address is valid
@@ -486,7 +550,10 @@ module FoundationMedicine =
                     let! address = Address.validate input.Address
                     and! cliaNumber = Lab.CliaNumber.validate input.CliaNumber
 
+                    let labName = LabName "Foundation Medicine"
+
                     return ({
+                        Name = labName
                         Address = address
                         CliaNumber = cliaNumber
                     } : Domain.Lab)
@@ -707,3 +774,76 @@ module FoundationMedicine =
                   Genes = this.Genes
                   Variants = this.Variants |> Seq.toList
                   Fusions = this.Fusions |> Seq.toList }
+
+
+    module DTO =
+        open Database
+        open Domain
+
+        /// Build a row to be inserted into the `vendors` database table.
+        let toVendorRow (overallReport: Report) =
+            let row = context.Public.Vendors.Create()
+            let lab = overallReport.Lab
+
+            row.Name          <- "Foundation Medicine"
+            row.CliaNumber    <- lab.CliaNumber.Value
+            row.StreetAddress <- lab.Address.Street.Value
+            row.City          <- lab.Address.City.Value
+            row.State         <- lab.Address.State.Value
+            row.ZipCode       <- lab.Address.Zip.Value
+
+            row
+
+        /// Build a row to be inserted into the `patients` database table if the report's patient has an MRN.
+        let tryPatientRow (report: Report) =
+            let pmi = report.PMI
+
+            pmi.TryMrnValue
+            |> Option.map (fun mrnValue ->
+                let row = context.Public.Patients.Create()
+
+                row.Mrn          <- mrnValue
+                row.LastName     <- pmi.LastName.Value
+                row.FirstName    <- pmi.FirstName.Value
+                row.DateOfBirth  <- pmi.DateOfBirth.Value
+                row.Sex          <- pmi.Gender.Value
+
+                row
+            )
+
+
+        /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
+        let tryReportRow (report: Report) =
+            let patient = report.PMI
+
+            patient.TryMrnValue
+            |> Option.map (fun mrnValue ->
+                let row = context.Public.Reports.Create()
+                let lab = report.Lab
+
+                row.PatientMrn <- mrnValue
+                row.VendorCliaNumber <- lab.CliaNumber.Value
+                row.ReportId <- report.ReportId.Value.ToString()
+                row.OrderingPhysician <- Some patient.OrderingMd.Name.Value
+                row.Pathologist <- Some patient.Pathologist.Value
+                row.IssuedDate <- report.IssuedDate.Value
+
+                row.TumorMutationalBurden <- report.TryTmbScoreFloat
+                row.MsiStatus <-report.TryMicrosatelliteStatusValue
+
+                row.DiagnosisName <- patient.SubmittedDiagnosis.Value
+
+                row
+            )
+
+        let toTumorSampleRow (report: Report) =
+            let sample = report.Sample
+            let row = context.Public.Samples.Create()
+
+            row.Category   <- "tumor"
+            row.SampleId   <- sample.SampleId.Value.ToString()
+            row.BiopsySite <- sample.Site.Value
+            row.SampleType <- sample.Format.Value
+
+            row
+
