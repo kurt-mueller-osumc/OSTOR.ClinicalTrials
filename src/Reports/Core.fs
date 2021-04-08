@@ -1,6 +1,7 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Core =
+    [<AutoOpen>]
     module Domain =
         module Person =
             type LastName =
@@ -55,6 +56,11 @@ module Core =
             { CliaNumber: CliaNumber
               Name: LabName
               Address: Address }
+
+        module Diagnosis =
+            type Name =
+                internal | Name of string
+                member this.Value = this |> fun (Name name) -> name
 
         module Patient =
             /// The patient's medical record number
