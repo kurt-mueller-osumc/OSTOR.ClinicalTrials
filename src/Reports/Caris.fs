@@ -1,8 +1,9 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Caris =
+    [<AutoOpen>]
     module Domain =
-        open Core.Domain
+        open Core
 
         type Patient =
             { MRN: Patient.MRN
@@ -13,16 +14,13 @@ module Caris =
         and Sex = internal Male | Female
 
         type Diagnosis =
-            { DiagnosisName: DiagnosisName
+            { DiagnosisName: Diagnosis.Name
               DiagnosisCodes: DiagnosisCodes
               PathologicDiagnosis: PathologicDiagnosis
               DiagnosisSite: DiagnosisSite
               Lineage: Lineage
               SubLineage: SubLineage }
 
-        and DiagnosisName =
-            internal | DiagnosisName of string
-            member this.Value = this |> fun (DiagnosisName diagnosisName) -> diagnosisName
         and DiagnosisCodes =
             internal | DiagnosisCodes of IcdCode list
 
@@ -305,6 +303,8 @@ module Caris =
                 this.GenomicAlterations |> Seq.filter (fun ga -> ga.HasMolecularConsequence)
 
     module Input =
+        open Core
+
         type Patient =
             { MRN: string
               LastName: string
@@ -316,7 +316,7 @@ module Caris =
             open FsToolkit.ErrorHandling
 
             module Sex =
-                open type Domain.Sex
+                open type Sex
 
                 /// Validate that the input for a patient's sex is is either (M|m)ale or (F|f)emale
                 let validate input =
@@ -325,7 +325,6 @@ module Caris =
                     | "Female" | "female" -> Ok Female
                     | _ -> Error $"Sex is invalid: {input}"
 
-            open Core
             open Core.Input
 
             /// Validate that a report's patient has a valid mrn, name, and sex
@@ -371,23 +370,23 @@ module Caris =
 
             module Name =
                 /// Validate that diagnosis name is not blank
-                let validate = validateNotBlank Domain.DiagnosisName "Diagnosis name can't be blank"
+                let validate = validateNotBlank Diagnosis.Name "Diagnosis name can't be blank"
 
             module Site =
                 /// Validate that diagnosis site is not blank
-                let validate = validateNotBlank Domain.DiagnosisSite "Diagnosis site can't be blank"
+                let validate = validateNotBlank DiagnosisSite "Diagnosis site can't be blank"
 
             module PathologicDiagnosis =
                 /// Validate that diagnosis site is not blank
-                let validate = validateNotBlank Domain.PathologicDiagnosis "Pathologic diagnosis site can't be blank"
+                let validate = validateNotBlank PathologicDiagnosis "Pathologic diagnosis site can't be blank"
 
             module Lineage =
                 /// Validate that lineage is not blank
-                let validate = validateNotBlank Domain.Lineage "Lineage can't be blank"
+                let validate = validateNotBlank Lineage "Lineage can't be blank"
 
             module SubLineage =
                 /// Validate that sublineage is not blank
-                let validate = validateNotBlank Domain.SubLineage "SubLineage can't be blank"
+                let validate = validateNotBlank SubLineage "SubLineage can't be blank"
 
             open FsToolkit.ErrorHandling
 
@@ -435,7 +434,7 @@ module Caris =
             { Organization: string }
 
         module Pathologist =
-            open type Domain.Pathologist.Organization
+            open type Pathologist.Organization
 
             /// Validate pathologist information. Caris Reports will only have the pathologist organization listed, if present.
             /// If the organization is not present, a blank string exists, which is still valid.
@@ -458,7 +457,7 @@ module Caris =
                 open Utilities.StringValidations.Typed
 
                 /// Validate that the specimen id is not blank
-                let validate = validateNotBlank Domain.Specimen.Identifier "Sample id cannot be blank"
+                let validate = validateNotBlank Specimen.Identifier "Sample id cannot be blank"
 
 
             module AccessionId =
@@ -470,12 +469,12 @@ module Caris =
                 ///    validate "invalidId" = Error "Invalid accession id: invalidId"
                 let validate input =
                     if Regex("^TN\d{2}-\d{6}-[A-Z]{1}$").Match(input).Success then
-                        Ok <| Domain.AccessionId input
+                        Ok <| AccessionId input
                     else
                         Error $"Invalid accession id: {input}"
 
             module Type =
-                open type Domain.Specimen.Type
+                open type Specimen.Type
 
                 /// Validate that a sample type's tissue biopsy is from a vial, blocks, or a slide.
                 let validate input =
@@ -487,14 +486,14 @@ module Caris =
 
             module Site =
                 open Utilities.StringValidations.Typed
-                open type Domain.Specimen.Site
+                open type Specimen.Site
 
                 /// Validate that a specimen site is not blank
                 let validate = validateNotBlank Site "Specimen site cannot be blank"
 
             open FsToolkit.ErrorHandling
-            open type Domain.CollectionDate
-            open type Domain.ReceivedDate
+            open type CollectionDate
+            open type ReceivedDate
 
 
             let validate sample =
@@ -528,13 +527,13 @@ module Caris =
             open Utilities.StringValidations.Typed
 
             module OrderedDate =
-                open type Domain.OrderedDate
+                open type OrderedDate
                 /// Validate the ordered date for a test
                 let validate input =
                     input |> validateDateTime OrderedDate $"Invalid ordered date: {input}"
 
             module ReceivedDate =
-                open type Domain.ReceivedDate
+                open type ReceivedDate
 
                 /// Validate the received date for a test
                 let validate input =
@@ -550,8 +549,6 @@ module Caris =
                     if Regex("^TN\d{2}-\d{6}$").Match(input).Success then
                         Ok <| Domain.ReportId input
                     else Error $"ReportId - Invalid report id: {input}"
-
-            open Core.Input
 
             /// Validate that a test has a report id, ordered date, received date, and lab name
             let validate test =
@@ -574,14 +571,14 @@ module Caris =
                 open Utilities.StringValidations.Typed
 
                 /// Validate that a gene interpretation is not blank
-                let validate = validateNotBlank Domain.GenomicAlteration.GeneInterpretation "Gene interpretation can't be blank"
+                let validate = validateNotBlank GenomicAlteration.GeneInterpretation "Gene interpretation can't be blank"
 
         module Nucleotide =
             open System.Text.RegularExpressions
             // Validate that a nucleotide is either blank string, or is composed of only A, G, C, or T
             let validate input =
                 if Regex("^(A|G|C|T)*$").Match(input).Success then
-                    Ok <| Domain.GenomicAlteration.Nucleotide input
+                    Ok <| GenomicAlteration.Nucleotide input
                 else
                     Error <| $"Invalid nucleotide(s): {input}"
 
@@ -590,8 +587,8 @@ module Caris =
               ProteinChange: string option }
 
         module HGVS =
-            open type Domain.HGVS.CodingChange
-            open type Domain.HGVS.ProteinChange
+            open type HGVS.CodingChange
+            open type HGVS.ProteinChange
 
             /// Validate that HGVS coding and protein change are both empty or are both present.
             let validate (hgvs: HGVS) : Result<Domain.HGVS option, string> =
@@ -623,7 +620,7 @@ module Caris =
 
         module GenomicAlteration =
             module Source =
-                open type Domain.GenomicAlteration.Source
+                open type GenomicAlteration.Source
                 open Utilities
 
                 /// Validate that genomic alteration source is somatic
@@ -636,10 +633,10 @@ module Caris =
                 let validateOptional = Optional.validateWith validate
 
             module ResultGroup =
-                open type Domain.GenomicAlteration.ResultGroup
-                open type Domain.GenomicAlteration.MutatedResults
-                open type Domain.GenomicAlteration.NoResults
-                open type Domain.GenomicAlteration.NormalResults
+                open type GenomicAlteration.ResultGroup
+                open type GenomicAlteration.MutatedResults
+                open type GenomicAlteration.NoResults
+                open type GenomicAlteration.NormalResults
 
                 /// Validate that a result group is 'mutated', 'no result', or 'normal' and that the result names are valid.
                 let validate resultGroup =
@@ -668,7 +665,7 @@ module Caris =
             module AlleleFrequency =
                 open Utilities
                 open Utilities.StringValidations.Typed
-                open type Domain.GenomicAlteration.AlleleFrequency
+                open type GenomicAlteration.AlleleFrequency
 
                 let validate (input: string) =
                     input |> validateUnsignedInteger AlleleFrequency $"Invalid allele frequency: {input}"
@@ -679,7 +676,7 @@ module Caris =
 
             module MolecularConsequence =
                 open Utilities
-                open type Domain.GenomicAlteration.MolecularConsequence
+                open type GenomicAlteration.MolecularConsequence
 
                 /// Validate that the input for a molecular consequence is one of the following:
                 /// 1. Blank
@@ -708,7 +705,7 @@ module Caris =
             module TranscriptAlterationDetails =
                 module StartPosition =
                     open Utilities.StringValidations.Typed
-                    open type Domain.GenomicAlteration.Transcript.StartPosition
+                    open type GenomicAlteration.Transcript.StartPosition
 
                     /// Validate that a start position is a valid unsigned integer
                     let validate input =
@@ -717,7 +714,7 @@ module Caris =
 
                 module StopPosition =
                     open Utilities.StringValidations.Typed
-                    open type Domain.GenomicAlteration.Transcript.StopPosition
+                    open type GenomicAlteration.Transcript.StopPosition
 
                     /// Validate that a stop position is a valid unsigned integer
                     let validate input =
@@ -725,7 +722,7 @@ module Caris =
 
                 module TranscriptId =
                     open System.Text.RegularExpressions
-                    open Domain.GenomicAlteration
+                    open GenomicAlteration
 
                     /// Validate that a transcript id is either blank or starts with "NM_" followed by at least one digit.
                     let validate input =
@@ -745,7 +742,7 @@ module Caris =
                         and! observedNucleotide = transcriptAlterationDetails.ObservedNucleotide |> Nucleotide.validate
                         and! referenceNucleotide = transcriptAlterationDetails.ReferenceNucelotide |> Nucleotide.validate
 
-                        let source = Domain.GenomicAlteration.Transcript.IdSource "RefSeq"
+                        let source = GenomicAlteration.Transcript.IdSource "RefSeq"
 
                         return ({
                             ObservedNucleotide = observedNucleotide
@@ -754,7 +751,7 @@ module Caris =
                             StopPosition = stopPosition
                             Identifier = transcriptId
                             IdSource = source
-                        } : Domain.GenomicAlteration.TranscriptAlterationDetails)
+                        } : GenomicAlteration.TranscriptAlterationDetails)
                     }
 
                 open Utilities
@@ -763,7 +760,6 @@ module Caris =
                 let validateOptional = Optional.validateWith validate
 
             open FsToolkit.ErrorHandling
-            open Core.Input
 
             /// Validate that genomic alteration has a valid gene name, result group, interpreation, molecular consequence, allele frequency, transcript alteration, hgvs, and source
             let validate (genomicAlteration: GenomicAlteration) =
@@ -816,17 +812,17 @@ module Caris =
                 open Utilities.StringValidations.Typed
 
                 let validate input =
-                    input |> validateUnsignedInteger Domain.Fusion.Exon $"Fusion exon not an unsigned integer: {input}"
+                    input |> validateUnsignedInteger Fusion.Exon $"Fusion exon not an unsigned integer: {input}"
 
             module Interpretation =
                 open Utilities.StringValidations.Typed
-                open type Domain.Fusion.Interpretation
+                open type Fusion.Interpretation
 
                 /// Validate that a fusion interpreation is not blank
                 let validate = validateNotBlank Interpretation "Fusion interpretation can't be blank"
 
             module Result =
-                open type Domain.Fusion.Result
+                open type Fusion.Result
 
                 /// Validate that a fusion result is either pathogenic or is at lest detected
                 let validate (fusionResult: FusionResult) =
@@ -835,9 +831,7 @@ module Caris =
                     | "Fusion Detected", "Mutated" -> Ok ``Fusion Detected``
                     | _ -> Error $"Invalid fusion result: {fusionResult}"
 
-
             open FsToolkit.ErrorHandling
-            open Core.Input
 
             /// Validate that a fusion has valid gene names, exons, interepretation, and result
             let validate fusion =
@@ -874,7 +868,6 @@ module Caris =
 
         module TumorMutationBurden =
             module Score =
-                open Core.Domain
                 open System.Text.RegularExpressions
 
                 /// Attempt to convert a score input to a valid tmb score. If the regex is valid, convert it to an integer
@@ -888,7 +881,7 @@ module Caris =
                     then Some (m.Groups.[1].Value |> int |> ((*) 1<mutation/megabase>))
                     else None
 
-            open type Domain.TumorMutationBurden.Score
+            open type TumorMutationBurden.Score
 
             /// Validate that a tumor mutation burden's call is indeterrminate, low, intermediate, or high and that, if applicable, the score is a valid score
             let validate (tumorMutationBurden: TumorMutationBurden)=
@@ -910,7 +903,7 @@ module Caris =
               ResultGroup: string }
 
         module MicrosatelliteInstability =
-            open type Domain.MicrosatelliteInstability.Status
+            open type MicrosatelliteInstability.Status
 
             /// Validate that a miscrosatellite instability is either stable, high, or indeterminate
             let validate msi =
