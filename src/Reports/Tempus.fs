@@ -1958,18 +1958,8 @@ module Tempus =
             )
 
         /// Build variant rows to be inserted into the `variants` database table. This function assumes that an existing sample report exists in the dtabase.
-        let toVariantRows (overallReport: OverallReport) =
+        let toVariantRows (sampleReportId: System.Guid) (overallReport: OverallReport) =
             let results = overallReport.Results
-            let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
-            let reportId = overallReport.Report.ReportId.Value.ToString()
-
-            let sampleReportId =
-                query {
-                    for sampleReport in context.Public.SampleReports do
-                    where (sampleReport.ReportId = reportId && sampleReport.SampleId = sampleId)
-                    select sampleReport.Id
-                    exactlyOne
-                }
 
             let somaticActionableMutationRows =
                 results.``Somatic Potentially Actionable Mutations``
@@ -2003,18 +1993,8 @@ module Tempus =
             @ inheritedVusRows
 
 
-        let toFusionRows (overallReport: OverallReport) =
+        let toFusionRows (sampleReportId: System.Guid) (overallReport: OverallReport) =
             let results = overallReport.Results
-            let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
-            let reportId = overallReport.Report.ReportId.Value.ToString()
-
-            let sampleReportId =
-                query {
-                    for sampleReport in context.Public.SampleReports do
-                    where (sampleReport.ReportId = reportId && sampleReport.SampleId = sampleId)
-                    select sampleReport.Id
-                    exactlyOne
-                }
 
             let relevantFusionRows =
                 results.``Somatic Biologically Relevant Variants``
@@ -2027,12 +2007,23 @@ module Tempus =
             relevantFusionRows
             @ fusionRows
 
+        let querySampleReportId (reportId: Report.Identifier) (sampleId: Sample.Identifier) =
+            query {
+                for sampleReport in context.Public.SampleReports do
+                where (sampleReport.ReportId = reportId.Value.ToString() && sampleReport.SampleId = sampleId.Value.ToString())
+                select sampleReport.Id
+                exactlyOne
+            }
+
         let toDatabase (overallReport: OverallReport) =
             overallReport
             |> tryPatientRow
             |> Option.map (fun patientRow ->
                 /// create parent objects
                 overallReport |> toVendorRow |> ignore
+
+                context.SubmitUpdates()
+
                 overallReport |> tryReportRow |> ignore
                 overallReport |> toGeneRows |> ignore
                 overallReport |> toTumorSampleRow |> ignore
@@ -2042,8 +2033,13 @@ module Tempus =
 
                 overallReport |> toTumorSampleReportRow |> ignore
                 overallReport |> tryNormalSampleReportRow |> ignore
-                overallReport |> toVariantRows |> ignore
-                overallReport |> toFusionRows |> ignore
+
+                context.SubmitUpdates()
+
+                let sampleReportId = querySampleReportId overallReport.Report.ReportId overallReport.TumorSample.SampleId
+
+                overallReport |> toVariantRows sampleReportId |> ignore
+                overallReport |> toFusionRows sampleReportId |> ignore
 
                 context.SubmitUpdates()
             )
