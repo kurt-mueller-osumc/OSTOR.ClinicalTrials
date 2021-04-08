@@ -1645,9 +1645,10 @@ module Tempus =
 
     module DTO =
         open Database
+        open Domain
 
         module SomaticPotentiallyActionable =
-            open Domain.SomaticPotentiallyActionable
+            open SomaticPotentiallyActionable
 
             module Mutation =
                 /// Convert a somatic, potentially actionable mutation to rows in the `variants` database table
@@ -1694,7 +1695,7 @@ module Tempus =
                     row
 
         module SomaticBiologicallyRelevantVariant =
-            open Domain.SomaticBiologicallyRelevant
+            open SomaticBiologicallyRelevant
 
             /// Try to convert a somatic, biologically relevant variant to a row in the `variants` database table
             let tryVariantRow (sampleReportId: System.Guid) (variant: Variant) =
@@ -1730,7 +1731,7 @@ module Tempus =
 
         module SomaticVUS =
             /// convert a somatic variant of unknown significance to a row in the `variants` database table
-            let toVariantRow (sampleReportId: System.Guid) (vus: Domain.SomaticVUS) =
+            let toVariantRow (sampleReportId: System.Guid) (vus: SomaticVUS) =
                 let row = context.Public.Variants.Create()
 
                 row.GeneName <- vus.Gene.Name.Value
@@ -1753,7 +1754,7 @@ module Tempus =
                 row
 
         module Fusion =
-            let toFusionRow (sampleReportId: System.Guid) (fusion: Domain.Fusion) =
+            let toFusionRow (sampleReportId: System.Guid) (fusion: Fusion) =
                 let row = context.Public.Fusions.Create()
 
                 row.FirstGeneName <- fusion.``5' Gene``.Name.Value
@@ -1766,7 +1767,7 @@ module Tempus =
                 row
 
         module InheritedRelevantVariant =
-            let toVariantRows (sampleReportId: System.Guid) (variants: Domain.InheritedRelevantVariants) =
+            let toVariantRows (sampleReportId: System.Guid) (variants: InheritedRelevantVariants) =
                 variants.Values |> List.map (fun variant ->
                     let row = context.Public.Variants.Create()
 
@@ -1788,7 +1789,7 @@ module Tempus =
                 )
 
         module InheritedVUS =
-            let toVariantRows (sampleReportId: System.Guid) (vus: Domain.InheritedVUS) =
+            let toVariantRows (sampleReportId: System.Guid) (vus: InheritedVUS) =
                 vus.Values |> List.map (fun variant ->
                     let row = context.Public.Variants.Create()
 
@@ -1810,7 +1811,7 @@ module Tempus =
                 )
 
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
-        let tryPatientRow (overallReport: Domain.OverallReport) =
+        let tryPatientRow (overallReport: OverallReport) =
             let row = context.Public.Patients.Create()
             let patient = overallReport.Patient
 
@@ -1827,7 +1828,7 @@ module Tempus =
             )
 
         /// Build a row to be inserted into the `vendors` database table.
-        let toVendorRow (overallReport: Domain.OverallReport) =
+        let toVendorRow (overallReport: OverallReport) =
             let row = context.Public.Vendors.Create()
             let lab = overallReport.Lab
 
@@ -1841,7 +1842,7 @@ module Tempus =
             row
 
         /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
-        let tryReportRow (overallReport: Domain.OverallReport) =
+        let tryReportRow (overallReport: OverallReport) =
             let patient = overallReport.Patient
 
             patient.TryMrnValue
@@ -1870,7 +1871,7 @@ module Tempus =
             )
 
         /// Build a row for the tumor sample to be inserted into the `samples` database table.
-        let toTumorSampleRow (overallReport: Domain.OverallReport) =
+        let toTumorSampleRow (overallReport: OverallReport) =
             let tumorSample = overallReport.TumorSample
             let row = context.Public.Samples.Create()
 
@@ -1882,7 +1883,7 @@ module Tempus =
             row
 
         /// Build a row for the normal sample, if it exists, to be inserted into the `samples` database table.
-        let tryNormalSampleRow (overallReport: Domain.OverallReport) =
+        let tryNormalSampleRow (overallReport: OverallReport) =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
                 let row = context.Public.Samples.Create()
@@ -1896,7 +1897,7 @@ module Tempus =
             )
 
         /// Build a row for the tumor sample to be inserted into the `sample_reports` database table
-        let toTumorSampleReportRow (overallReport: Domain.OverallReport) =
+        let toTumorSampleReportRow (overallReport: OverallReport) =
             let tumorSample = overallReport.TumorSample
             let report = overallReport.Report
             let row = context.Public.SampleReports.Create()
@@ -1913,7 +1914,7 @@ module Tempus =
             row
 
         /// Build a row for the normal sample, if it exists, to be insterested into the `sample_reports` database table
-        let tryNormalSampleReportRow (overallReport: Domain.OverallReport) =
+        let tryNormalSampleReportRow (overallReport: OverallReport) =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
 
@@ -1930,7 +1931,7 @@ module Tempus =
                 row
             )
 
-        let toGeneRows (overallReport: Domain.OverallReport) =
+        let toGeneRows (overallReport: OverallReport) =
             let results = overallReport.Results
             let somaticPotentiallyActionableGenes = results.``Somatic Potentially Actionable Mutations`` |> List.map (fun mutation -> mutation.Gene)
             let somaticPotentiallyActionableCopyNumberGenes = results.``Somatic Potentially Actionable Copy Number Variants`` |> List.map (fun variant -> variant.Gene)
@@ -1957,7 +1958,7 @@ module Tempus =
             )
 
         /// Build variant rows to be inserted into the `variants` database table. This function assumes that an existing sample report exists in the dtabase.
-        let toVariantRows (overallReport: Domain.OverallReport) =
+        let toVariantRows (overallReport: OverallReport) =
             let results = overallReport.Results
             let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
             let reportId = overallReport.Report.ReportId.Value.ToString()
@@ -2002,7 +2003,7 @@ module Tempus =
             @ inheritedVusRows
 
 
-        let toFusionRows (overallReport: Domain.OverallReport) =
+        let toFusionRows (overallReport: OverallReport) =
             let results = overallReport.Results
             let sampleId = overallReport.TumorSample.SampleId.Value.ToString()
             let reportId = overallReport.Report.ReportId.Value.ToString()
@@ -2025,3 +2026,25 @@ module Tempus =
 
             relevantFusionRows
             @ fusionRows
+
+        let toDatabase (overallReport: OverallReport) =
+            overallReport
+            |> tryPatientRow
+            |> Option.map (fun patientRow ->
+                /// create parent objects
+                overallReport |> toVendorRow |> ignore
+                overallReport |> tryReportRow |> ignore
+                overallReport |> toGeneRows |> ignore
+                overallReport |> toTumorSampleRow |> ignore
+                overallReport |> tryNormalSampleRow |> ignore
+
+                context.SubmitUpdates()
+
+                overallReport |> toTumorSampleReportRow |> ignore
+                overallReport |> tryNormalSampleReportRow |> ignore
+                overallReport |> toVariantRows |> ignore
+                overallReport |> toFusionRows |> ignore
+
+                context.SubmitUpdates()
+            )
+
