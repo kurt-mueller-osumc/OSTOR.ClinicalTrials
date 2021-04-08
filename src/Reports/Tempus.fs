@@ -1,8 +1,9 @@
 namespace OSTOR.ClinicalTrials.Reports
 
 module Tempus =
+    [<AutoOpen>]
     module Domain =
-        open Core.Domain
+        open Core
 
         module Report =
             type Identifier =
@@ -22,7 +23,6 @@ module Tempus =
             { ReportId: Report.Identifier
               SigningPathologist: Report.Pathologist
               SignoutDate: Report.SignoutDate }
-
 
         module HGVS =
             /// An abbreviated HGVS protein change
@@ -64,10 +64,6 @@ module Tempus =
                     |> Option.map (fun proteinChange -> proteinChange.Abbreviated.Value)
                     |> Option.defaultValue this.CodingChange.Value
 
-        type DiagnosisName =
-            internal | DiagnosisName of string
-            member this.Value = this |> fun (DiagnosisName diagnosisName) -> diagnosisName
-
         type DiagnosisDate =
             internal | DiagnosisDate of System.DateTime
             member this.Value = this |> fun (DiagnosisDate diagnosisDate) -> diagnosisDate
@@ -92,7 +88,7 @@ module Tempus =
               LastName: Person.LastName
               DateOfBirth: Person.DateOfBirth
               Sex: Patient.Sex
-              DiagnosisName: DiagnosisName
+              DiagnosisName: Diagnosis.Name
               DiagnosisDate: DiagnosisDate option }
 
             member this.TryMrnValue =
@@ -201,10 +197,6 @@ module Tempus =
               EntrezId: Gene.EntrezId }
 
         module Variant =
-            type NucleotideAlteration =
-                internal | NucleotideAlteration of string
-                member this.Value = this |> fun (NucleotideAlteration na) -> na
-
             type AllelicFraction =
                 internal | AllelicFraction of float
                 member this.Value = this |> fun (AllelicFraction allelicFraction) -> allelicFraction
@@ -473,6 +465,8 @@ module Tempus =
         open FsToolkit.ErrorHandling
         open Utilities
 
+        open Core
+
         type Lab =
             { Name: string
               StreetAddress: string
@@ -508,7 +502,6 @@ module Tempus =
 
         module Lab =
             open StringValidations
-            open Core
             open Core.Input
 
             /// Validate the `lab` section of the json report
@@ -570,7 +563,7 @@ module Tempus =
 
                 module Name =
                     /// Validate that diagnosis name is not blank
-                    let validate = validateNotBlank Domain.DiagnosisName "Diagnosis name can't be blank"
+                    let validate = validateNotBlank Diagnosis.Name "Diagnosis name can't be blank"
 
             module Sex =
                 open Domain.Patient
@@ -582,19 +575,19 @@ module Tempus =
                     | "Female" | "female" -> Ok Female
                     | _ -> Error $"Invalid sex: {str}"
 
-            open Core
+            open Core.Input
 
             /// Validate a patient input: their name, mrn, and sex
             let validate (patient: Patient) : Validation<Domain.Patient,string> =
                 validation {
-                    let! firstName = patient.FirstName |> Input.Person.FirstName.validate
-                    and! lastName  = patient.LastName  |> Input.Person.LastName.validate
-                    and! mrn       = patient.Mrn |> Input.Patient.MRN.validateOptional
+                    let! firstName = patient.FirstName |> Person.FirstName.validate
+                    and! lastName  = patient.LastName  |> Person.LastName.validate
+                    and! mrn       = patient.Mrn |> Patient.MRN.validateOptional
                     and! sex       = patient.Sex |> Sex.validate
                     and! diagnosisName = patient.Diagnosis |> Diagnosis.Name.validate
 
-                    let tempusId  = patient.TempusId |> Domain.Patient.TempusIdentifier
-                    let birthDate = patient.DateOfBirth |> Domain.Person.DateOfBirth
+                    let tempusId  = patient.TempusId |> Patient.TempusIdentifier
+                    let birthDate = patient.DateOfBirth |> Person.DateOfBirth
                     let diagnosisDate = patient.DiagnosisDate |> Option.map Domain.DiagnosisDate
 
                     return ({ MRN = mrn
@@ -625,7 +618,7 @@ module Tempus =
                     } )
 
         module Report =
-            open Domain.Report
+            open Report
 
             module Pathologist =
                 open Utilities.StringValidations.Typed
@@ -709,7 +702,7 @@ module Tempus =
                 /// Validate that a fusion type is `gene`, for now.
                 let validate fusionType =
                     match fusionType with
-                    | "gene" -> Ok Domain.Fusion.GeneFusion
+                    | "gene" -> Ok Fusion.GeneFusion
                     | _ -> Error $"Invalid fusion type: {fusionType}"
 
                 /// Validate an optional fusion type if it exists.
@@ -719,8 +712,8 @@ module Tempus =
                 /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
                 let validate description =
                     match description with
-                    | "Chromosomal rearrangement" -> Ok Domain.Fusion.``Chromosomal rearrangement``
-                    | "Deletion (exons 2-7)" -> Ok Domain.Fusion.``Deletion (exons 2-7)``
+                    | "Chromosomal rearrangement" -> Ok Fusion.``Chromosomal rearrangement``
+                    | "Deletion (exons 2-7)" -> Ok Fusion.``Deletion (exons 2-7)``
                     | _ -> Error $"Invalid fusion variant description: {description}"
 
             /// Validate that a fusion has 2 valid genes and a valid fusion type, if present.
@@ -787,12 +780,12 @@ module Tempus =
             module Test =
                 open Utilities.StringValidations.Typed
 
-                let validateCode = validateNotBlank Domain.Order.TestCode "Order test code can't be blank"
-                let validateName = validateNotBlank Domain.Order.TestName "Order test name can't be blank"
-                let validateDescription = validateNotBlank Domain.Order.TestDescription "Order test description can't be blank"
+                let validateCode = validateNotBlank Order.TestCode "Order test code can't be blank"
+                let validateName = validateNotBlank Order.TestName "Order test name can't be blank"
+                let validateDescription = validateNotBlank Order.TestDescription "Order test description can't be blank"
 
                 /// Validate that a order test's code, name, and description are not blank
-                let validate (test: Test) : Validation<Domain.Order.Test,string> =
+                let validate (test: Test) : Validation<Order.Test,string> =
                     validation {
                         let! testCode = test.Code |> validateCode
                         and! testName = test.Name |> validateName
@@ -802,7 +795,7 @@ module Tempus =
                             TestName = testName
                             TestCode = testCode
                             TestDescription = testDescription
-                        } : Domain.Order.Test)
+                        } : Order.Test)
                     }
 
             module Identifier =
@@ -825,21 +818,21 @@ module Tempus =
                 ///
                 ///    validate "TL-19-DF60D1" = Ok (Domain.Order.AccessionId "TL-19-DF60D1")
                 //     validate "TL-33-AAAAAA" = Error "Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: TL-33-AAAAAA"
-                let validate accessionId : Result<Domain.Order.OrderAccessionId, string> =
+                let validate accessionId : Result<Order.OrderAccessionId, string> =
                     if Regex("^TL-(0|1|2){1}\d{1}-(\d|[A-Z]|[a-z]){6}$").Match(accessionId).Success then
-                        Ok <| Domain.Order.OrderAccessionId accessionId
+                        Ok <| Order.OrderAccessionId accessionId
                     else
                         Error $"Accession id must be in the following format, TL-(0|1|2)d-xxxxxx: {accessionId}"
 
             module Institution =
                 open StringValidations.Typed
-                open type Domain.Order.Institution
+                open type Order.Institution
 
                 let validate = validateNotBlank Institution "Order institution cannot be blank"
 
             module Physician =
                 open StringValidations.Typed
-                open type Domain.Order.Physician
+                open type Order.Physician
 
                 let validate = validateNotBlank Physician "Order physician cannot be blank"
 
@@ -916,7 +909,7 @@ module Tempus =
 
             module Dates =
                 /// Validate that sample's collection date happens before its received date
-                let validate dates : Result<Domain.Sample.Dates, string> =
+                let validate dates : Result<Sample.Dates, string> =
                     if dates.CollectionDate < dates.ReceivedDate then
                         Ok ({ CollectionDate = CollectionDate dates.CollectionDate
                               ReceivedDate   = ReceivedDate dates.ReceivedDate
@@ -933,7 +926,6 @@ module Tempus =
                     | "tumor" -> Ok "tumor"
                     | _ -> Error $"Sample category is not tumor: {category}"
 
-            open Utilities.StringValidations
             open Domain.Sample
 
             /// Validate a tumor sample
@@ -989,8 +981,7 @@ module Tempus =
                 }
 
             /// Validate normal sample, if it's present
-            let validateOptional  =
-                Optional.validateWith validate
+            let validateOptional = Optional.validateWith validate
 
 
         /// Represents HGVS reference sequences for proteins and coding DNA
@@ -1022,19 +1013,19 @@ module Tempus =
             /// 3. if hgvs.p is present
             ///    - hgvs.pFull (vice versa) is present
             ///    - hgvs.p == mutation effect
-            let validate (hgvs: HGVS) : Result<Domain.HGVS.Variant, string> =
+            let validate (hgvs: HGVS) : Result<HGVS.Variant, string> =
                 match (hgvs.``HGVS.p``, hgvs.``HGVS.pFull``, hgvs.``HGVS.c``, hgvs.MutationEffect, hgvs.Transcript) with
                 /// No HGVS protein sequence change present; only a coding DNA sequence is present
                 | (BlankString, BlankString, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.c`` = hgvs.MutationEffect ->
-                    Ok <| { ProteinChange = None
-                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
-                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
+                    Ok <| { ProteinChange     = None
+                            CodingChange      = HGVS.CodingChange hgvs.``HGVS.c``
+                            ReferenceSequence = HGVS.ReferenceSequence hgvs.Transcript }
                 /// Both HGVS protein sequence change and coding DNA sequence change are present
                 | (NotBlank, NotBlank, NotBlank, NotBlank, NotBlank) when hgvs.``HGVS.p`` = hgvs.MutationEffect ->
-                    Ok <| { ProteinChange = Some { Abbreviated =  Domain.HGVS.AbbreviatedProteinChange hgvs.``HGVS.p``
-                                                   Full = Domain.HGVS.FullProteinChange hgvs.``HGVS.pFull`` }
-                            CodingChange = Domain.HGVS.CodingChange hgvs.``HGVS.c``
-                            ReferenceSequence = Domain.HGVS.ReferenceSequence hgvs.Transcript }
+                    Ok <| { ProteinChange = Some { Abbreviated = HGVS.AbbreviatedProteinChange hgvs.``HGVS.p``
+                                                   Full        = HGVS.FullProteinChange hgvs.``HGVS.pFull`` }
+                            CodingChange      = HGVS.CodingChange hgvs.``HGVS.c``
+                            ReferenceSequence = HGVS.ReferenceSequence hgvs.Transcript }
                 | _ -> Error $"Invalid HGVS: {hgvs}"
 
             /// If the HGVS is present, validate it.
@@ -1058,7 +1049,7 @@ module Tempus =
                 open StringValidations.Typed
 
                 /// Validate that a nucleotide alteration is not blank
-                let validate = validateNotBlank Domain.Variant.NucleotideAlteration "Nucleotide alteration cannot be blank"
+                let validate = validateNotBlank Variant.NucleotideAlteration "Nucleotide alteration cannot be blank"
 
                 /// Validate a nucleotide alteration, if it exists.
                 let validateOptional = Optional.validateWith validate
@@ -1070,11 +1061,11 @@ module Tempus =
                     >> Option.bind (fun num ->
                         if num >= 0.0 then Some num
                         else None)
-                    >> Option.map Domain.Variant.AllelicFraction
+                    >> Option.map Variant.AllelicFraction
 
                 /// Validate that an allelic fraction is a parseable float greater than or equal to 0.
                 ///
-                ///    validate "10.0" = Ok (Domain.Variant.AllelicFraction 10.0)
+                ///    validate "10.0" = Ok (Variant.AllelicFraction 10.0)
                 ///    validate "-10.0" = Error "Invalid allelic fraction: -10.0"
                 let validate input =
                     match input with
@@ -1088,7 +1079,7 @@ module Tempus =
                 open StringValidations.Typed
 
                 /// Validate that a variant description is not blank
-                let validate = validateNotBlank Domain.Variant.Description $"Variant description can't be blank"
+                let validate = validateNotBlank Variant.Description $"Variant description can't be blank"
 
 
         /// Logic for the `somaticPotentiallyActionableMutations` subsection of the report's `results` section
@@ -1110,7 +1101,7 @@ module Tempus =
 
             module Variant =
                 /// Validate a somatic, potentially actionable variant's hgvs, nucleotide alteration, allelic fraction, and variant description
-                let validate (json: Variant) : Validation<Domain.SomaticPotentiallyActionable.Variant,string> =
+                let validate (json: Variant) : Validation<SomaticPotentiallyActionable.Variant,string> =
                     validation {
                         let! hgvs = json.HgvsJson |> HGVS.validate
                         and! nucleotideAlteration = json.NucleotideAlteration |> Variant.NucleotideAlteration.validateOptional
@@ -1122,7 +1113,7 @@ module Tempus =
                             NucleotideAlteration = nucleotideAlteration
                             AllelicFraction = allelicFraction
                             Description = variantDescription
-                        } : Domain.SomaticPotentiallyActionable.Variant )
+                        } : SomaticPotentiallyActionable.Variant )
                     }
 
             module Variants =
@@ -1144,7 +1135,7 @@ module Tempus =
 
             module Mutation =
                 /// Validate that somatic, potentially actionable mutation has a valid gene and variants.
-                let validate (mutation: Mutation) : Validation<Domain.SomaticPotentiallyActionable.Mutation, string> =
+                let validate (mutation: Mutation) : Validation<SomaticPotentiallyActionable.Mutation, string> =
                     validation {
                         let! gene = mutation.GeneJson |> Gene.validate
                         and! variants = mutation.VariantJsons |> Variants.validate
@@ -1152,7 +1143,7 @@ module Tempus =
                         return ({
                             Gene = gene
                             Variants = variants
-                        } : Domain.SomaticPotentiallyActionable.Mutation) }
+                        } : SomaticPotentiallyActionable.Mutation) }
 
             module Mutations =
                 /// Validate a list of somatic, potentially actionable mutations
@@ -1239,7 +1230,7 @@ module Tempus =
 
         module SomaticBiologicallyRelevantVariant =
             module Gene =
-                open type Domain.SomaticBiologicallyRelevant.Mutation
+                open type SomaticBiologicallyRelevant.Mutation
 
                 /// Validate that a gene or a fusion gene is present and valid
                 let validate geneJson fusionGeneJson =
@@ -1250,7 +1241,7 @@ module Tempus =
                   | (_, Ok fusion) -> Ok <| RelevantFusion fusion
 
             module Type =
-                open type Domain.SomaticBiologicallyRelevant.Type
+                open type SomaticBiologicallyRelevant.Type
 
                 /// Validate that a somatic biologically relevant variant type is either 'CNV', 'SNV', or 'fusion'
                 let validate input =
@@ -1275,7 +1266,7 @@ module Tempus =
                         Type     = variantType
                         AllelicFraction      = allelicFraction
                         NucleotideAlteration = nucleotideAlteration
-                    } : Domain.SomaticBiologicallyRelevant.Variant ) }
+                    } : SomaticBiologicallyRelevant.Variant ) }
 
         module SomaticBiologicallyRelevantVariants =
             /// Validate a list of somatic biologically relevant variant inputs
@@ -1304,7 +1295,7 @@ module Tempus =
 
         module SomaticVUS =
             module Type =
-                open type Domain.SomaticVUS.Type
+                open type SomaticVUS.Type
 
                 let validate input =
                     match input with
@@ -1378,7 +1369,7 @@ module Tempus =
             open StringValidations.Typed
 
             module Note =
-                open type Domain.InheritedVariants.Note
+                open type InheritedVariants.Note
 
                 /// Validate that an inherited variant note is not blank.
                 let validate = validateNotBlank Note "Inherited variant note cannot be blank"
@@ -1387,25 +1378,25 @@ module Tempus =
 
             module Value =
                 module Disease =
-                    open type Domain.InheritedVariants.Disease
+                    open type InheritedVariants.Disease
 
                     /// Validate that an inherited variant disease is not blank.
                     let validate = validateNotBlank Disease "Inherited variant disease cannot be blank"
 
                 module VariantDescription =
-                    open type Domain.Variant.Description
+                    open type Variant.Description
 
                     /// Validate that an inherited variant description is not blank.
                     let validate = validateNotBlank Description "Inherited variant description cannot be blank"
 
                 module ReferenceNucleotide =
-                    open type Domain.InheritedVariants.ReferencedNucleotide
+                    open type InheritedVariants.ReferencedNucleotide
 
                     /// Validate that an inherited variant referenced nucleotide is not blank.
                     let validate = validateNotBlank ReferencedNucleotide "Reference nucleotide cannot be blank"
 
                 module AlteredNucleotide =
-                    open type Domain.InheritedVariants.AlteredNucleotide
+                    open type InheritedVariants.AlteredNucleotide
 
                     /// Validate that an inherited variant altered nucleotide is not blank.
                     let validate = validateNotBlank AlteredNucleotide "Altered nucleotide cannot be blank"
@@ -1414,7 +1405,7 @@ module Tempus =
                 type ClinicalSignificanceValidator<'clinicalSignificance> = (string -> Result<'clinicalSignificance, string>)
 
                 /// Validate that an inherited variant value has a valid gene, hgvs, description, clinical significnace, disease, allelic fraction, referenced nucleotide, and altered nucleotide
-                let validate (validateClinicalSignificance: ClinicalSignificanceValidator<'clinicalSignificance>) (value: InheritedVariantValue) : Validation<Domain.InheritedVariants.Value<'clinicalSignificance>, string> =
+                let validate (validateClinicalSignificance: ClinicalSignificanceValidator<'clinicalSignificance>) (value: InheritedVariantValue) : Validation<InheritedVariants.Value<'clinicalSignificance>, string> =
                     validation {
                         let! gene = value.Gene |> Gene.validate
                         and! hgvs = value.Hgvs |> HGVS.validate
@@ -1425,8 +1416,8 @@ module Tempus =
                         and! referenceNucleotide = value.ReferenceNucleotide |> ReferenceNucleotide.validate
                         and! alteredNucleotide = value.AlteredNucleotide |> AlteredNucleotide.validate
 
-                        let chromosome = value.Chromosome |> Domain.InheritedVariants.Chromosome
-                        let position = value.Position |> Domain.InheritedVariants.Position
+                        let chromosome = value.Chromosome |> InheritedVariants.Chromosome
+                        let position = value.Position |> InheritedVariants.Position
 
                         return ({
                             Gene = gene
@@ -1439,7 +1430,7 @@ module Tempus =
                             AlteredNucleotide = alteredNucleotide
                             Chromosome = chromosome
                             Position = position
-                        } : Domain.InheritedVariants.Value<'clinicalSignificance> )
+                        } : InheritedVariants.Value<'clinicalSignificance> )
                     }
 
             module Values =
@@ -1463,7 +1454,7 @@ module Tempus =
         /// logic `results.inheritedRelevantVariants` section
         module InheritedRelevantVariants =
             module ClinicalSignificance =
-                open type Domain.InheritedRelevantVariants.ClinicalSignificance
+                open type InheritedRelevantVariants.ClinicalSignificance
 
                 /// Validate that an inherited relevant variant's clinical signficance is either "Likely Pathogenic", "Pathogenic", "Risk Allele", or "VUS Favoring Pathogenic"
                 let validate input =
@@ -1481,7 +1472,7 @@ module Tempus =
         /// logic for `results.InheritedVariantsOfUnknownSignficance` section
         module InheritedVUS =
             module ClinicalSignificance =
-                open type Domain.InheritedVUS.ClinicalSignificance
+                open type InheritedVUS.ClinicalSignificance
 
                 /// Validate that a VUS clinical signficance is "Variant of Unknown Significance"
                 let validate input =
@@ -1504,8 +1495,8 @@ module Tempus =
                     })
 
         module TumorMutationBurden =
-            open type Domain.TumorMutationBurden.Score
-            open type Domain.TumorMutationBurden.Percentile
+            open type TumorMutationBurden.Score
+            open type TumorMutationBurden.Percentile
 
             /// Validate that tmb score and percentile are both present or absent.
             ///
@@ -1521,7 +1512,7 @@ module Tempus =
                 | None, Some _ -> Error $"TMB score is missing: {tumorMutationBurden}"
 
         module MicrosatelliteInstabilityStatus =
-            open type Domain.MicrosatelliteInstabilityStatus
+            open type MicrosatelliteInstabilityStatus
             open StringValidations.Typed
 
             /// Validate that msi status is not blank
@@ -1645,7 +1636,6 @@ module Tempus =
 
     module DTO =
         open Database
-        open Domain
 
         module SomaticPotentiallyActionable =
             open SomaticPotentiallyActionable
