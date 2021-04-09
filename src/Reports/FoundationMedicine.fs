@@ -32,8 +32,11 @@ module FoundationMedicine =
         type Sample =
             { SampleId: Sample.Identifier
               ReceivedDate: Sample.ReceivedDate
-              BlockId: Sample.BlockId
+              BlockId: Sample.BlockId option
               Format: Sample.Format }
+
+            member this.TryBlockIdValue =
+                this.BlockId |> Option.map (fun blockId -> blockId.Value)
 
         module OrderingMd =
             type Name =
@@ -254,7 +257,7 @@ module FoundationMedicine =
 
         type Sample =
             { SampleId: string
-              BlockId: string
+              BlockId: string option
               ReceivedDate: System.DateTime
               Format: string }
 
@@ -276,11 +279,14 @@ module FoundationMedicine =
                         Error <| $"Invalid sample id: {input}"
 
             module BlockId =
+                open Utilities
                 open Utilities.StringValidations.Typed
                 open type Sample.BlockId
 
                 /// Validate that a sample's block id is not blank
                 let validate = validateNotBlank BlockId "Block id can't be blank"
+
+                let validateOptional = Optional.validateWith validate
 
 
             module Format =
@@ -300,7 +306,7 @@ module FoundationMedicine =
             let validate (sample: Sample) =
                 validation {
                     let! sampleId = SampleId.validate sample.SampleId
-                    and! blockId = BlockId.validate sample.BlockId
+                    and! blockId = BlockId.validateOptional sample.BlockId
                     and! specimenFormat = Format.validate sample.Format
 
                     return ({
@@ -897,8 +903,13 @@ module FoundationMedicine =
 
             /// Retrieve the report's sample
             member this.Sample : Sample =
+                /// a block id is optional
+                let optionalBlockId =
+                    try (Some this.ReportSample.BlockId)
+                    with | :? System.Exception -> None
+
                 { SampleId = this.ReportSample.SampleId
-                  BlockId = this.ReportSample.BlockId
+                  BlockId = optionalBlockId
                   ReceivedDate = this.ReportSample.ReceivedDate
                   Format = this.ReportSample.SpecFormat }
 
@@ -1035,7 +1046,7 @@ module FoundationMedicine =
 
             row.ReportId <- report.ReportId.Value
             row.SampleId <- sample.SampleId.Value
-            row.BlockId <- sample.BlockId.Value |> Some
+            row.BlockId <- sample.TryBlockIdValue
 
             row.CollectionDate <- pmi.CollectionDate.Value
             row.ReceiptDate    <- sample.ReceivedDate.Value
