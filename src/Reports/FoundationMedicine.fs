@@ -425,8 +425,15 @@ module FoundationMedicine =
                 open Utilities.StringValidations.Typed
 
                 /// Validate that submitted diagnosis name is not blank
-                let validate = validateNotBlank SpecimenSite "Diagnosis name can't be blank"
-                let validateOptional = Optional.validateWith validate
+                let validate = validateNotBlank SpecimenSite "Specimen site can't be blank"
+
+                let validateOptional (optionalInput: string option) =
+                    match optionalInput with
+                    | None | Some "" -> Ok None
+                    | Some input -> input |> validate |> Result.map Some
+
+
+
 
             module Pathologist =
                 open Utilities
@@ -851,6 +858,7 @@ module FoundationMedicine =
 
         module Report =
             open FsToolkit.ErrorHandling
+            open Core.Input
 
             let validate report =
                 validation {
@@ -879,7 +887,9 @@ module FoundationMedicine =
                         Fusions = fusions
                         ShortVariants = shortVariants
                     } : Domain.Report)
-                }
+                } |> Result.mapError (fun errors ->
+                    ({ ReportId = report.ReportId
+                       Errors = errors } : Report.ValidationError))
 
     module XML =
         open FSharp.Data
