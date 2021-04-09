@@ -93,8 +93,12 @@ module FoundationMedicine =
         and VariantName = internal VariantName of string
 
         module Fusion =
-            type Description = internal | Description of string
-            type Type = internal | Type of string
+            type Description =
+                internal | Description of string
+                member this.Value = this |> fun (Description description) -> description
+            type Type =
+                internal | Type of string
+                member this.Value = this |> fun (Type fusionType) -> fusionType
 
         type Fusion =
             { TargetedGene: Gene.Name
@@ -1048,6 +1052,22 @@ module FoundationMedicine =
 
                 row.Transcript <- shortVariant.Transcript.Value |> Some
                 row.AllelicFraction <- shortVariant.AlleleFraction.Value |> float |> Some
+
+                row
+            )
+
+        let toFusionRows (report: Report) =
+            let sampleReportId = querySampleReportId report.ReportId report.Sample.SampleId
+
+            report.Fusions |> Seq.map (fun fusion ->
+                let row = context.Public.Fusions.Create()
+
+                row.SampleReportId <- sampleReportId
+                row.FirstGeneName <- fusion.TargetedGene.Value
+                row.SecondGeneName <- fusion.OtherGene.Value
+
+                row.Description <- fusion.Description.Value |> Some
+                row.FusionType <- fusion.Type.Value
 
                 row
             )
