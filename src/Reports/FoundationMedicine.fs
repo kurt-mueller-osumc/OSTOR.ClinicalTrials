@@ -26,7 +26,6 @@ module FoundationMedicine =
                     | Block -> "block"
                     | TubeSet -> "tube set"
 
-
         /// The sample for each FMI report.
         /// FMI only reports tumor samples.
         type Sample =
@@ -56,14 +55,17 @@ module FoundationMedicine =
               FirstName: Person.FirstName
               SubmittedDiagnosis: Diagnosis.Name
               Gender: Gender
-              DateOfBirth: Person.DateOfBirth
-              SpecimenSite: SpecimenSite // the sample site
-              CollectionDate: CollectionDate // the sample collection date
+              DateOfBirth: Person.DateOfBirth option
+              SpecimenSite: SpecimenSite option // the sample site
+              CollectionDate: CollectionDate option // the sample collection date
               OrderingMd: OrderingMd
               Pathologist: Pathologist option }
 
             member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
+            member this.TryDobValue = this.DateOfBirth |> Option.map (fun dob -> dob.Value)
             member this.TryPathologistValue = this.Pathologist |> Option.map (fun pathologist -> pathologist.Value)
+            member this.TrySpecimenSiteValue = this.SpecimenSite |> Option.map (fun site -> site.Value)
+            member this.TryCollectionDateValue = this.CollectionDate |> Option.map (fun collectionDate -> collectionDate.Value)
 
 
         and Gender =
@@ -323,14 +325,14 @@ module FoundationMedicine =
               Identifier: string }
 
         type PMI =
-            { MRN: string
+            { MRN: string option
               Gender: string
               LastName: string
               FirstName: string
               SubmittedDiagnosis: string
-              DateOfBirth: System.DateTime
-              SpecimenSite: string
-              CollectionDate: System.DateTime
+              DateOfBirth: System.DateTime option
+              SpecimenSite: string option
+              CollectionDate: System.DateTime option
               OrderingMd: OrderingMd
               Pathologist: string option }
 
@@ -341,14 +343,17 @@ module FoundationMedicine =
             module MRN =
                 open Core.Input
 
-                /// Validate that a patient's MRN is in the correct format or that the MRN is not provided at all.
-                let validateOptional input =
-                    if input = "" then
-                        Ok None
-                    else
-                        match Patient.MRN.validate input with
-                        | Ok mrn -> Ok <| Some mrn
-                        | Error e -> Error e
+                /// Validate that a patient's MRN, if it exists, is valid. In this case, nonexisting MRNs include a blank string.
+                let validateOptional (optionalInput: string option) =
+                    match optionalInput with
+                    | None -> Ok None
+                    | Some input ->
+                        match input with
+                        | "" -> Ok None
+                        | _ ->
+                            input
+                            |> Patient.MRN.validate
+                            |> Result.map Some
 
             module Gender =
                 open type Gender
@@ -366,9 +371,12 @@ module FoundationMedicine =
                 let validate = validateNotBlank Diagnosis.Name "Diagnosis name can't be blank"
 
             module SpecimenSite =
+                open Utilities
                 open Utilities.StringValidations.Typed
+
                 /// Validate that submitted diagnosis name is not blank
                 let validate = validateNotBlank SpecimenSite "Diagnosis name can't be blank"
+                let validateOptional = Optional.validateWith validate
 
             module Pathologist =
                 open Utilities
@@ -408,11 +416,11 @@ module FoundationMedicine =
                     and! firstName = Person.FirstName.validate pmi.FirstName
                     and! submittedDiagnosis = SubmittedDiagnosis.validate pmi.SubmittedDiagnosis
                     and! pathologist = Pathologist.validateOptional pmi.Pathologist
-                    and! specimenSite = SpecimenSite.validate pmi.SpecimenSite
+                    and! specimenSite = SpecimenSite.validateOptional pmi.SpecimenSite
                     and! orderingMd = OrderingMd.validate pmi.OrderingMd
 
-                    let dob = Person.DateOfBirth pmi.DateOfBirth
-                    let collectionDate = Domain.CollectionDate pmi.CollectionDate
+                    let dob = pmi.DateOfBirth |> Option.map Person.DateOfBirth
+                    let collectionDate = pmi.CollectionDate |> Option.map CollectionDate
 
                     return ({
                         MRN = mrn
@@ -926,14 +934,30 @@ module FoundationMedicine =
                     try (Some pmi.Pathologist)
                     with | :? System.Exception -> None
 
-                { MRN = pmi.Mrn
+                let optionalSpecSite =
+                    try (Some pmi.SpecSite)
+                    with | :? System.Exception -> None
+
+                let optionalMrn =
+                    try (Some pmi.Mrn)
+                    with | :? System.Exception -> None
+
+                let optionalCollectionDate =
+                    try (Some pmi.CollDate)
+                    with | :? System.Exception -> None
+
+                let optionalDob =
+                    try (Some pmi.Dob)
+                    with | :? System.Exception -> None
+
+                { MRN = optionalMrn
                   LastName = pmi.LastName
                   FirstName = pmi.FirstName
                   SubmittedDiagnosis = pmi.SubmittedDiagnosis
                   Gender = pmi.Gender
-                  DateOfBirth = pmi.Dob
-                  SpecimenSite = pmi.SpecSite
-                  CollectionDate = pmi.CollDate
+                  DateOfBirth = optionalDob
+                  SpecimenSite = optionalSpecSite
+                  CollectionDate = optionalCollectionDate
                   OrderingMd = { OrderingMd.Name = pmi.OrderingMd; OrderingMd.Identifier = pmi.OrderingMdId }
                   Pathologist = optionalPathologist }
 
@@ -1005,7 +1029,7 @@ module FoundationMedicine =
                 row.Mrn          <- mrnValue
                 row.LastName     <- pmi.LastName.Value
                 row.FirstName    <- pmi.FirstName.Value
-                row.DateOfBirth  <- pmi.DateOfBirth.Value
+                row.DateOfBirth  <- pmi.DateOfBirth.Value.Value // assume that the optional dob exists and get the underlying datetime
                 row.Sex          <- pmi.Gender.Value
 
                 row
@@ -1043,7 +1067,7 @@ module FoundationMedicine =
 
             row.Category   <- "tumor"
             row.SampleId   <- sample.SampleId.Value
-            row.BiopsySite <- pmi.SpecimenSite.Value
+            row.BiopsySite <- pmi.TrySpecimenSiteValue
             row.SampleType <- sample.Format.Value
 
             row
@@ -1057,7 +1081,7 @@ module FoundationMedicine =
             row.SampleId <- sample.SampleId.Value
             row.BlockId <- sample.TryBlockIdValue
 
-            row.CollectionDate <- pmi.CollectionDate.Value
+            row.CollectionDate <- pmi.TryCollectionDateValue
             row.ReceiptDate    <- sample.ReceivedDate.Value
 
             row
