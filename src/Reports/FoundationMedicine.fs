@@ -164,7 +164,8 @@ module FoundationMedicine =
               Lab: Lab
               Genes: Gene list
               Variants: Variant list
-              Fusions: Fusion list }
+              Fusions: Fusion list
+              ShortVariants: ShortVariant list }
 
             member this.TryMicrosatelliteStatusValue =
                 this.MicrosatelliteStatus |> Option.map (fun ms -> ms.Value)
@@ -700,6 +701,15 @@ module FoundationMedicine =
                     } : Domain.ShortVariant)
                 }
 
+        module ShortVariants =
+            open Utilities
+
+            /// Validate a collection of short variants
+            let validate =
+                List.map ShortVariant.validate
+                >> Result.combine
+                >> Result.mapError List.flatten
+
 
         type Report =
             { ReportId: string
@@ -711,7 +721,8 @@ module FoundationMedicine =
               TumorMutationBurden: TumorMutationBurden option
               Genes: Gene list
               Variants: Variant list
-              Fusions: Fusion list }
+              Fusions: Fusion list
+              ShortVariants: ShortVariant list }
 
         module Report =
             open FsToolkit.ErrorHandling
@@ -728,6 +739,7 @@ module FoundationMedicine =
                     and! issuedDate = IssuedDate.validate report.IssuedDate
                     and! genes = Genes.validate report.Genes
                     and! fusions = Fusions.validate report.Fusions
+                    and! shortVariants = ShortVariants.validate report.ShortVariants
 
                     return ({
                         ReportId = reportId
@@ -740,6 +752,7 @@ module FoundationMedicine =
                         Genes = genes
                         Variants = variants
                         Fusions = fusions
+                        ShortVariants = shortVariants
                     } : Domain.Report)
                 }
 
@@ -881,7 +894,8 @@ module FoundationMedicine =
                   TumorMutationBurden = this.TumorMutationBurden
                   Genes = this.Genes
                   Variants = this.Variants |> Seq.toList
-                  Fusions = this.Fusions |> Seq.toList }
+                  Fusions = this.Fusions |> Seq.toList
+                  ShortVariants = this.ShortVariantsSansUnknown |> Seq.toList }
 
 
     module DTO =
