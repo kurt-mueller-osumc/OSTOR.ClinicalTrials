@@ -19,9 +19,10 @@ module FoundationMedicine =
                 member this.Value = this |> fun (BlockId blockId) -> blockId
 
             type Format =
-                internal | SlideDeck | Block | TubeSet
+                internal | Slide | SlideDeck | Block | TubeSet
                 member this.Value =
                     match this with
+                    | Slide -> "slide"
                     | SlideDeck -> "slide deck"
                     | Block -> "block"
                     | TubeSet -> "tube set"
@@ -69,11 +70,12 @@ module FoundationMedicine =
 
 
         and Gender =
-            internal Male | Female
+            internal Male | Female | Unknown
             member this.Value =
                 match this with
                 | Male -> "male"
                 | Female -> "female"
+                | Unknown -> "unknown"
 
         and SpecimenSite =
             internal | SpecimenSite of string
@@ -240,15 +242,26 @@ module FoundationMedicine =
         module ReportId =
             open System.Text.RegularExpressions
 
-            /// Validate that a report id is in the following format where 'd' is a digit: `ORD-ddddddd-dd`
+            let (|ValidId|_|) (input: string) =
+                let idRegexes = [
+                    "^ORD-\d{7,}-\d{2,}$" // e.g. `ORD-1234567-89`
+                    "^CRF\d{6}$" // e.g. `CRF123456`
+                    "^TRF\d{6}$" ]
+
+                let isValidId = idRegexes |> Seq.exists (fun regex -> Regex(regex).Match(input).Success)
+
+                if isValidId then Some <| ReportId input
+                else None
+
+
+            /// Validate that a report id is in a valid format.
             ///
-            ///    validate (ReportId "ORD-1234567-89") = Ok (ReportId "ORD-1234567-89")
-            ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
+            ///    validate "ORD-1234567-89" = Ok (ReportId "ORD-1234567-89")
+            ///    validate "invalidId" = Error "Invalid report id: invalidId"
             let validate input =
-                if Regex("ORD-\d{7,}-\d{2,}").Match(input).Success then
-                    Ok <| ReportId input
-                else
-                    Error <| $"Invalid report id: {input}"
+                match input with
+                | ValidId reportId -> Ok reportId
+                | _ -> Error $"Invalid report id: {input}"
 
         module IssuedDate =
             open Utilities
@@ -272,15 +285,27 @@ module FoundationMedicine =
             module SampleId =
                 open System.Text.RegularExpressions
 
-                /// Validate that a sample's id is in the following format where 'd' is a digit: `USddddddd.dd`
+                let (|ValidId|_|) input =
+
+                    let idRegexes = [
+                        "US\d{7,}\.\d{2,}" // e.g. "US0123456.78"
+                        "TRF\d{6}\.\d{2,}" // e.g. "TRF123456.01"
+                    ]
+
+                    let isValidId = idRegexes |> Seq.exists (fun idRegex -> Regex(idRegex).Match(input).Success)
+
+                    if isValidId then Some <| Sample.Identifier input
+                    else None
+
+
+                /// Validate that a sample's id is in a valid format
                 ///
                 ///    validate "US0123456.78" = Ok (SampleId "US0123456.78")
                 ///    validate "invalidId" = Error "Invalid sample id: invalidId"
                 let validate input =
-                    if Regex("US\d{7,}.\d{2,}").Match(input).Success then
-                        Ok <| Sample.Identifier input
-                    else
-                        Error <| $"Invalid sample id: {input}"
+                    match input with
+                    | ValidId sampleId -> Ok sampleId
+                    | _ -> Error <| $"Invalid sample id: {input}"
 
             module BlockId =
                 open Utilities
@@ -300,6 +325,7 @@ module FoundationMedicine =
                 let validate input =
                     match input with
                     | "Slide Deck" -> Ok SlideDeck
+                    | "Slide" -> Ok Slide
                     | "Block" -> Ok Block
                     | "Tube Set" -> Ok TubeSet
                     | _ -> Error $"Unknown sample format: {input}"
@@ -363,6 +389,7 @@ module FoundationMedicine =
                     match input with
                     | "male" | "Male" -> Ok Male
                     | "female" | "Female" -> Ok Female
+                    | "Unknown" | "unknown" -> Ok Unknown
                     | _ -> Error $"Invalid gender: {input}"
 
             module SubmittedDiagnosis =
