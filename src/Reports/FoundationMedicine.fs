@@ -187,7 +187,7 @@ module FoundationMedicine =
               PMI: PMI
               MicrosatelliteStatus: MicrosatelliteStatus option
               TumorMutationBurden: TumorMutationBurden option
-              Lab: Lab
+              Labs: Lab list
               Genes: Gene list
               Variants: Variant list
               Fusions: Fusion list
@@ -201,6 +201,23 @@ module FoundationMedicine =
 
             member this.TryTmbScoreFloat =
                 this.TumorMutationBurden |> Option.map (fun tmb -> tmb.Score.Float)
+
+            static member DefaultLab = {
+                CliaNumber = CliaNumber "22D2027531"
+                Name = LabName "Foundation Medicine"
+                Address = {
+                    Street = StreetAddress "150 Second St., 1st Floor"
+                    City = City "Cambridge"
+                    State = State "MA"
+                    Zip = ZipCode "02141"
+                }
+            }
+
+            /// Grab the first lab, if it exists, or use the default FMI lab
+            member this.FirstLabOrDefault =
+                this.Labs
+                |> Seq.tryHead
+                |> Option.defaultValue Report.DefaultLab
 
         and ReportId =
             internal | ReportId of string
@@ -603,6 +620,15 @@ module FoundationMedicine =
                     } : Domain.Lab)
                 }
 
+        module Labs =
+            open Utilities
+
+            /// Validate a collection of labs
+            let validate =
+                List.map Lab.validate
+                >> Result.combine
+                >> Result.mapError List.flatten
+
         type Gene =
             { Name: string
               Alterations: string list }
@@ -743,7 +769,7 @@ module FoundationMedicine =
         type Report =
             { ReportId: string
               IssuedDate: string
-              Lab: Lab
+              Labs: Lab list
               Sample: Sample
               PMI: PMI
               MicrosatelliteStatus: string option
@@ -761,7 +787,7 @@ module FoundationMedicine =
                     let! reportId = ReportId.validate report.ReportId
                     and! sample = Sample.validate report.Sample
                     and! pmi = PMI.validate report.PMI
-                    and! lab = Lab.validate report.Lab
+                    and! labs = Labs.validate report.Labs
                     and! msStatus = MicrosatelliteStatus.validateOptional report.MicrosatelliteStatus
                     and! tmb = TumorMutationBurden.validateOptional report.TumorMutationBurden
                     and! variants = Variants.validate report.Variants
@@ -777,7 +803,7 @@ module FoundationMedicine =
                         IssuedDate = issuedDate
                         MicrosatelliteStatus = msStatus
                         TumorMutationBurden = tmb
-                        Lab = lab
+                        Labs = labs
                         Genes = genes
                         Variants = variants
                         Fusions = fusions
@@ -862,11 +888,12 @@ module FoundationMedicine =
             member this.ReportId = this.ClinicalReport.ReportId
 
             /// Retrieve the lab's address and clia number
-            member this.Lab : Lab =
-                let processSite = this.ReportSample.ProcessSites.[0]
+            member this.Labs : Lab seq =
+                this.ReportSample.ProcessSites
+                |> Seq.map (fun processSite ->
+                    { Address = processSite.Address
+                      CliaNumber = processSite.CliaNumber })
 
-                { Address = processSite.Address
-                  CliaNumber = processSite.CliaNumber }
 
             /// Retrieve the report's sample
             member this.Sample : Sample =
@@ -916,7 +943,7 @@ module FoundationMedicine =
             member this.Report =
                 { ReportId = this.ReportId
                   IssuedDate = this.ServerTime
-                  Lab = this.Lab
+                  Labs = this.Labs |> Seq.toList
                   Sample = this.Sample
                   PMI = this.PMI
                   MicrosatelliteStatus = this.MicrosatelliteStatus
@@ -932,9 +959,9 @@ module FoundationMedicine =
         open Domain
 
         /// Build a row to be inserted into the `vendors` database table.
-        let toVendorRow (overallReport: Report) =
+        let toVendorRow (report: Report) =
             let row = context.Public.Vendors.Create()
-            let lab = overallReport.Lab
+            let lab = report.FirstLabOrDefault
 
             row.Name          <- "Foundation Medicine"
             row.CliaNumber    <- lab.CliaNumber.Value
@@ -944,6 +971,8 @@ module FoundationMedicine =
             row.ZipCode       <- lab.Address.Zip.Value
 
             row
+
+
 
         /// Build a row to be inserted into the `patients` database table if the report's patient has an MRN.
         let tryPatientRow (report: Report) =
@@ -970,7 +999,7 @@ module FoundationMedicine =
             patient.TryMrnValue
             |> Option.map (fun mrnValue ->
                 let row = context.Public.Reports.Create()
-                let lab = report.Lab
+                let lab = report.FirstLabOrDefault
 
                 row.PatientMrn <- mrnValue
                 row.VendorCliaNumber <- lab.CliaNumber.Value
