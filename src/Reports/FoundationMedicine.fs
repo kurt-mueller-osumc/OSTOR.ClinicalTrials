@@ -1035,9 +1035,7 @@ module FoundationMedicine =
                 exactlyOne
             }
 
-        let toVariantRows (report: Report) =
-            let sampleReportId = querySampleReportId report.ReportId report.Sample.SampleId
-
+        let toVariantRows (sampleReportId: System.Guid) (report: Report) =
             report.ShortVariants
             |> Seq.map (fun shortVariant ->
                 let row = context.Public.Variants.Create()
@@ -1056,9 +1054,7 @@ module FoundationMedicine =
                 row
             )
 
-        let toFusionRows (report: Report) =
-            let sampleReportId = querySampleReportId report.ReportId report.Sample.SampleId
-
+        let toFusionRows (sampleReportId: System.Guid) (report: Report) =
             report.Fusions |> Seq.map (fun fusion ->
                 let row = context.Public.Fusions.Create()
 
@@ -1070,4 +1066,28 @@ module FoundationMedicine =
                 row.FusionType <- fusion.Type.Value
 
                 row
+            )
+
+        open Utilities
+
+        let tryDatabaseRows (report: Report) =
+            report |> tryPatientRow |> Option.map (fun patientRow ->
+                /// insert patient, vendor, genes, and sample into database
+                report |> toVendorRow |> ignore
+                report |> toGeneRows |> ignore
+                report |> toSampleRow |> ignore
+
+                context.SubmitUpdates()
+
+                /// insert report into database
+                report |> tryReportRow |> Optional.value |> ignore
+
+                context.SubmitUpdates()
+
+                /// insert sample report, variants, and fusions into database
+                let sampleReportId = querySampleReportId report.ReportId report.Sample.SampleId
+                report |> toVariantRows sampleReportId |> ignore
+                report |> toFusionRows sampleReportId |> ignore
+
+                context.SubmitUpdates()
             )
