@@ -1867,7 +1867,7 @@ module Tempus =
 
             row.Category   <- "tumor"
             row.SampleId   <- tumorSample.SampleId.Value.ToString()
-            row.BiopsySite <- tumorSample.Site.Value
+            row.BiopsySite <- tumorSample.Site.Value |> Some
             row.SampleType <- tumorSample.Type.Value
 
             row
@@ -1880,7 +1880,7 @@ module Tempus =
 
                 row.Category   <- "normal"
                 row.SampleId   <- normalSample.SampleId.Value.ToString()
-                row.BiopsySite <- normalSample.Site.Value
+                row.BiopsySite <- normalSample.Site.Value |> Some
                 row.SampleType <- normalSample.Type.Value
 
                 row
@@ -1896,7 +1896,7 @@ module Tempus =
             row.ReportId <- report.ReportId.Value.ToString()
             row.BlockId  <- tumorSample.TryBlockIdValue
 
-            row.CollectionDate <- tumorSample.Dates.CollectionDate.Value
+            row.CollectionDate <- tumorSample.Dates.CollectionDate.Value |> Some
             row.ReceiptDate    <- tumorSample.Dates.ReceivedDate.Value
 
             row.TumorPercentage <- tumorSample.TryTumorPercentageValue |> Option.map int
@@ -1915,7 +1915,7 @@ module Tempus =
                 row.ReportId <- report.ReportId.Value.ToString()
                 row.BlockId  <- normalSample.TryBlockIdValue
 
-                row.CollectionDate <- normalSample.Dates.CollectionDate.Value
+                row.CollectionDate <- normalSample.Dates.CollectionDate.Value |> Some
                 row.ReceiptDate    <- normalSample.Dates.ReceivedDate.Value
 
                 row

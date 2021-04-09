@@ -1237,7 +1237,7 @@ module Caris =
             row.SampleId       <- specimen.SpecimenId.Value
             row.SampleType     <- specimen.Type.Value
             row.Category       <- "tumor"
-            row.BiopsySite     <- specimen.Site.Value
+            row.BiopsySite     <- specimen.Site.Value |> Some
 
             row
 
@@ -1247,7 +1247,7 @@ module Caris =
             let test = report.Test
             let row = context.Public.SampleReports.Create()
 
-            row.CollectionDate <- specimen.CollectionDate.Value
+            row.CollectionDate <- specimen.CollectionDate.Value |> Some
             row.ReceiptDate    <- specimen.ReceivedDate.Value
             row.ReportId       <- test.ReportId.Value
 
