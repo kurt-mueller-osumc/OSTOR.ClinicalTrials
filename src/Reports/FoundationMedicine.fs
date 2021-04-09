@@ -60,9 +60,11 @@ module FoundationMedicine =
               SpecimenSite: SpecimenSite // the sample site
               CollectionDate: CollectionDate // the sample collection date
               OrderingMd: OrderingMd
-              Pathologist: Pathologist }
+              Pathologist: Pathologist option }
 
             member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
+            member this.TryPathologistValue = this.Pathologist |> Option.map (fun pathologist -> pathologist.Value)
+
 
         and Gender =
             internal Male | Female
@@ -330,7 +332,7 @@ module FoundationMedicine =
               SpecimenSite: string
               CollectionDate: System.DateTime
               OrderingMd: OrderingMd
-              Pathologist: string }
+              Pathologist: string option }
 
         /// The Patient Medical Information section of an FMI report
         module PMI =
@@ -369,6 +371,7 @@ module FoundationMedicine =
                 let validate = validateNotBlank SpecimenSite "Diagnosis name can't be blank"
 
             module Pathologist =
+                open Utilities
                 open Utilities.StringValidations
 
                 /// Validate that a pathologist's name is provided or is explicitly not provided
@@ -377,6 +380,8 @@ module FoundationMedicine =
                     | "Provided, Not" -> Ok PathologistNotProvided
                     | NotBlank -> Ok <| PathologistName input
                     | _ -> Error "Pathologist cannot be blank"
+
+                let validateOptional = Optional.validateWith validate
 
             module OrderingMd =
                 open Utilities.StringValidations
@@ -402,7 +407,7 @@ module FoundationMedicine =
                     and! lastName = Person.LastName.validate pmi.LastName
                     and! firstName = Person.FirstName.validate pmi.FirstName
                     and! submittedDiagnosis = SubmittedDiagnosis.validate pmi.SubmittedDiagnosis
-                    and! pathologist = Pathologist.validate pmi.Pathologist
+                    and! pathologist = Pathologist.validateOptional pmi.Pathologist
                     and! specimenSite = SpecimenSite.validate pmi.SpecimenSite
                     and! orderingMd = OrderingMd.validate pmi.OrderingMd
 
@@ -917,6 +922,10 @@ module FoundationMedicine =
             member this.PMI : PMI =
                 let pmi = this.ClinicalReport.Pmi
 
+                let optionalPathologist =
+                    try (Some pmi.Pathologist)
+                    with | :? System.Exception -> None
+
                 { MRN = pmi.Mrn
                   LastName = pmi.LastName
                   FirstName = pmi.FirstName
@@ -926,7 +935,7 @@ module FoundationMedicine =
                   SpecimenSite = pmi.SpecSite
                   CollectionDate = pmi.CollDate
                   OrderingMd = { OrderingMd.Name = pmi.OrderingMd; OrderingMd.Identifier = pmi.OrderingMdId }
-                  Pathologist = pmi.Pathologist }
+                  Pathologist = optionalPathologist }
 
             /// Retrieve the report's variants, including gene name, VUS status, and variant name(s)
             member this.Variants : Variant seq =
@@ -1016,7 +1025,7 @@ module FoundationMedicine =
                 row.VendorCliaNumber <- lab.CliaNumber.Value
                 row.ReportId <- report.ReportId.Value.ToString()
                 row.OrderingPhysician <- Some patient.OrderingMd.Name.Value
-                row.Pathologist <- Some patient.Pathologist.Value
+                row.Pathologist <- patient.TryPathologistValue
                 row.IssuedDate <- report.IssuedDate.Value
 
                 row.TumorMutationalBurden <- report.TryTmbScoreFloat
