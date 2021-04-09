@@ -54,8 +54,8 @@ module FoundationMedicine =
               SubmittedDiagnosis: Diagnosis.Name
               Gender: Gender
               DateOfBirth: Person.DateOfBirth
-              SpecimenSite: SpecimenSite
-              CollectionDate: CollectionDate
+              SpecimenSite: SpecimenSite // the sample site
+              CollectionDate: CollectionDate // the sample collection date
               OrderingMd: OrderingMd
               Pathologist: Pathologist }
 
@@ -72,7 +72,10 @@ module FoundationMedicine =
             internal | SpecimenSite of string
             member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
 
-        and CollectionDate = internal CollectionDate of System.DateTime
+        and CollectionDate =
+            internal | CollectionDate of System.DateTime
+            member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
+
         and Pathologist =
             internal | PathologistNotProvided | PathologistName of string
 
@@ -89,13 +92,17 @@ module FoundationMedicine =
               VariantNames: VariantName list }
         and VariantName = internal VariantName of string
 
+        module Fusion =
+            type Description = internal | Description of string
+            type Type = internal | Type of string
+
         type Fusion =
             { TargetedGene: Gene.Name
               OtherGene: Gene.Name
-              Description: FusionDescription
-              Type: FusionType }
-        and FusionDescription = FusionDescription of string
-        and FusionType = FusionType of string
+              Description: Fusion.Description
+              Type: Fusion.Type }
+
+            member this.Genes = [ this.TargetedGene; this.OtherGene]
 
         module Gene =
             type Alteration = internal Alteration of alternationName : string
@@ -105,18 +112,33 @@ module FoundationMedicine =
               Alterations: Gene.Alteration list }
 
         module ShortVariant =
-            type Status = internal | Unknown | Known | Likely
-            type FunctionalEffect = internal FunctionalEffect of string
-            type CdsEffect = internal CdsEffect of string
-            type ProteinEffect = internal ProteinEffect of string
-            type Transcript = internal Transcript of string
-            type AlleleFraction = internal AlleleFraction of decimal
+            type Status =
+                internal | Unknown | Known | Likely
+                member this.Value =
+                    match this with
+                    | Unknown -> "unknown"
+                    | Known -> "known"
+                    | Likely -> "likely"
+
+            type FunctionalEffect =
+                internal | FunctionalEffect of string
+                member this.Value = this |> fun (FunctionalEffect functionalEffect) -> functionalEffect
+            type CodingSequenceEffect = internal CodingSequenceEffect of string
+            type ProteinEffect =
+                internal | ProteinEffect of string
+                member this.Value = this |> fun (ProteinEffect proteinEffect) -> proteinEffect
+            type Transcript =
+                internal | Transcript of string
+                member this.Value = this |> fun (Transcript transcript) -> transcript
+            type AlleleFraction =
+                internal | AlleleFraction of decimal
+                member this.Value = this |> fun (AlleleFraction alleleFraction) -> alleleFraction
 
         type ShortVariant =
             { GeneName: Gene.Name
               FunctionalEffect: ShortVariant.FunctionalEffect
               Status: ShortVariant.Status
-              CdsEffect: ShortVariant.CdsEffect
+              CodingSequenceEffect: ShortVariant.CodingSequenceEffect
               ProteinEffect: ShortVariant.ProteinEffect
               Transcript: ShortVariant.Transcript
               AlleleFraction: ShortVariant.AlleleFraction }
@@ -426,6 +448,8 @@ module FoundationMedicine =
               Type: string }
 
         module Fusion =
+            open Utilities.StringValidations.Typed
+
             module OtherGene =
                 let validate input =
                     match input with
@@ -433,23 +457,24 @@ module FoundationMedicine =
                     | _ -> Ok (Gene.Name input)
 
             module TargetedGene =
-                open Utilities.StringValidations.Typed
-
                 /// Validate that a gene name is not blank
                 let validate = validateNotBlank Gene.Name $"Targeted fusion gene can't be blank"
 
             module Description =
+                open type Fusion.Description
+
+                /// Validate that a fusion description contains 'fusion'
                 let validate (input: string) =
                     if input.Contains("fusion") then
-                        Ok (Domain.FusionDescription input)
+                        Ok (Description input)
                     else
                         Error $"Invalid fusion description: {input}"
 
             module FusionType =
-                open Utilities.StringValidations.Typed
+                open type Fusion.Type
 
                 /// Validate that fusion type is not blank
-                let validate = validateNotBlank Domain.FusionType "Fusion type cannot be blank"
+                let validate = validateNotBlank Type "Fusion type cannot be blank"
 
             open FsToolkit.ErrorHandling
 
@@ -627,7 +652,7 @@ module FoundationMedicine =
             Transcript: string
             Status: string
             ProteinEffect: string
-            CdsEffect: string
+            CodingSequenceEffect: string
         }
 
         module ShortVariant =
@@ -653,7 +678,7 @@ module FoundationMedicine =
                 let validate (input: string) =
                     let replaced = input.Replace("&gt;", ">")
 
-                    replaced |> validateNotBlank ShortVariant.CdsEffect "Short variant CDS effect cannot be blank"
+                    replaced |> validateNotBlank ShortVariant.CodingSequenceEffect "Short variant CDS effect cannot be blank"
 
             module ProteinEffect =
                 /// Validate that a short variant's protein effect is not blank. Convert the `&gt;` html entity to `>`
@@ -683,7 +708,7 @@ module FoundationMedicine =
             let validate shortVariant =
                 validation {
                     let! alleleFraction = shortVariant.AlleleFraction |> AlleleFraction.validate
-                    and! cdsEffect = shortVariant.CdsEffect |> CdsEffect.validate
+                    and! cdsEffect = shortVariant.CodingSequenceEffect |> CdsEffect.validate
                     and! functionalEffect = shortVariant.FunctionalEffect |> FunctionalEffect.validate
                     and! geneName = shortVariant.GeneName |> Gene.Name.validate
                     and! proteinEffect = shortVariant.ProteinEffect |> ProteinEffect.validate
@@ -694,7 +719,7 @@ module FoundationMedicine =
                         GeneName = geneName
                         FunctionalEffect = functionalEffect
                         ProteinEffect = proteinEffect
-                        CdsEffect = cdsEffect
+                        CodingSequenceEffect = cdsEffect
                         Transcript = transcript
                         AlleleFraction = alleleFraction
                         Status = status
@@ -878,7 +903,7 @@ module FoundationMedicine =
                     { AlleleFraction = shortVariant.AlleleFraction
                       FunctionalEffect = shortVariant.FunctionalEffect
                       GeneName = shortVariant.Gene
-                      CdsEffect = shortVariant.CdsEffect
+                      CodingSequenceEffect = shortVariant.CdsEffect
                       ProteinEffect = shortVariant.ProteinEffect // also the alteration name found in gene alterations
                       Transcript = shortVariant.Transcript
                       Status = shortVariant.Status
@@ -958,15 +983,71 @@ module FoundationMedicine =
                 row
             )
 
-        let toTumorSampleRow (report: Report) =
+        let toSampleRow (report: Report) =
             let sample = report.Sample
             let pmi = report.PMI
             let row = context.Public.Samples.Create()
 
             row.Category   <- "tumor"
-            row.SampleId   <- sample.SampleId.Value.ToString()
+            row.SampleId   <- sample.SampleId.Value
             row.BiopsySite <- pmi.SpecimenSite.Value
             row.SampleType <- sample.Format.Value
 
             row
 
+        let toSampleReportRow (report: Report) =
+            let row = context.Public.SampleReports.Create()
+            let sample = report.Sample
+            let pmi = report.PMI
+
+            row.ReportId <- report.ReportId.Value
+            row.SampleId <- sample.SampleId.Value
+            row.BlockId <- sample.BlockId.Value |> Some
+
+            row.CollectionDate <- pmi.CollectionDate.Value
+            row.ReceiptDate    <- sample.ReceivedDate.Value
+
+            row
+
+        let toGeneRows (report: Report) =
+            let shortGeneNames = report.ShortVariants |> List.map (fun shortVariant -> shortVariant.GeneName)
+            let fusionGenes = report.Fusions |> List.collect (fun fusion -> fusion.Genes)
+
+            shortGeneNames
+            @ fusionGenes
+            |> List.map (fun geneName ->
+                let row = context.Public.Genes.Create()
+
+                row.Name <- geneName.Value
+
+                row
+            )
+
+        let querySampleReportId (reportId: ReportId) (sampleId: Sample.Identifier) =
+            query {
+                for sampleReport in context.Public.SampleReports do
+                where (sampleReport.ReportId = reportId.Value.ToString() && sampleReport.SampleId = sampleId.Value.ToString())
+                select sampleReport.Id
+                exactlyOne
+            }
+
+        let toVariantRows (report: Report) =
+            let sampleReportId = querySampleReportId report.ReportId report.Sample.SampleId
+
+            report.ShortVariants
+            |> Seq.map (fun shortVariant ->
+                let row = context.Public.Variants.Create()
+
+                row.SampleReportId <- sampleReportId
+                row.GeneName <- shortVariant.GeneName.Value
+                row.Name     <- shortVariant.ProteinEffect.Value
+                row.Category <- "somatic"
+
+                row.Type <- shortVariant.FunctionalEffect.Value |> Some
+                row.Assessment <- shortVariant.Status.Value |> Some
+
+                row.Transcript <- shortVariant.Transcript.Value |> Some
+                row.AllelicFraction <- shortVariant.AlleleFraction.Value |> float |> Some
+
+                row
+            )
