@@ -268,6 +268,8 @@ module Utilities =
                 | Ok ok -> Ok <| Some ok
                 | Error e -> Error e
 
+        let value (option: 'a option) = option.Value
+
     module Xml =
         open System.IO
         open System.Linq
