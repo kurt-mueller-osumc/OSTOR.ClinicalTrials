@@ -67,7 +67,11 @@ module FoundationMedicine =
                 match this with
                 | Male -> "male"
                 | Female -> "female"
-        and SpecimenSite = internal SpecimenSite of string
+
+        and SpecimenSite =
+            internal | SpecimenSite of string
+            member this.Value = this |> fun (SpecimenSite specimenSite) -> specimenSite
+
         and CollectionDate = internal CollectionDate of System.DateTime
         and Pathologist =
             internal | PathologistNotProvided | PathologistName of string
@@ -99,6 +103,23 @@ module FoundationMedicine =
         type Gene =
             { Name: Gene.Name
               Alterations: Gene.Alteration list }
+
+        module ShortVariant =
+            type Status = internal | Unknown | Known | Likely
+            type FunctionalEffect = internal FunctionalEffect of string
+            type CdsEffect = internal CdsEffect of string
+            type ProteinEffect = internal ProteinEffect of string
+            type Transcript = internal Transcript of string
+            type AlleleFraction = internal AlleleFraction of decimal
+
+        type ShortVariant =
+            { GeneName: Gene.Name
+              FunctionalEffect: ShortVariant.FunctionalEffect
+              Status: ShortVariant.Status
+              CdsEffect: ShortVariant.CdsEffect
+              ProteinEffect: ShortVariant.ProteinEffect
+              Transcript: ShortVariant.Transcript
+              AlleleFraction: ShortVariant.AlleleFraction }
 
         type MicrosatelliteStatus =
             internal
@@ -174,7 +195,7 @@ module FoundationMedicine =
             ///    validate (ReportId "invalidId") = Error "Invalid report id: invalidId"
             let validate input =
                 if Regex("ORD-\d{7,}-\d{2,}").Match(input).Success then
-                    Ok <| Domain.ReportId input
+                    Ok <| ReportId input
                 else
                     Error <| $"Invalid report id: {input}"
 
@@ -184,7 +205,7 @@ module FoundationMedicine =
             /// Validate that a report has a valid issued date.
             let validate input =
                 match DateTime.tryParse input with
-                | Some issuedDate -> Ok <| Domain.IssuedDate issuedDate
+                | Some issuedDate -> Ok <| IssuedDate issuedDate
                 | None -> Error $"Invalid issued date: {input}"
 
         type Sample =
@@ -206,20 +227,20 @@ module FoundationMedicine =
                 ///    validate "invalidId" = Error "Invalid sample id: invalidId"
                 let validate input =
                     if Regex("US\d{7,}.\d{2,}").Match(input).Success then
-                        Ok <| Domain.Sample.Identifier input
+                        Ok <| Sample.Identifier input
                     else
                         Error <| $"Invalid sample id: {input}"
 
             module BlockId =
                 open Utilities.StringValidations.Typed
-                open type Domain.Sample.BlockId
+                open type Sample.BlockId
 
                 /// Validate that a sample's block id is not blank
                 let validate = validateNotBlank BlockId "Block id can't be blank"
 
 
             module Format =
-                open type Domain.Sample.Format
+                open type Sample.Format
 
                 /// Validate that a sample's format is either a 'Slide Deck', 'Block', and 'Tube Set'.
                 let validate input =
@@ -229,7 +250,7 @@ module FoundationMedicine =
                     | "Tube Set" -> Ok TubeSet
                     | _ -> Error $"Unknown sample format: {input}"
 
-            open type Domain.Sample.ReceivedDate
+            open type Sample.ReceivedDate
 
             /// Validate the FMI report's sample
             let validate (sample: Sample) =
@@ -278,7 +299,7 @@ module FoundationMedicine =
                         | Error e -> Error e
 
             module Gender =
-                open type Domain.Gender
+                open type Gender
 
                 /// Validate a patient's "gender" is `(M|m)ale` or `(F|f)emale`
                 let validate input =
@@ -295,7 +316,7 @@ module FoundationMedicine =
             module SpecimenSite =
                 open Utilities.StringValidations.Typed
                 /// Validate that submitted diagnosis name is not blank
-                let validate = validateNotBlank Domain.SpecimenSite "Diagnosis name can't be blank"
+                let validate = validateNotBlank SpecimenSite "Diagnosis name can't be blank"
 
             module Pathologist =
                 open Utilities.StringValidations
@@ -303,14 +324,14 @@ module FoundationMedicine =
                 /// Validate that a pathologist's name is provided or is explicitly not provided
                 let validate input =
                     match input with
-                    | "Provided, Not" -> Ok Domain.PathologistNotProvided
-                    | NotBlank -> Ok <| Domain.PathologistName input
+                    | "Provided, Not" -> Ok PathologistNotProvided
+                    | NotBlank -> Ok <| PathologistName input
                     | _ -> Error "Pathologist cannot be blank"
 
             module OrderingMd =
                 open Utilities.StringValidations
-                open type Domain.OrderingMd.Name
-                open type Domain.OrderingMd.Identifier
+                open type OrderingMd.Name
+                open type OrderingMd.Identifier
 
                 let validate (orderingMd: OrderingMd) =
                     match orderingMd.Name, orderingMd.Identifier with
@@ -321,7 +342,6 @@ module FoundationMedicine =
                     | NotBlank, _ -> Error "Ordering MD id can't be blank"
                     | _ -> Error $"Invalid ordering md: {orderingMd}"
 
-            open Core.Domain
             open Core.Input
 
             /// Validate that a patient's medical information is valid
@@ -352,7 +372,6 @@ module FoundationMedicine =
                         Pathologist = pathologist } : Domain.PMI)
                 }
 
-
         /// A variant in an FMI report only has the gene name, whether or not it's a variant of unknown significance, and the variant name.
         type Variant =
             { GeneName: string
@@ -361,14 +380,13 @@ module FoundationMedicine =
 
         module Variant =
             open Utilities
-            open Core.Domain
 
             /// Convert variant names from a comma-separated string to a list
             let (|ValidVariantNames|_|) variantNames =
                 if variantNames <> "" then
                     variantNames
                     |> String.split ','
-                    |> List.map Domain.VariantName
+                    |> List.map VariantName
                     |> Some
                 else None
 
@@ -376,7 +394,7 @@ module FoundationMedicine =
                 if geneName <> "" then Some (Gene.Name geneName)
                 else None
 
-            open type Domain.Variant
+            open type Variant
 
             /// Validate that a variant input has a gene name and at least one variant name.
             let validate (variant: Variant) =
@@ -408,15 +426,12 @@ module FoundationMedicine =
 
         module Fusion =
             module OtherGene =
-                open Core.Domain
-
                 let validate input =
                     match input with
                     | "N/A" | "" -> Error $"Invalid other gene for fusion: {input}"
                     | _ -> Ok (Gene.Name input)
 
             module TargetedGene =
-                open Core.Domain
                 open Utilities.StringValidations.Typed
 
                 /// Validate that a gene name is not blank
@@ -462,7 +477,7 @@ module FoundationMedicine =
                 >> Result.mapError List.flatten
 
         module MicrosatelliteStatus =
-            open type Domain.MicrosatelliteStatus
+            open type MicrosatelliteStatus
             open Utilities
 
             /// Validate that if a microsatellite status cannot be determined, is stable, oor high.
@@ -484,8 +499,7 @@ module FoundationMedicine =
             open FsToolkit.ErrorHandling
 
             module Score =
-                open Core.Domain
-                open type Domain.TumorMutationBurden.Score
+                open type TumorMutationBurden.Score
 
                 /// Validate that a tumor mutation burden score is greater than or equal to 0.0
                 let validate input =
@@ -493,7 +507,7 @@ module FoundationMedicine =
                     else Error $"Invalid score: {input}"
 
             module Status =
-                open type Domain.TumorMutationBurden.Status
+                open type TumorMutationBurden.Status
 
                 /// Validate that a tumor mutation burden status is either low, intermediate, high, or unknown.
                 let validate input =
@@ -605,6 +619,88 @@ module FoundationMedicine =
                 >> Result.combine
                 >> Result.mapError List.flatten
 
+        type ShortVariant = {
+            GeneName: string
+            FunctionalEffect: string
+            AlleleFraction: decimal
+            Transcript: string
+            Status: string
+            ProteinEffect: string
+            CdsEffect: string
+        }
+
+        module ShortVariant =
+            open Utilities.StringValidations.Typed
+
+            module FunctionalEffect =
+                /// Validate that a short variant's functional effect is not blank
+                let validate = validateNotBlank ShortVariant.FunctionalEffect "Functional effect cannot be blank"
+
+            module Status =
+                open type ShortVariant.Status
+
+                /// Validate that a short variant's status is either `known`, `likely`, or `unknown`.
+                let validate status =
+                    match status with
+                    | "known" -> Ok Known
+                    | "likely" -> Ok Likely
+                    | "unknown" -> Ok Unknown
+                    | _ -> Error $"Invalid short variant status: {status}"
+
+            module CdsEffect =
+                /// Validate that a short variant's cds effect is not blank. Convert the `&gt;` html entity to `>`
+                let validate (input: string) =
+                    let replaced = input.Replace("&gt;", ">")
+
+                    replaced |> validateNotBlank ShortVariant.CdsEffect "Short variant CDS effect cannot be blank"
+
+            module ProteinEffect =
+                /// Validate that a short variant's protein effect is not blank. Convert the `&gt;` html entity to `>`
+                let validate (input: string) =
+                    let replaced = input.Replace("&gt;", ">")
+
+                    replaced |> validateNotBlank ShortVariant.ProteinEffect "Short variant protein seffect cannot be blank"
+
+            module Transcript =
+                /// Validate that a short variant's transcript is not blank
+                let validate = validateNotBlank ShortVariant.Transcript "Short variant transcript cannot be blank"
+
+            module AlleleFraction =
+                open type ShortVariant.AlleleFraction
+
+                /// Validate that a short variant's allele fraction is >= 0.0
+                let validate (fraction: decimal) =
+                    if fraction >= (decimal 0.0) then
+                        Ok <| AlleleFraction fraction
+                    else
+                        Error $"Allele fraction must be >= 0.0: {fraction}"
+
+            open FsToolkit.ErrorHandling
+            open Core.Input
+
+            /// Validate that a short variant's allele fraction, cds effect, functional effect, protein effect, gene name, status, and transcript are valid.
+            let validate shortVariant =
+                validation {
+                    let! alleleFraction = shortVariant.AlleleFraction |> AlleleFraction.validate
+                    and! cdsEffect = shortVariant.CdsEffect |> CdsEffect.validate
+                    and! functionalEffect = shortVariant.FunctionalEffect |> FunctionalEffect.validate
+                    and! geneName = shortVariant.GeneName |> Gene.Name.validate
+                    and! proteinEffect = shortVariant.ProteinEffect |> ProteinEffect.validate
+                    and! status = shortVariant.Status |> Status.validate
+                    and! transcript = shortVariant.Transcript |> Transcript.validate
+
+                    return ({
+                        GeneName = geneName
+                        FunctionalEffect = functionalEffect
+                        ProteinEffect = proteinEffect
+                        CdsEffect = cdsEffect
+                        Transcript = transcript
+                        AlleleFraction = alleleFraction
+                        Status = status
+                    } : Domain.ShortVariant)
+                }
+
+
         type Report =
             { ReportId: string
               IssuedDate: string
@@ -683,6 +779,8 @@ module FoundationMedicine =
 
             member _.ClinicalReport = ClinicalReportProvider.Parse(finalReportElement.ToString())
             member _.VariantReport = VariantReportProvider.Parse(variantReportElement.ToString())
+
+            member this.Biomarkers = this.VariantReport.Biomarkers
             member this.ReportSample = this.ClinicalReport.Sample
 
             /// When the report was issued
@@ -698,15 +796,10 @@ module FoundationMedicine =
                     }
                 ) |> Seq.toList
 
-
             /// Retrieve the report's microsatellite status, if it exists.
-            member this.MicroSatelliteStatus =
-                this.Genes
-                |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
-                |> Option.map (fun msStatus -> Seq.head(msStatus.Alterations))
-
-            member this.Biomarkers =
-                this.VariantReport.Biomarkers
+            member this.MicrosatelliteStatus =
+                this.Biomarkers.MicrosatelliteInstability
+                |> Option.map (fun msStatus -> msStatus.Status)
 
             member this.TumorMutationBurden : TumorMutationBurden option =
                 this.Biomarkers.TumorMutationBurden
@@ -763,13 +856,28 @@ module FoundationMedicine =
                       IsVus = variantProperty.IsVus
                       VariantName = variantProperty.VariantName })
 
+
+            /// short variants sans variants with an 'unknown' status
+            member this.ShortVariantsSansUnknown =
+                this.VariantReport.ShortVariants
+                |> Seq.filter (fun shortVariant -> shortVariant.Status <> "unknown")
+                |> Seq.map (fun shortVariant ->
+                    { AlleleFraction = shortVariant.AlleleFraction
+                      FunctionalEffect = shortVariant.FunctionalEffect
+                      GeneName = shortVariant.Gene
+                      CdsEffect = shortVariant.CdsEffect
+                      ProteinEffect = shortVariant.ProteinEffect
+                      Transcript = shortVariant.Transcript
+                      Status = shortVariant.Status
+                    })
+
             member this.Report =
                 { ReportId = this.ReportId
                   IssuedDate = this.ServerTime
                   Lab = this.Lab
                   Sample = this.Sample
                   PMI = this.PMI
-                  MicrosatelliteStatus = this.MicroSatelliteStatus
+                  MicrosatelliteStatus = this.MicrosatelliteStatus
                   TumorMutationBurden = this.TumorMutationBurden
                   Genes = this.Genes
                   Variants = this.Variants |> Seq.toList
@@ -838,11 +946,12 @@ module FoundationMedicine =
 
         let toTumorSampleRow (report: Report) =
             let sample = report.Sample
+            let pmi = report.PMI
             let row = context.Public.Samples.Create()
 
             row.Category   <- "tumor"
             row.SampleId   <- sample.SampleId.Value.ToString()
-            row.BiopsySite <- sample.Site.Value
+            row.BiopsySite <- pmi.SpecimenSite.Value
             row.SampleType <- sample.Format.Value
 
             row
