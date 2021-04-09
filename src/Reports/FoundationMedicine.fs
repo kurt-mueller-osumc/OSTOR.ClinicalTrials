@@ -870,8 +870,8 @@ module FoundationMedicine =
                       VariantName = variantProperty.VariantName })
 
 
-            /// short variants sans variants with an 'unknown' status
-            member this.ShortVariantsSansUnknown =
+            /// the short variants sections will include the same gene and alteration name found in the gene/alteration section
+            member this.ShortVariants =
                 this.VariantReport.ShortVariants
                 |> Seq.filter (fun shortVariant -> shortVariant.Status <> "unknown")
                 |> Seq.map (fun shortVariant ->
@@ -879,7 +879,7 @@ module FoundationMedicine =
                       FunctionalEffect = shortVariant.FunctionalEffect
                       GeneName = shortVariant.Gene
                       CdsEffect = shortVariant.CdsEffect
-                      ProteinEffect = shortVariant.ProteinEffect
+                      ProteinEffect = shortVariant.ProteinEffect // also the alteration name found in gene alterations
                       Transcript = shortVariant.Transcript
                       Status = shortVariant.Status
                     })
@@ -895,7 +895,7 @@ module FoundationMedicine =
                   Genes = this.Genes
                   Variants = this.Variants |> Seq.toList
                   Fusions = this.Fusions |> Seq.toList
-                  ShortVariants = this.ShortVariantsSansUnknown |> Seq.toList }
+                  ShortVariants = this.ShortVariants |> Seq.toList }
 
 
     module DTO =
