@@ -19,12 +19,23 @@ module FoundationMedicine =
                 member this.Value = this |> fun (BlockId blockId) -> blockId
 
             type Format =
-                internal | Slide | SlideDeck | Block | TubeSet
+                internal
+                | Aspirate
+                | Blood
+                | ``Extracted DNA``
+                | Slide
+                | SlideDeck
+                | Block
+                | TubeSet
+
                 member this.Value =
                     match this with
+                    | Aspirate -> "aspirate"
+                    | Block -> "block"
+                    | Blood -> "blood"
+                    | ``Extracted DNA`` -> "extracted DNA"
                     | Slide -> "slide"
                     | SlideDeck -> "slide deck"
-                    | Block -> "block"
                     | TubeSet -> "tube set"
 
         /// The sample for each FMI report.
@@ -160,12 +171,14 @@ module FoundationMedicine =
             internal
             | ``Cannot Be Determined``
             | Stable
+            | Intermediate
             | ``High Instability``
 
             member this.Value =
                 match this with
                 | ``Cannot Be Determined`` -> "cannot be determined"
                 | Stable -> "stable"
+                | Intermediate -> "intermediate"
                 | ``High Instability`` -> "high instability"
 
         module TumorMutationBurden =
@@ -245,8 +258,10 @@ module FoundationMedicine =
             let (|ValidId|_|) (input: string) =
                 let idRegexes = [
                     "^ORD-\d{7,}-\d{2,}$" // e.g. `ORD-1234567-89`
-                    "^CRF\d{6}$" // e.g. `CRF123456`
-                    "^TRF\d{6}$" ]
+                    "^CRF\d{6}$"
+                    "^TRF\d{6}$"
+                    "^QRF\d{6}$"
+                ]
 
                 let isValidId = idRegexes |> Seq.exists (fun regex -> Regex(regex).Match(input).Success)
 
@@ -288,8 +303,10 @@ module FoundationMedicine =
                 let (|ValidId|_|) input =
 
                     let idRegexes = [
-                        "US\d{7,}\.\d{2,}" // e.g. "US0123456.78"
-                        "TRF\d{6}\.\d{2,}" // e.g. "TRF123456.01"
+                        "^US\d{7,}\.\d{2,}$" // e.g. "US0123456.78"
+                        "^TRF\d{6}\.\d{2,}$" // e.g. "TRF123456.01"
+                        "^QRF\d{6}\.\d{2,}$" // e.g. "QRF123456.01"
+                        "^CRF\d{6}\.\d{2,}$" // e.g. "CRF123456.01"
                     ]
 
                     let isValidId = idRegexes |> Seq.exists (fun idRegex -> Regex(idRegex).Match(input).Success)
@@ -315,7 +332,10 @@ module FoundationMedicine =
                 /// Validate that a sample's block id is not blank
                 let validate = validateNotBlank BlockId "Block id can't be blank"
 
-                let validateOptional = Optional.validateWith validate
+                let validateOptional (optionalInput: string option) =
+                    match optionalInput with
+                    | None | Some "" -> Ok None
+                    | Some input -> input |> validate |> Result.map Some
 
 
             module Format =
@@ -324,9 +344,12 @@ module FoundationMedicine =
                 /// Validate that a sample's format is either a 'Slide Deck', 'Block', and 'Tube Set'.
                 let validate input =
                     match input with
+                    | "Aspirate" -> Ok Aspirate
+                    | "Block" -> Ok Block
+                    | "Blood" -> Ok Blood
+                    | "Extracted DNA" -> Ok ``Extracted DNA``
                     | "Slide Deck" -> Ok SlideDeck
                     | "Slide" -> Ok Slide
-                    | "Block" -> Ok Block
                     | "Tube Set" -> Ok TubeSet
                     | _ -> Error $"Unknown sample format: {input}"
 
@@ -377,7 +400,7 @@ module FoundationMedicine =
                         match input with
                         | "" -> Ok None
                         | _ ->
-                            input
+                            input.Replace("OSU MRN ", "") // remove "OSU MRN " prefix from some of the mrns
                             |> Patient.MRN.validate
                             |> Result.map Some
 
@@ -577,7 +600,8 @@ module FoundationMedicine =
             let validate input =
                 match input with
                 | "Cannot Be Determined" -> Ok ``Cannot Be Determined``
-                | "MS-Stable" -> Ok Stable
+                | "MS-Stable" | "MSS" -> Ok Stable
+                | "MSI-Intermediate" -> Ok Intermediate
                 | "MSI-High" -> Ok ``High Instability``
                 | _ -> Error $"Invalid MicrosatelliteStatus: {input}"
 
@@ -912,8 +936,10 @@ module FoundationMedicine =
 
             /// Retrieve the report's microsatellite status, if it exists.
             member this.MicrosatelliteStatus =
-                this.Biomarkers.MicrosatelliteInstability
-                |> Option.map (fun msStatus -> msStatus.Status)
+                this.Genes
+                |> Seq.tryFind (fun gene -> gene.Name = "Microsatellite status")
+                |> Option.map (fun mss -> mss.Alterations |> Seq.head)
+
 
             member this.TumorMutationBurden : TumorMutationBurden option =
                 this.Biomarkers.TumorMutationBurden
