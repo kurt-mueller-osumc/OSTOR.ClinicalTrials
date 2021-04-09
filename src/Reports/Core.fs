@@ -214,3 +214,8 @@ module Core =
                 /// Validate that a gene name is not blank
                 let validate =
                     validateNotBlank Name "Gene name can't be blank"
+
+        module Report =
+            type ValidationError =
+                { ReportId: string
+                  Errors: string list }
