@@ -10,34 +10,45 @@ open System.IO
 open FsToolkit.ErrorHandling
 
 open OSTOR.ClinicalTrials.Reports
+open Utilities
 
 (* Tempus Reports *)
 
-// let tempusReportJsonsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "Tempus"|])
+let tempusReportJsonsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "Tempus"|])
 
-// let tempusJsonResults =
-//     DirectoryInfo(tempusReportJsonsPath).EnumerateFileSystemInfos("*.json")
-//     |> Seq.map (fun filePath ->
-//         let jsonText = File.ReadAllText(filePath.FullName)
-//         Tempus.Json.deserializeWithError filePath.Name jsonText
-//     ) |> Seq.toList
+let tempusJsonResults =
+    DirectoryInfo(tempusReportJsonsPath).EnumerateFileSystemInfos("*.json")
+    |> Seq.map (fun filePath ->
+        let jsonText = File.ReadAllText(filePath.FullName)
+        Tempus.Json.deserializeWithError filePath.Name jsonText
+    ) |> Seq.toList
 
-// let (tempusJsons, tempusErrors) = Result.partition tempusJsonResults
+let (tempusJsons, tempusJsonErrors) = Result.partition tempusJsonResults
+
+
+let (tempusReports, tempusErrors) =
+    tempusJsons
+    |> Seq.map (fun json ->
+        printfn $"Tempus report id: {json.Report.ReportId}"
+        Tempus.Json.validate json
+    )
+    |> Seq.toList
+    |> Result.partition
 
 
 (* FMI Reports *)
 
-let fmiReportsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "FMI"|])
+// let fmiReportsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "FMI"|])
 
-let (fmiReports, fmiErrors) =
-    DirectoryInfo(fmiReportsPath).EnumerateFileSystemInfos("*.xml")
-    // |> Seq.map (fun filePath -> FoundationMedicine.XML.Report(filePath.FullName))
-    |> Seq.map (fun filePath ->
-        printfn $"FMI XML: {filePath}"
-        FoundationMedicine.XML.Report(filePath.FullName).Report |> FoundationMedicine.Input.Report.validate
-    )
-    |> Seq.toList
-    |> Result.partition
+// let (fmiReports, fmiErrors) =
+//     DirectoryInfo(fmiReportsPath).EnumerateFileSystemInfos("*.xml")
+//     // |> Seq.map (fun filePath -> FoundationMedicine.XML.Report(filePath.FullName))
+//     |> Seq.map (fun filePath ->
+//         printfn $"FMI XML: {filePath}"
+//         FoundationMedicine.XML.Report(filePath.FullName).Report |> FoundationMedicine.Input.Report.validate
+//     )
+//     |> Seq.toList
+//     |> Result.partition
 
 
 // let (fmiReports, fmiErrors) = Result.partition fmiResults
