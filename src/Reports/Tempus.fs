@@ -165,9 +165,21 @@ module Tempus =
                 internal |  TumorPercentage of uint
                 member this.Value = this |> fun (TumorPercentage tumorPercentage) -> tumorPercentage
 
+            type CancerCategory =
+                internal
+                | Tumor
+                | ``CFDNA specimen``
+
+                member this.Value =
+                    match this with
+                    | Tumor -> "tumor"
+                    | ``CFDNA specimen`` -> "cfDNA specimen"
+
+
         /// the tumor sample that will be present in the `specimens` section of the report
-        type TumorSample =
+        type CancerousSample =
             { SampleId: Sample.Identifier
+              Category: Sample.CancerCategory
               Site: Sample.Site
               Type: Sample.Type
               Dates: Sample.Dates
@@ -452,7 +464,7 @@ module Tempus =
               Patient: Patient
               Report: Report
               Order: Order
-              TumorSample: TumorSample
+              CancerousSample: CancerousSample
               NormalSample: NormalSample option
               Results: Results
             }
@@ -918,21 +930,22 @@ module Tempus =
                         Error $"Collection date, {dates.CollectionDate}, doesn't occur before received date, {dates.ReceivedDate}"
 
 
-        module TumorSample =
+        module CancerousSample =
             module Category =
-                /// Validate that a tumor sample category is 'tumor'
+                open type Sample.CancerCategory
+                /// Validate that a canceorus sample category is 'tumor' or 'cfDNA specimen'
                 let validate category =
                     match category with
-                    | "tumor" -> Ok "tumor"
+                    | "tumor" -> Ok Tumor
+                    | "cfDNA specimen" -> Ok ``CFDNA specimen``
                     | _ -> Error $"Sample category is not tumor: {category}"
 
             open Domain.Sample
 
-            /// Validate a tumor sample
-            let validate (json: Sample) : Validation<Domain.TumorSample, string> =
+            /// Validate that a cancerous sample has a valid category, dates, site, type, id, block id, and tumor percentage
+            let validate (json: Sample) : Validation<Domain.CancerousSample, string> =
                 validation {
-                    // validate that the sample's listed category is 'tumor'
-                    let! tumorCategory = json.SampleCategory |> Category.validate
+                    let! sampleCategory = json.SampleCategory |> Category.validate
                     and! sampleDates   = { Sample.Dates.CollectionDate = json.CollectionDate
                                            Sample.Dates.ReceivedDate   = json.ReceivedDate } |> Sample.Dates.validate
                     and! sampleSite    = json.SampleSite |> Sample.Site.validate
@@ -942,13 +955,15 @@ module Tempus =
                     let blockId         = json.Institution.BlockId |> Option.map BlockId
                     let tumorPercentage = json.Institution.TumorPercentage |> Option.map TumorPercentage
 
-                    return ({ SampleId = sampleId
-                              Site = sampleSite
-                              Dates = sampleDates
-                              Type = sampleType
-                              BlockId = blockId
-                              TumorPercentage = tumorPercentage
-                            } : Domain.TumorSample)
+                    return ({
+                        SampleId = sampleId
+                        Category = sampleCategory
+                        Site = sampleSite
+                        Dates = sampleDates
+                        Type = sampleType
+                        BlockId = blockId
+                        TumorPercentage = tumorPercentage
+                    })
                 }
 
         module NormalSample =
@@ -1596,8 +1611,8 @@ module Tempus =
                         Results = "results"   |> flip get.Required.Field Results.Decoder
                       } )
 
-            member this.TumorSample =
-                this.Samples |> Seq.find (fun sample -> sample.SampleCategory = "tumor")
+            member this.CancerousSample =
+                this.Samples |> Seq.find (fun sample -> sample.SampleCategory <> "normal")
 
             member this.TryNormalSample =
                 this.Samples |> Seq.tryFind (fun sample -> sample.SampleCategory = "normal")
@@ -1614,14 +1629,14 @@ module Tempus =
             >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
 
         /// Validate an overall report
-        let validate (overallReport: OverallReport) =
+        let validate (overallReport: OverallReport) : Validation<Domain.OverallReport, string> =
             validation {
                 let! lab     = overallReport.Lab     |> Lab.validate
                 and! report  = overallReport.Report  |> Report.validate
                 and! patient = overallReport.Patient |> Patient.validate
                 and! order   = overallReport.Order   |> Order.validate
-                and! tumorSample  = overallReport.TumorSample     |> TumorSample.validate
-                and! normalSample = overallReport.TryNormalSample |> NormalSample.validateOptional
+                and! cancerousSample = overallReport.CancerousSample |> CancerousSample.validate
+                and! normalSample = overallReport.TryNormalSample  |> NormalSample.validateOptional
                 and! results = overallReport.Results |> Results.validate
 
                 return ({
@@ -1629,10 +1644,11 @@ module Tempus =
                     Report  = report
                     Patient = patient
                     Order   = order
-                    TumorSample  = tumorSample
+                    CancerousSample = cancerousSample
                     NormalSample = normalSample
                     Results = results
-                } : Domain.OverallReport) }
+                })
+            }
 
     module DTO =
         open Database
@@ -1861,14 +1877,14 @@ module Tempus =
             )
 
         /// Build a row for the tumor sample to be inserted into the `samples` database table.
-        let toTumorSampleRow (overallReport: OverallReport) =
-            let tumorSample = overallReport.TumorSample
+        let toCancerousSampleRows (overallReport: OverallReport) =
             let row = context.Public.Samples.Create()
+            let cancerousSample = overallReport.CancerousSample
 
-            row.Category   <- "tumor"
-            row.SampleId   <- tumorSample.SampleId.Value.ToString()
-            row.BiopsySite <- tumorSample.Site.Value |> Some
-            row.SampleType <- tumorSample.Type.Value
+            row.SampleId   <- cancerousSample.SampleId.Value.ToString()
+            row.Category   <- cancerousSample.Category.Value
+            row.BiopsySite <- cancerousSample.Site.Value |> Some
+            row.SampleType <- cancerousSample.Type.Value
 
             row
 
@@ -1887,19 +1903,19 @@ module Tempus =
             )
 
         /// Build a row for the tumor sample to be inserted into the `sample_reports` database table
-        let toTumorSampleReportRow (overallReport: OverallReport) =
-            let tumorSample = overallReport.TumorSample
+        let toCancerousSampleReportRow (overallReport: OverallReport) =
             let report = overallReport.Report
+            let cancerousSample = overallReport.CancerousSample
             let row = context.Public.SampleReports.Create()
 
-            row.SampleId <- tumorSample.SampleId.Value.ToString()
+            row.SampleId <- cancerousSample.SampleId.Value.ToString()
             row.ReportId <- report.ReportId.Value.ToString()
-            row.BlockId  <- tumorSample.TryBlockIdValue
+            row.BlockId  <- cancerousSample.TryBlockIdValue
 
-            row.CollectionDate <- tumorSample.Dates.CollectionDate.Value |> Some
-            row.ReceiptDate    <- tumorSample.Dates.ReceivedDate.Value
+            row.CollectionDate <- cancerousSample.Dates.CollectionDate.Value |> Some
+            row.ReceiptDate    <- cancerousSample.Dates.ReceivedDate.Value
 
-            row.TumorPercentage <- tumorSample.TryTumorPercentageValue |> Option.map int
+            row.TumorPercentage <- cancerousSample.TryTumorPercentageValue |> Option.map int
 
             row
 
@@ -2016,17 +2032,17 @@ module Tempus =
 
                 overallReport |> tryReportRow |> ignore
                 overallReport |> toGeneRows |> ignore
-                overallReport |> toTumorSampleRow |> ignore
+                overallReport |> toCancerousSampleRows |> ignore
                 overallReport |> tryNormalSampleRow |> ignore
 
                 context.SubmitUpdates()
 
-                overallReport |> toTumorSampleReportRow |> ignore
+                overallReport |> toCancerousSampleReportRow |> ignore
                 overallReport |> tryNormalSampleReportRow |> ignore
 
                 context.SubmitUpdates()
 
-                let sampleReportId = querySampleReportId overallReport.Report.ReportId overallReport.TumorSample.SampleId
+                let sampleReportId = querySampleReportId overallReport.Report.ReportId overallReport.CancerousSample.SampleId
 
                 overallReport |> toVariantRows sampleReportId |> ignore
                 overallReport |> toFusionRows sampleReportId |> ignore
