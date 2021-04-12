@@ -52,15 +52,10 @@ module Caris =
 
         type Pathologist =
             { Organization: Pathologist.Organization option }
+
             member this.TryOrganizationValue =
                 this.Organization |> Option.map (fun org -> org.Value)
 
-        type CollectionDate =
-            internal | CollectionDate of System.DateTime
-            member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
-        type ReceivedDate =
-            internal | ReceivedDate of System.DateTime
-            member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
 
         module Specimen =
             type Identifier =
@@ -84,14 +79,17 @@ module Caris =
                     | ``Tissue Biopsy Paraffin Blocks`` -> "Tissue Biopsy Paraffin Blocks"
                     | ``Tissue Biopsy Slide Unstained`` -> "Tissue Biopsy Slide Unstained"
 
+            type Dates =
+                { CollectionDate: Sample.CollectionDate
+                  ReceivedDate: Sample.ReceivedDate}
+
         /// The report's specimen/sample. Caris reports only list a tumor specimen.
         type Specimen =
             { SpecimenId: Specimen.Identifier
               AccessionId: AccessionId
               Type: Specimen.Type
               Site: Specimen.Site
-              CollectionDate: CollectionDate
-              ReceivedDate: ReceivedDate }
+              Dates: Specimen.Dates }
         and AccessionId = internal AccessionId of string
 
         /// Test meta information
@@ -115,9 +113,14 @@ module Caris =
         and ReportId =
             internal | ReportId of string
             member this.Value = this |> fun (ReportId reportId) -> reportId
+
         and OrderedDate =
             internal | OrderedDate of System.DateTime
             member this.Value = this |> fun (OrderedDate orderedDate) -> orderedDate
+
+        and ReceivedDate =
+            internal | ReceivedDate of System.DateTime
+            member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
 
         module HGVS =
             type CodingChange =
@@ -480,8 +483,11 @@ module Caris =
               AccessionId: string
               Type: string
               Site: string
-              CollectionDate: System.DateTime
-              ReceivedDate: System.DateTime }
+              Dates: SpecimenDates }
+        and SpecimenDates = {
+            CollectionDate: System.DateTime
+            ReceivedDate: System.DateTime }
+
 
         /// Caris only contains a tumor specimen.
         module TumorSpecimen =
@@ -490,7 +496,6 @@ module Caris =
 
                 /// Validate that the specimen id is not blank
                 let validate = validateNotBlank Specimen.Identifier "Sample id cannot be blank"
-
 
             module AccessionId =
                 open System.Text.RegularExpressions
@@ -524,10 +529,15 @@ module Caris =
                 /// Validate that a specimen site is not blank
                 let validate = validateNotBlank Site "Specimen site cannot be blank"
 
-            open FsToolkit.ErrorHandling
-            open type CollectionDate
-            open type ReceivedDate
+            module Dates =
+                let validate (input: SpecimenDates) : Result<Specimen.Dates, string> =
+                    if input.CollectionDate < input.ReceivedDate then
+                        Ok <| { CollectionDate = Sample.CollectionDate input.CollectionDate
+                                ReceivedDate   = Sample.ReceivedDate   input.ReceivedDate }
+                    else
+                        Error "Sample collection date must occur before received date"
 
+            open FsToolkit.ErrorHandling
 
             let validate sample =
                 validation {
@@ -535,17 +545,17 @@ module Caris =
                     and! accessionId = AccessionId.validate sample.AccessionId
                     and! specimenType = Type.validate sample.Type
                     and! specimenSite = Site.validate sample.Site
+                    and! sampleDates = Dates.validate sample.Dates
 
-                    let collectionDate = CollectionDate sample.CollectionDate
-                    let receivedDate = ReceivedDate sample.ReceivedDate
+                    // let collectionDate = CollectionDate sample.CollectionDate
+                    // let receivedDate = ReceivedDate sample.ReceivedDate
 
                     return ({
                         SpecimenId = specimenId
                         AccessionId = accessionId
                         Type = specimenType
                         Site = specimenSite
-                        CollectionDate = collectionDate
-                        ReceivedDate = receivedDate
+                        Dates = sampleDates
                     } : Domain.Specimen)
                 }
 
@@ -1175,8 +1185,10 @@ module Caris =
                   AccessionId = this.TumorSpecimenInfo.SpecimenAccessionId
                   Type = this.TumorSpecimenInfo.SpecimenType
                   Site = this.TumorSpecimenInfo.SpecimenSite
-                  CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate
-                  ReceivedDate = this.TumorSpecimenInfo.SpecimenReceivedDate
+                  Dates = {
+                      CollectionDate = this.TumorSpecimenInfo.SpecimenCollectionDate
+                      ReceivedDate   = this.TumorSpecimenInfo.SpecimenReceivedDate
+                  }
                 }
 
             member this.Fusions : Fusion list =
@@ -1206,6 +1218,7 @@ module Caris =
 
 
     module DTO =
+        open System
         open Core
         open Database
         open Domain
@@ -1215,7 +1228,7 @@ module Caris =
             report.Patient.MRN |> Option.map (fun mrn ->
                 let patient = report.Patient
 
-                ({ CreatedAt = System.DateTime.Now
+                ({ CreatedAt = DateTime.Now
                    MRN = mrn
                    FirstName = patient.FirstName
                    LastName = patient.LastName
@@ -1226,41 +1239,42 @@ module Caris =
 
         /// Prepare a row to be created in the "vendors" table for Caris Life Sciences
         let toVendorRow (report: Report) =
-            ({ CreatedAt = System.DateTime.Now
+            ({ CreatedAt = DateTime.Now
                Lab = report.Test.Lab
             } : DTO.Vendor).Row
 
         /// Prepare a database row in the "reports" table
         let tryReportRow (report: Report) =
-            report.Patient.TryMrnValue |> Option.map (fun mrnValue ->
-                let row = context.Public.Reports.Create()
+            report.Patient.MRN |> Option.map (fun mrn ->
                 let test = report.Test
                 let orderingMd = report.OrderingMd
                 let pathologist = report.Pathologist
                 let diagnosis = report.Diagnosis
 
-                // overall report info
-                row.VendorCliaNumber <- "03D1019490"
-                row.ReportId   <- test.ReportId.Value
-                row.PatientMrn <- mrnValue
-                row.IssuedDate <- test.ReceivedDate.Value
+                ({ // meta
+                   CreatedAt = DateTime.Now
+                   ReportId   = test.ReportId.Value
+                   IssuedDate = test.ReceivedDate.Value
 
-                // ordering physician
-                row.OrderingPhysician       <- orderingMd.Name.Value |> Some
-                row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
+                   // foreign keys
+                   PatientMRN = mrn
+                   VendorCliaNumber = test.Lab.CliaNumber
 
-                // pathologist - only organizations get listed in caris reports
-                row.Pathologist <- pathologist.TryOrganizationValue
+                   // diagnosis - caris doesn't report diagnosis dates
+                   DiagnosisName     = diagnosis.DiagnosisName
+                   DiagnosisIcdCodes = diagnosis.DiagnosisCodes.Values
+                   DiagnosisDate = None
 
-                // diagnosis - caris doesn't report diagnosis dates
-                row.DiagnosisName       <- diagnosis.DiagnosisName.Value
-                row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes.Values |> List.toArray |> Some
+                   // ordering physician
+                   OrderingPhysicianName   = orderingMd.Name.Value |> Some
+                   OrderingPhysicianNumber = orderingMd.NationalProviderId |> Some
+                   Pathologist = pathologist.TryOrganizationValue
 
-                // biomarkers
-                row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
-                row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
-
-                row
+                   // biomarkers
+                   TumorMutationBurden = report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
+                   TumorMutationBurdenPercentile = None
+                   MicrosatelliteInstabilityStatus = report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
+                } : DTO.Report).Row
             )
 
         /// Each report lists a sample that may be referred to across reports. Therefore, samples are given their own table and listings of a sample in a report are givne their own table.
@@ -1269,7 +1283,7 @@ module Caris =
         let toSampleRow (report: Report) =
             let specimen = report.Specimen
 
-            ({ CreatedAt  = System.DateTime.Now
+            ({ CreatedAt  = DateTime.Now
                SampleId   = specimen.SpecimenId.Value
                SampleType = specimen.Type.Value
                Category   = "tumor"
@@ -1280,13 +1294,15 @@ module Caris =
         let toSampleReportRow (report: Report) =
             let specimen = report.Specimen
             let test = report.Test
-            let row = context.Public.SampleReports.Create()
 
-            row.CollectionDate <- specimen.CollectionDate.Value |> Some
-            row.ReceiptDate    <- specimen.ReceivedDate.Value
-            row.ReportId       <- test.ReportId.Value
-
-            row
+            ({ CreatedAt = DateTime.Now
+               SampleId = specimen.SpecimenId.Value
+               ReportId = test.ReportId.Value
+               CollectionDate = specimen.Dates.CollectionDate |> Some
+               ReceivedDate = specimen.Dates.ReceivedDate
+               BlockId = None
+               TumorPercentage = None
+            } : DTO.SampleReport).Row
 
         /// Convert all genomic alterations with molecular consequences to 'gene' database rows
         let toGeneRows (report: Report) =
@@ -1295,7 +1311,7 @@ module Caris =
 
             geneNames @ fusionGenes
             |> List.map (fun geneName ->
-                ({ CreatedAt = System.DateTime.Now
+                ({ CreatedAt = DateTime.Now
                    Name = geneName
                    EntrezId = None
                    HgncId = None
@@ -1307,7 +1323,7 @@ module Caris =
         /// Each genomic alteration with a "molecular consequence" will also have an hgvs coding change and protein change.
         ///
         /// Each variant row has a parent sample report and a parent gene. The parent sample report and gene must already exist in the database.
-        let toVariantRows (sampleReportId: System.Guid) (report: Report) =
+        let toVariantRows (sampleReportId: Guid) (report: Report) =
             report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
                 let row = context.Public.Variants.Create()
@@ -1328,13 +1344,12 @@ module Caris =
                 row)
 
         /// Assumes that fusion genes already exist in the database
-        let toFusionRows (sampleReportId: System.Guid) (report: Report) =
+        let toFusionRows (sampleReportId: Guid) (report: Report) =
             report.Fusions
             |> Seq.map (fun fusion ->
                 let row = context.Public.Fusions.Create()
 
                 row.SampleReportId <- sampleReportId
-                // reow.SampleReportId
                 row.FirstGeneName  <- fusion.Gene1Name.Value
                 row.SecondGeneName <- fusion.Gene2Name.Value
                 row.Description    <- fusion.Interpretation.Value |> Some
