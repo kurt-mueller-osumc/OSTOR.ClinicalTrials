@@ -15,11 +15,12 @@ module Database =
     let context = SQL.GetDataContext()
 
     module DTO =
+        open System
         open Core
 
         /// A dto representing a row in the `vendors` table
         type Vendor =
-            { CreatedAt: System.DateTime
+            { CreatedAt: DateTime
               Lab: Lab }
 
             member this.Row =
@@ -43,7 +44,7 @@ module Database =
 
         /// A dto representing a row in the `patients` table
         type Patient =
-            { CreatedAt: System.DateTime
+            { CreatedAt: DateTime
               MRN: Patient.MRN
               FirstName: Person.FirstName
               LastName: Person.LastName
@@ -68,7 +69,7 @@ module Database =
 
         /// A dto representing a row in the `genes` table
         type Gene =
-            { CreatedAt: System.DateTime
+            { CreatedAt: DateTime
               Name: Gene.Name
               EntrezId: int option
               HgncId: string option }
@@ -91,7 +92,7 @@ module Database =
 
         /// A dto representing a row in the `samples` table
         type Sample =
-            { CreatedAt: System.DateTime
+            { CreatedAt: DateTime
               SampleId: string
               SampleType: string
               Category: string
@@ -116,19 +117,20 @@ module Database =
 
         type Report =
             { // meta
-              CreatedAt: System.DateTime
+              CreatedAt: DateTime
               ReportId: string
-              IssuedDate: System.DateTime
+              IssuedDate: DateTime
               // foreign keys
               PatientMRN: Patient.MRN
               VendorCliaNumber: CliaNumber
               // diagnosis
               DiagnosisName: Diagnosis.Name
-              DiagnosisDate: System.DateTime option
+              DiagnosisDate: DateTime option
               DiagnosisIcdCodes: string list
               // ordering physician
-              OrderingPhysicanName: string option
-              OrderingPhysicanNumber: int64 option
+              OrderingPhysicianName: string option
+              OrderingPhysicianNumber: NationalProviderId option
+              Pathologist: string option
               // biomarkers
               MicrosatelliteInstabilityStatus: string option
               TumorMutationBurden: float option
@@ -154,12 +156,43 @@ module Database =
                 row.DiagnosisIcd10Codes <- this.DiagnosisIcdCodes |> List.toArray |> Some
 
                 // ordering physician
-                row.OrderingPhysician <- this.OrderingPhysicanName
-                row.OrderingPhysicianNumber <- this.OrderingPhysicanNumber
+                row.OrderingPhysician <- this.OrderingPhysicianName
+                row.OrderingPhysicianNumber <- this.OrderingPhysicianNumber |> Option.map (fun npi -> npi.Value)
+                row.Pathologist <- this.Pathologist
 
                 // biomarkers (tumor mutation burden, microsatellite instability)
                 row.TumorMutationalBurden <- this.TumorMutationBurden
                 row.TumorMutationalBurdenPercentile <- this.TumorMutationBurdenPercentile
                 row.MsiStatus <- this.MicrosatelliteInstabilityStatus
+
+                row
+
+        type SampleReport =
+            { CreatedAt: DateTime
+              // foreign keys
+              SampleId: string
+              ReportId: string
+              // meta
+              BlockId: string option
+              // dates
+              CollectionDate: Sample.CollectionDate option
+              ReceivedDate: Sample.ReceivedDate
+              TumorPercentage: int option }
+
+            member this.Row =
+                let row = context.Public.SampleReports.Create()
+
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+
+                row.SampleId <- this.SampleId
+                row.ReportId <- this.ReportId
+
+                row.BlockId <- this.BlockId
+
+                row.CollectionDate <- this.CollectionDate |> Option.map (fun collectionDate -> collectionDate.Value)
+                row.ReceiptDate <- this.ReceivedDate.Value
+
+                row.TumorPercentage <- this.TumorPercentage
 
                 row
