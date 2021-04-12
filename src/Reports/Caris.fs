@@ -15,7 +15,13 @@ module Caris =
             member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
             member this.HasMRN = this.MRN.IsSome
 
-        and Sex = internal Male | Female
+        and Sex =
+            internal Male | Female
+
+            member this.Value =
+                match this with
+                | Male -> "male"
+                | Female -> "female"
 
         type Diagnosis =
             { DiagnosisName: Diagnosis.Name
