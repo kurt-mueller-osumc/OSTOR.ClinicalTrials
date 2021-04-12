@@ -90,10 +90,22 @@ module Caris =
 
         /// Test meta information
         type Test =
-            { LabName: LabName
+            { Lab: Lab
               OrderedDate: OrderedDate
               ReceivedDate: ReceivedDate
               ReportId: ReportId }
+
+            static member DefaultLab =
+                { CliaNumber = CliaNumber "03D1019490"
+                  Name = LabName "Caris Life Sciences"
+                  Address = {
+                      Street = StreetAddress "4610 SOUTH 44TH PLACE"
+                      City = City "Phoenix"
+                      State = State "Arizona"
+                      Zip = ZipCode "85040"
+                  }
+                }
+
         and ReportId =
             internal | ReportId of string
             member this.Value = this |> fun (ReportId reportId) -> reportId
@@ -571,11 +583,12 @@ module Caris =
                     let! reportId = ReportId.validate test.ReportId
                     and! orderedDate = OrderedDate.validate test.OrderedDate
                     and! receivedDate = ReceivedDate.validate test.ReceivedDate
-                    and! labName = Lab.Name.validate test.LabName
+
+                    let lab = Test.DefaultLab
 
                     return ({
                         ReportId = reportId
-                        LabName = labName
+                        Lab = lab
                         OrderedDate = orderedDate
                         ReceivedDate = receivedDate
                     } : Domain.Test)
