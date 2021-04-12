@@ -68,6 +68,15 @@ module Core =
                 internal | MRN of int64
                 member this.Value = this |> fun (MRN mrn) -> mrn
 
+        module Sample =
+            type CollectionDate =
+                internal | CollectionDate of System.DateTime
+                member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
+
+            type ReceivedDate =
+                internal | ReceivedDate of System.DateTime
+                member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
+
         type NationalProviderId =
             internal | NationalProviderId of int64
             member this.Value = this |> fun (NationalProviderId npi) -> npi
