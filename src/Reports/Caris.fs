@@ -6,11 +6,15 @@ module Caris =
         open Core
 
         type Patient =
-            { MRN: Patient.MRN
+            { MRN: Patient.MRN option
               LastName: Person.LastName
               FirstName: Person.FirstName
               DateOfBirth: Person.DateOfBirth
               Sex: Sex }
+
+            member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
+            member this.HasMRN = this.MRN.IsSome
+
         and Sex = internal Male | Female
 
         type Diagnosis =
@@ -325,12 +329,20 @@ module Caris =
                     | "Female" | "female" -> Ok Female
                     | _ -> Error $"Sex is invalid: {input}"
 
+            module MRN =
+                open Utilities.StringValidations
+
+                let validate str =
+                    match str with
+                    | "" -> Ok None
+                    | _ -> str |> Input.Patient.MRN.validate |> Result.map Some
+
             open Core.Input
 
             /// Validate that a report's patient has a valid mrn, name, and sex
             let validate (patient: Patient) =
                 validation {
-                    let! mrn = patient.MRN |> Patient.MRN.validate
+                    let! mrn = patient.MRN |> MRN.validate
                     and! lastName =  patient.LastName |> Person.LastName.validate
                     and! firstName =  patient.FirstName |> Person.FirstName.validate
                     and! sex = patient.Sex |> Sex.validate
@@ -1170,16 +1182,18 @@ module Caris =
         open Domain
 
         /// Convert report's patient information to a patient database row.
-        let toPatientRow (report: Report) =
-            let patient = report.Patient
-            let row = context.Public.Patients.Create()
+        let tryPatientRow (report: Report) =
+            report.Patient.TryMrnValue |> Option.map (fun mrnValue ->
+                let patient = report.Patient
+                let row = context.Public.Patients.Create()
 
-            row.Mrn         <- patient.MRN.Value
-            row.FirstName   <- patient.FirstName.Value
-            row.LastName    <- patient.LastName.Value
-            row.DateOfBirth <- patient.DateOfBirth.Value
+                row.Mrn         <- mrnValue
+                row.FirstName   <- patient.FirstName.Value
+                row.LastName    <- patient.LastName.Value
+                row.DateOfBirth <- patient.DateOfBirth.Value
 
-            row
+                row
+            )
 
         /// Prepare a row to be created in the "vendors" table for Caris Life Sciences
         let toVendorRow =
@@ -1196,36 +1210,38 @@ module Caris =
             row
 
         /// Prepare a database row in the "reports" table
-        let toReportRow (report: Report) =
-            let row = context.Public.Reports.Create()
-            let test = report.Test
-            let patient = report.Patient
-            let orderingMd = report.OrderingMd
-            let pathologist = report.Pathologist
-            let diagnosis = report.Diagnosis
+        let tryReportRow (report: Report) =
+            report.Patient.TryMrnValue |> Option.map (fun mrnValue ->
+                let row = context.Public.Reports.Create()
+                let test = report.Test
+                let patient = report.Patient
+                let orderingMd = report.OrderingMd
+                let pathologist = report.Pathologist
+                let diagnosis = report.Diagnosis
 
-            // overall report info
-            row.VendorCliaNumber <- "03D1019490"
-            row.ReportId   <- test.ReportId.Value
-            row.PatientMrn <- patient.MRN.Value
-            row.IssuedDate <- test.ReceivedDate.Value
+                // overall report info
+                row.VendorCliaNumber <- "03D1019490"
+                row.ReportId   <- test.ReportId.Value
+                row.PatientMrn <- mrnValue
+                row.IssuedDate <- test.ReceivedDate.Value
 
-            // ordering physician
-            row.OrderingPhysician       <- orderingMd.Name.Value |> Some
-            row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
+                // ordering physician
+                row.OrderingPhysician       <- orderingMd.Name.Value |> Some
+                row.OrderingPhysicianNumber <- orderingMd.NationalProviderId.Value |> Some
 
-            // pathologist - only organizations get listed in caris reports
-            row.Pathologist <- pathologist.TryOrganizationValue
+                // pathologist - only organizations get listed in caris reports
+                row.Pathologist <- pathologist.TryOrganizationValue
 
-            // diagnosis - caris doesn't report diagnosis dates
-            row.DiagnosisName       <- diagnosis.DiagnosisName.Value
-            row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes.Values |> List.toArray |> Some
+                // diagnosis - caris doesn't report diagnosis dates
+                row.DiagnosisName       <- diagnosis.DiagnosisName.Value
+                row.DiagnosisIcd10Codes <- diagnosis.DiagnosisCodes.Values |> List.toArray |> Some
 
-            // biomarkers
-            row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
-            row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
+                // biomarkers
+                row.TumorMutationalBurden <- report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
+                row.MsiStatus <- report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
 
-            row
+                row
+            )
 
         /// Each report lists a sample that may be referred to across reports. Therefore, samples are given their own table and listings of a sample in a report are givne their own table.
         ///
