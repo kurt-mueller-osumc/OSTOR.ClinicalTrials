@@ -69,6 +69,10 @@ module Core =
                 member this.Value = this |> fun (MRN mrn) -> mrn
 
         module Sample =
+            type BlockId =
+                internal | BlockId of string
+                member this.Value = this |> fun (BlockId blockId) -> blockId
+
             type CollectionDate =
                 internal | CollectionDate of System.DateTime
                 member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
@@ -104,6 +108,13 @@ module Core =
                 member this.Value = this |> fun (EntrezId entrezId) -> entrezId
 
         module Variant =
+            type Category =
+                internal | Germline | Somatic
+                member this.Value =
+                    match this with
+                    | Germline -> "germline"
+                    | Somatic -> "somatic"
+
             type NucleotideAlteration =
                 internal | NucleotideAlteration of string
                 member this.Value = this |> fun (NucleotideAlteration na) -> na
