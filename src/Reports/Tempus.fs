@@ -91,6 +91,8 @@ module Tempus =
               DiagnosisName: Diagnosis.Name
               DiagnosisDate: DiagnosisDate option }
 
+            member this.HasMRN = this.MRN.IsSome
+
             member this.TryMrnValue =
                 this.MRN |> Option.map (fun mrn -> mrn.Value)
 
@@ -145,18 +147,6 @@ module Tempus =
                     | ``FFPE Slides (Unstained)`` -> "FFPE Slides (Unstained)"
                     | Saliva -> "Saliva"
 
-            type Dates =
-                { CollectionDate: CollectionDate
-                  ReceivedDate: ReceivedDate }
-
-            and CollectionDate =
-                internal | CollectionDate of System.DateTime
-                member this.Value = this |> fun (CollectionDate collectionDate) -> collectionDate
-
-            and ReceivedDate =
-                internal | ReceivedDate of System.DateTime
-                member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
-
             type BlockId =
                 internal | BlockId of string
                 member this.Value = this |> fun (BlockId blockId) -> blockId
@@ -174,6 +164,10 @@ module Tempus =
                     match this with
                     | Tumor -> "tumor"
                     | ``CFDNA specimen`` -> "cfDNA specimen"
+
+            type Dates =
+                { CollectionDate: Sample.CollectionDate
+                  ReceivedDate:   Sample.ReceivedDate }
 
 
         /// the tumor sample that will be present in the `specimens` section of the report
@@ -933,6 +927,7 @@ module Tempus =
         module CancerousSample =
             module Category =
                 open type Sample.CancerCategory
+
                 /// Validate that a canceorus sample category is 'tumor' or 'cfDNA specimen'
                 let validate category =
                     match category with

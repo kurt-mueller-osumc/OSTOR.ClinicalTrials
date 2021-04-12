@@ -38,16 +38,20 @@ module FoundationMedicine =
                     | SlideDeck -> "slide deck"
                     | TubeSet -> "tube set"
 
+            type Dates =
+                { CollectionDate: Sample.CollectionDate option
+                  ReceivedDate: Sample.ReceivedDate }
+
         /// The sample for each FMI report.
         /// FMI only reports tumor samples.
         type Sample =
             { SampleId: Sample.Identifier
-              ReceivedDate: Sample.ReceivedDate
+              Dates: Sample.Dates
               BlockId: Sample.BlockId option
               Format: Sample.Format }
 
-            member this.TryBlockIdValue =
-                this.BlockId |> Option.map (fun blockId -> blockId.Value)
+            member this.TryBlockIdValue = this.BlockId |> Option.map (fun blockId -> blockId.Value)
+            member this.TryCollectionDateValue = this.Dates.CollectionDate |> Option.map (fun collectionDate -> collectionDate.Value)
 
         module OrderingMd =
             type Name =
@@ -69,16 +73,14 @@ module FoundationMedicine =
               Gender: Gender
               DateOfBirth: Person.DateOfBirth option
               SpecimenSite: SpecimenSite option // the sample site
-              CollectionDate: CollectionDate option // the sample collection date
               OrderingMd: OrderingMd
               Pathologist: Pathologist option }
 
+            member this.HasMRN = this.MRN.IsSome
             member this.TryMrnValue = this.MRN |> Option.map (fun mrn -> mrn.Value)
             member this.TryDobValue = this.DateOfBirth |> Option.map (fun dob -> dob.Value)
             member this.TryPathologistValue = this.Pathologist |> Option.map (fun pathologist -> pathologist.Value)
             member this.TrySpecimenSiteValue = this.SpecimenSite |> Option.map (fun site -> site.Value)
-            member this.TryCollectionDateValue = this.CollectionDate |> Option.map (fun collectionDate -> collectionDate.Value)
-
 
         and Gender =
             internal Male | Female | Unknown
@@ -290,8 +292,11 @@ module FoundationMedicine =
         type Sample =
             { SampleId: string
               BlockId: string option
-              ReceivedDate: System.DateTime
-              Format: string }
+              Format: string
+              Dates: SampleDates }
+        and SampleDates =
+            { CollectionDate: System.DateTime option
+              ReceivedDate: System.DateTime }
 
         /// A report's sample
         module Sample =
@@ -313,7 +318,6 @@ module FoundationMedicine =
 
                     if isValidId then Some <| Sample.Identifier input
                     else None
-
 
                 /// Validate that a sample's id is in a valid format
                 ///
@@ -353,18 +357,33 @@ module FoundationMedicine =
                     | "Tube Set" -> Ok TubeSet
                     | _ -> Error $"Unknown sample format: {input}"
 
+            module Dates =
+                let validate (input: SampleDates) : Result<Sample.Dates, string> =
+                    match input.CollectionDate, input.ReceivedDate with
+                    | None, receivedDate ->
+                        Ok { CollectionDate = None
+                             ReceivedDate = Sample.ReceivedDate receivedDate }
+                    | Some collectionDate, receivedDate ->
+                        if collectionDate < receivedDate then
+                            Ok { CollectionDate = Some <| Sample.CollectionDate collectionDate
+                                 ReceivedDate = Sample.ReceivedDate receivedDate }
+                        else
+                            Error "Collection date must occur before received date"
+
+
             open type Sample.ReceivedDate
 
             /// Validate the FMI report's sample
             let validate (sample: Sample) =
                 validation {
-                    let! sampleId = SampleId.validate sample.SampleId
-                    and! blockId = BlockId.validateOptional sample.BlockId
-                    and! specimenFormat = Format.validate sample.Format
+                    let! sampleId = sample.SampleId |> SampleId.validate
+                    and! blockId = sample.BlockId |> BlockId.validateOptional
+                    and! specimenFormat = sample.Format |> Format.validate
+                    and! sampleDates = sample.Dates |> Dates.validate
 
                     return ({
                         SampleId = sampleId
-                        ReceivedDate = ReceivedDate sample.ReceivedDate
+                        Dates = sampleDates
                         BlockId = blockId
                         Format = specimenFormat } : Domain.Sample)
                 }
@@ -381,7 +400,6 @@ module FoundationMedicine =
               SubmittedDiagnosis: string
               DateOfBirth: System.DateTime option
               SpecimenSite: string option
-              CollectionDate: System.DateTime option
               OrderingMd: OrderingMd
               Pathologist: string option }
 
@@ -432,9 +450,6 @@ module FoundationMedicine =
                     | None | Some "" -> Ok None
                     | Some input -> input |> validate |> Result.map Some
 
-
-
-
             module Pathologist =
                 open Utilities
                 open Utilities.StringValidations
@@ -477,7 +492,6 @@ module FoundationMedicine =
                     and! orderingMd = OrderingMd.validate pmi.OrderingMd
 
                     let dob = pmi.DateOfBirth |> Option.map Person.DateOfBirth
-                    let collectionDate = pmi.CollectionDate |> Option.map CollectionDate
 
                     return ({
                         MRN = mrn
@@ -487,7 +501,6 @@ module FoundationMedicine =
                         SubmittedDiagnosis = submittedDiagnosis
                         DateOfBirth = dob
                         SpecimenSite = specimenSite
-                        CollectionDate = collectionDate
                         OrderingMd = orderingMd
                         Pathologist = pathologist } : Domain.PMI)
                 }
@@ -979,14 +992,21 @@ module FoundationMedicine =
 
             /// Retrieve the report's sample
             member this.Sample : Sample =
+                let pmi = this.ClinicalReport.Pmi
+
                 /// a block id is optional
                 let optionalBlockId =
                     try (Some this.ReportSample.BlockId)
                     with | :? System.Exception -> None
 
+                let optionalCollectionDate =
+                    try (Some pmi.CollDate)
+                    with | :? System.Exception -> None
+
                 { SampleId = this.ReportSample.SampleId
                   BlockId = optionalBlockId
-                  ReceivedDate = this.ReportSample.ReceivedDate
+                  Dates = { CollectionDate = optionalCollectionDate
+                            ReceivedDate   = this.ReportSample.ReceivedDate }
                   Format = this.ReportSample.SpecFormat }
 
             /// Retrieve the report's patient medical information
@@ -1005,10 +1025,6 @@ module FoundationMedicine =
                     try (Some pmi.Mrn)
                     with | :? System.Exception -> None
 
-                let optionalCollectionDate =
-                    try (Some pmi.CollDate)
-                    with | :? System.Exception -> None
-
                 let optionalDob =
                     try (Some pmi.Dob)
                     with | :? System.Exception -> None
@@ -1020,7 +1036,6 @@ module FoundationMedicine =
                   Gender = pmi.Gender
                   DateOfBirth = optionalDob
                   SpecimenSite = optionalSpecSite
-                  CollectionDate = optionalCollectionDate
                   OrderingMd = { OrderingMd.Name = pmi.OrderingMd; OrderingMd.Identifier = pmi.OrderingMdId }
                   Pathologist = optionalPathologist }
 
