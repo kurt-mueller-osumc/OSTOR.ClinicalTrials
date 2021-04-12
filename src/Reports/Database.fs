@@ -114,4 +114,52 @@ module Database =
         module Sample =
             let buildRow (dto: Sample) = dto.Row
 
+        type Report =
+            { // meta
+              CreatedAt: System.DateTime
+              ReportId: string
+              IssuedDate: System.DateTime
+              // foreign keys
+              PatientMRN: Patient.MRN
+              VendorCliaNumber: CliaNumber
+              // diagnosis
+              DiagnosisName: Diagnosis.Name
+              DiagnosisDate: System.DateTime option
+              DiagnosisIcdCodes: string list
+              // ordering physician
+              OrderingPhysicanName: string option
+              OrderingPhysicanNumber: int64 option
+              // biomarkers
+              MicrosatelliteInstabilityStatus: string option
+              TumorMutationBurden: float option
+              TumorMutationBurdenPercentile: int option
+            }
 
+            member this.Row =
+                let row = context.Public.Reports.Create()
+
+                // meta
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+                row.ReportId <- this.ReportId
+                row.IssuedDate <- this.IssuedDate
+
+                // foreign keys
+                row.PatientMrn <- this.PatientMRN.Value
+                row.VendorCliaNumber <- this.VendorCliaNumber.Value
+
+                // diagnosis
+                row.DiagnosisName <- this.DiagnosisName.Value
+                row.DiagnosisDate <- this.DiagnosisDate
+                row.DiagnosisIcd10Codes <- this.DiagnosisIcdCodes |> List.toArray |> Some
+
+                // ordering physician
+                row.OrderingPhysician <- this.OrderingPhysicanName
+                row.OrderingPhysicianNumber <- this.OrderingPhysicanNumber
+
+                // biomarkers (tumor mutation burden, microsatellite instability)
+                row.TumorMutationalBurden <- this.TumorMutationBurden
+                row.TumorMutationalBurdenPercentile <- this.TumorMutationBurdenPercentile
+                row.MsiStatus <- this.MicrosatelliteInstabilityStatus
+
+                row
