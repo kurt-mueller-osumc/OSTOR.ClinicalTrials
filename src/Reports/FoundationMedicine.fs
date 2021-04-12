@@ -14,10 +14,6 @@ module FoundationMedicine =
                 internal | ReceivedDate of System.DateTime
                 member this.Value = this |> fun (ReceivedDate receivedDate) -> receivedDate
 
-            type BlockId =
-                internal | BlockId of string
-                member this.Value = this |> fun (BlockId blockId) -> blockId
-
             type Format =
                 internal
                 | Aspirate
@@ -1077,135 +1073,143 @@ module FoundationMedicine =
 
 
     module DTO =
+        open System
         open Database
         open Domain
 
-        /// Build a row to be inserted into the `vendors` database table.
-        let toVendorRow (report: Report) =
-            let row = context.Public.Vendors.Create()
+        /// Build a dto to be inserted into the `vendors` database table.
+        let toVendorRow (report: Report) : DTO.Vendor =
             let lab = report.FirstLabOrDefault
 
-            row.Name          <- "Foundation Medicine"
-            row.CliaNumber    <- lab.CliaNumber.Value
-            row.StreetAddress <- lab.Address.Street.Value
-            row.City          <- lab.Address.City.Value
-            row.State         <- lab.Address.State.Value
-            row.ZipCode       <- lab.Address.Zip.Value
+            { CreatedAt = DateTime.Now
+              Lab = lab
+            }
 
-            row
-
-
-
-        /// Build a row to be inserted into the `patients` database table if the report's patient has an MRN.
-        let tryPatientRow (report: Report) =
+        /// Build a dto to be inserted into the `patients` database table if the report's patient has an MRN.
+        let tryPatientRow (report: Report) : DTO.Patient option =
             let pmi = report.PMI
 
-            pmi.TryMrnValue
-            |> Option.map (fun mrnValue ->
-                let row = context.Public.Patients.Create()
-
-                row.Mrn          <- mrnValue
-                row.LastName     <- pmi.LastName.Value
-                row.FirstName    <- pmi.FirstName.Value
-                row.DateOfBirth  <- pmi.DateOfBirth.Value.Value // assume that the optional dob exists and get the underlying datetime
-                row.Sex          <- pmi.Gender.Value
-
-                row
+            pmi.MRN
+            |> Option.map (fun mrn ->
+                { CreatedAt    = DateTime.Now
+                  MRN          = mrn
+                  LastName     = pmi.LastName
+                  FirstName    = pmi.FirstName
+                  DateOfBirth  = pmi.DateOfBirth.Value // assume that the optional dob exists and get the underlying datetime
+                  Sex          = pmi.Gender.Value
+                }
             )
 
 
         /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
-        let tryReportRow (report: Report) =
+        let tryReportRow (report: Report) : DTO.Report option =
             let patient = report.PMI
 
-            patient.TryMrnValue
-            |> Option.map (fun mrnValue ->
-                let row = context.Public.Reports.Create()
+            patient.MRN
+            |> Option.map (fun mrn ->
                 let lab = report.FirstLabOrDefault
 
-                row.PatientMrn <- mrnValue
-                row.VendorCliaNumber <- lab.CliaNumber.Value
-                row.ReportId <- report.ReportId.Value.ToString()
-                row.OrderingPhysician <- Some patient.OrderingMd.Name.Value
-                row.Pathologist <- patient.TryPathologistValue
-                row.IssuedDate <- report.IssuedDate.Value
+                { // meta
+                  CreatedAt = DateTime.Now
+                  ReportId = report.ReportId.Value.ToString()
+                  IssuedDate = report.IssuedDate.Value
 
-                row.TumorMutationalBurden <- report.TryTmbScoreFloat
-                row.MsiStatus <-report.TryMicrosatelliteStatusValue
+                  // foreign keys
+                  PatientMRN = mrn
+                  VendorCliaNumber = lab.CliaNumber
 
-                row.DiagnosisName <- patient.SubmittedDiagnosis.Value
+                  // diagnosis
+                  DiagnosisName = patient.SubmittedDiagnosis
+                  DiagnosisDate = None
+                  DiagnosisIcdCodes = []
 
-                row
+                  // ordering physician
+                  OrderingPhysicianName = Some patient.OrderingMd.Name.Value
+                  OrderingPhysicianNumber = None
+                  Pathologist =  patient.TryPathologistValue
+
+                  // biomarkers
+                  TumorMutationBurden = report.TryTmbScoreFloat
+                  TumorMutationBurdenPercentile = None
+                  MicrosatelliteInstabilityStatus = report.TryMicrosatelliteStatusValue
+                }
             )
 
-        let toSampleRow (report: Report) =
-            let sample = report.Sample
-            let pmi = report.PMI
-            let row = context.Public.Samples.Create()
-
-            row.Category   <- "tumor"
-            row.SampleId   <- sample.SampleId.Value
-            row.BiopsySite <- pmi.TrySpecimenSiteValue
-            row.SampleType <- sample.Format.Value
-
-            row
-
-        let toSampleReportRow (report: Report) =
-            let row = context.Public.SampleReports.Create()
+        let toSampleRow (report: Report) : DTO.Sample =
             let sample = report.Sample
             let pmi = report.PMI
 
-            row.ReportId <- report.ReportId.Value
-            row.SampleId <- sample.SampleId.Value
-            row.BlockId <- sample.TryBlockIdValue
+            { CreatedAt = DateTime.Now
+              SampleId = sample.SampleId.Value
+              SampleType = sample.Format.Value
+              BiopsySite = pmi.TrySpecimenSiteValue
+              Category = "tumor"
+            }
 
-            row.CollectionDate <- pmi.TryCollectionDateValue
-            row.ReceiptDate    <- sample.ReceivedDate.Value
+        let toSampleReportRow (report: Report) : DTO.SampleReport =
+            let sample = report.Sample
 
-            row
+            { CreatedAt = DateTime.Now
+              // foreign keys
+              ReportId = report.ReportId.Value
+              SampleId = sample.SampleId.Value
 
-        let toGeneRows (report: Report) =
+              // identifier
+              BlockId = sample.BlockId
+
+              // dates
+              CollectionDate = sample.Dates.CollectionDate
+              ReceivedDate   = sample.Dates.ReceivedDate
+
+              TumorPercentage = None
+            }
+
+        let toGeneRows (report: Report) : DTO.Gene list =
             let shortGeneNames = report.ShortVariants |> List.map (fun shortVariant -> shortVariant.GeneName)
             let fusionGenes = report.Fusions |> List.collect (fun fusion -> fusion.Genes)
 
             shortGeneNames
             @ fusionGenes
             |> List.map (fun geneName ->
-                let row = context.Public.Genes.Create()
-
-                row.Name <- geneName.Value
-
-                row
+                { CreatedAt = DateTime.Now
+                  Name = geneName
+                  EntrezId = None
+                  HgncId = None
+                }
             )
 
-        let querySampleReportId (reportId: ReportId) (sampleId: Sample.Identifier) =
-            query {
-                for sampleReport in context.Public.SampleReports do
-                where (sampleReport.ReportId = reportId.Value.ToString() && sampleReport.SampleId = sampleId.Value.ToString())
-                select sampleReport.Id
-                exactlyOne
-            }
+        open Core
+        open type Variant.Category
 
-        let toVariantRows (sampleReportId: System.Guid) (report: Report) =
+        let toVariantRows (sampleReportId: Guid) (report: Report) : DTO.Variant list =
             report.ShortVariants
-            |> Seq.map (fun shortVariant ->
-                let row = context.Public.Variants.Create()
+            |> List.map (fun shortVariant ->
+                { CreatedAt = DateTime.Now
+                  // foreign keys
+                  GeneName = shortVariant.GeneName
+                  SampleReportId = sampleReportId
+                  // identifier
+                  Name = shortVariant.ProteinEffect.Value
+                  Category = Somatic
 
-                row.SampleReportId <- sampleReportId
-                row.GeneName <- shortVariant.GeneName.Value
-                row.Name     <- shortVariant.ProteinEffect.Value
-                row.Category <- "somatic"
+                  // opinions
+                  Type = shortVariant.FunctionalEffect.Value |> Some
+                  Assessment = shortVariant.Status.Value |> Some
 
-                row.Type <- shortVariant.FunctionalEffect.Value |> Some
-                row.Assessment <- shortVariant.Status.Value |> Some
+                  // info
+                  Description = None
+                  AllelicFraction = shortVariant.AlleleFraction.Value |> float |> Some
 
-                row.Transcript <- shortVariant.Transcript.Value |> Some
-                row.AllelicFraction <- shortVariant.AlleleFraction.Value |> float |> Some
-
-                row
+                  // HGVS
+                  Transcript = shortVariant.Transcript.Value |> Some
+                  HgvsCodingChange = None
+                  HgvsProteinFullChange = None
+                  HgvsProteinAbbreviatedChange = None
+                  NucleotideAlteration = None
+                }
             )
 
-        let toFusionRows (sampleReportId: System.Guid) (report: Report) =
+        let toFusionRows (sampleReportId: Guid) (report: Report) =
             report.Fusions |> Seq.map (fun fusion ->
                 let row = context.Public.Fusions.Create()
 
@@ -1236,7 +1240,7 @@ module FoundationMedicine =
                 context.SubmitUpdates()
 
                 /// insert sample report, variants, and fusions into database
-                let sampleReportId = querySampleReportId report.ReportId report.Sample.SampleId
+                let sampleReportId = querySampleReportId report.ReportId.Value report.Sample.SampleId.Value
                 report |> toVariantRows sampleReportId |> ignore
                 report |> toFusionRows sampleReportId |> ignore
 
