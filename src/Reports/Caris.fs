@@ -1338,23 +1338,27 @@ module Caris =
                 exactlyOne
             }
 
-        let toDatabase (report: Report) =
-            toVendorRow |> ignore
+        open Utilities
 
-            context.SubmitUpdates()
+        let tryInsertRows (report: Report) =
+            report.Patient.TryMrnValue |> Option.map (fun _ ->
+                toVendorRow |> ignore
+                report |> tryPatientRow |> Optional.value |> ignore
+                report |> toGeneRows |> ignore
+                report |> toSampleRow |> ignore
 
-            report |> toPatientRow |> ignore
-            report |> toReportRow |> ignore
-            report |> toSampleRow |> ignore
-            report |> toGeneRows |> ignore
+                context.SubmitUpdates()
 
-            context.SubmitUpdates()
+                report |> tryReportRow  |> Optional.value |> ignore
 
-            report |> toSampleReportRow |> ignore
+                context.SubmitUpdates()
 
-            context.SubmitUpdates()
+                report |> toSampleReportRow |> ignore
 
-            let sampleReportId = querySampleReportId report.Test.ReportId report.Specimen.SpecimenId
+                context.SubmitUpdates()
 
-            report |> toFusionRows sampleReportId |> ignore
-            report |> toVariantRows sampleReportId |> ignore
+                let sampleReportId = querySampleReportId report.Test.ReportId report.Specimen.SpecimenId
+
+                report |> toFusionRows sampleReportId |> ignore
+                report |> toVariantRows sampleReportId |> ignore
+            )
