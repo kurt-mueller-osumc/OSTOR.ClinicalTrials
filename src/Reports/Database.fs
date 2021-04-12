@@ -14,6 +14,14 @@ module Database =
 
     let context = SQL.GetDataContext()
 
+    let querySampleReportId (reportId: string) (sampleId: string) =
+        query {
+            for sampleReport in context.Public.SampleReports do
+            where (sampleReport.ReportId = reportId && sampleReport.SampleId = sampleId)
+            select sampleReport.Id
+            exactlyOne
+        }
+
     module DTO =
         open System
         open Core
@@ -172,8 +180,8 @@ module Database =
               // foreign keys
               SampleId: string
               ReportId: string
-              // meta
-              BlockId: string option
+              // identifier
+              BlockId: Sample.BlockId option
               // dates
               CollectionDate: Sample.CollectionDate option
               ReceivedDate: Sample.ReceivedDate
@@ -187,12 +195,65 @@ module Database =
 
                 row.SampleId <- this.SampleId
                 row.ReportId <- this.ReportId
-
-                row.BlockId <- this.BlockId
+                row.BlockId <- this.BlockId |> Option.map (fun blockId -> blockId.Value)
 
                 row.CollectionDate <- this.CollectionDate |> Option.map (fun collectionDate -> collectionDate.Value)
                 row.ReceiptDate <- this.ReceivedDate.Value
 
                 row.TumorPercentage <- this.TumorPercentage
+
+                row
+
+        type Variant =
+            { CreatedAt: DateTime
+              // foreign keys
+              GeneName: Gene.Name
+              SampleReportId: Guid
+              // identifier
+              Name: string
+              Category: Variant.Category
+              // opinions
+              Type: string option
+              Assessment: string option
+              // info
+              Description: string option
+              AllelicFraction: float option
+
+              // HGVS
+              Transcript: string option
+              HgvsCodingChange: string option
+              HgvsProteinFullChange: string option
+              HgvsProteinAbbreviatedChange: string option
+              NucleotideAlteration: string option
+            }
+
+            member this.Row =
+                let row = context.Public.Variants.Create()
+
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+
+                // foreign keys
+                row.GeneName <- this.GeneName.Value
+                row.SampleReportId <- this.SampleReportId
+
+                // identifier
+                row.Name <- this.Name
+                row.Category <- this.Category.Value
+
+                // opinions
+                row.Type <- this.Type
+                row.Assessment <- this.Assessment
+
+                // info
+                row.Description <- this.Description
+                row.AllelicFraction <- this.AllelicFraction
+
+                // hgvs
+                row.Transcript <- this.Transcript
+                row.HgvsC <- this.HgvsCodingChange
+                row.HgvsProteinFull <- this.HgvsProteinFullChange
+                row.HgvsProtein <- this.HgvsProteinAbbreviatedChange
+                row.NucleotideAlteration <- this.NucleotideAlteration
 
                 row
