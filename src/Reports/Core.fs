@@ -155,15 +155,19 @@ module Core =
                     optionalString |> Optional.validateWith validate
 
         module NationalProviderId =
-            open Utilities
             open Domain
+            open System.Text.RegularExpressions
 
-            /// Validate that an national provider id is a 10 digit integer
+            let (|ValidNPI|_|) input =
+                if Regex("^\d{9,}$").Match(input).Success then
+                    Some <| NationalProviderId (int64 input)
+                else None
+
+            /// Validate that an national provider id is at least a 9 digit integer
             let validate (str: string) : Result<NationalProviderId,string> =
-                match (String.length str, Integer64.tryParse str) with
-                | 10, Some npi -> Ok (NationalProviderId npi)
-                | _, Some npi -> Error $"NPI must be a 10 digit number: {npi}"
-                | _ -> Error $"NPI is invalid: {str}"
+                match str with
+                | ValidNPI npi -> Ok npi
+                | _ -> Error $"Invalid NPI: {str}"
 
         module Lab =
             open Domain
