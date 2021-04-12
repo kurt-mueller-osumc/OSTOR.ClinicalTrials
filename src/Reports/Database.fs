@@ -22,13 +22,12 @@ module Database =
             { CreatedAt: System.DateTime
               Lab: Lab }
 
-        module Vendor =
-            /// Build a row to be inserted into `vendors` table
-            let buildRow (dto: Vendor) =
+            member this.Row =
                 let row = context.Public.Vendors.Create()
-                let lab = dto.Lab
+                let lab = this.Lab
 
-                row.CreatedAt <- dto.CreatedAt
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
                 row.Name <- lab.Name.Value
                 row.CliaNumber <- lab.CliaNumber.Value
                 row.StreetAddress <- lab.Address.Street.Value
@@ -37,6 +36,10 @@ module Database =
                 row.ZipCode <- lab.Address.Zip.Value
 
                 row
+
+        module Vendor =
+            /// Build a row to be inserted into `vendors` table
+            let buildRow (dto: Vendor) = dto.Row
 
         /// A dto representing a row in the `patients` table
         type Patient =
@@ -47,15 +50,68 @@ module Database =
               DateOfBirth: Person.DateOfBirth
               Sex: string }
 
-        module Patient =
-            /// Build a row to be inserted into `patients` table
-            let buildRow (dto: Patient) =
+            member this.Row =
                 let row = context.Public.Patients.Create()
 
-                row.CreatedAt <- dto.CreatedAt
-                row.Mrn <- dto.MRN.Value
-                row.FirstName <- dto.FirstName.Value
-                row.LastName <- dto.LastName.Value
-                row.DateOfBirth <- dto.DateOfBirth.Value
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+                row.Mrn <- this.MRN.Value
+                row.FirstName <- this.FirstName.Value
+                row.LastName <- this.LastName.Value
+                row.DateOfBirth <- this.DateOfBirth.Value
 
                 row
+
+        module Patient =
+            /// Build a row to be inserted into `patients` table
+            let buildRow (dto: Patient) = dto.Row
+
+        /// A dto representing a row in the `genes` table
+        type Gene =
+            { CreatedAt: System.DateTime
+              Name: Gene.Name
+              EntrezId: int option
+              HgncId: string option }
+
+            /// Build a row to be inserted into `genes` table
+            member this.Row =
+                let row = context.Public.Genes.Create()
+
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+
+                row.Name <- this.Name.Value
+                row.EntrezId <- this.EntrezId
+                row.HgncId <- this.HgncId
+
+                row
+
+        module Gene =
+            let buildRow (dto: Gene) = dto.Row
+
+        /// A dto representing a row in the `samples` table
+        type Sample =
+            { CreatedAt: System.DateTime
+              SampleId: string
+              SampleType: string
+              Category: string
+              BiopsySite: string option }
+
+            /// Build a row to be inserted into `samples` table
+            member this.Row =
+                let row = context.Public.Samples.Create()
+
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+
+                row.SampleId <- this.SampleId
+                row.SampleType <- this.SampleType
+                row.Category <- this.Category
+                row.BiopsySite <- this.BiopsySite
+
+                row
+
+        module Sample =
+            let buildRow (dto: Sample) = dto.Row
+
+
