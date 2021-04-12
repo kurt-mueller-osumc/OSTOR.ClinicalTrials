@@ -252,7 +252,6 @@ module Utilities =
                 |> Result.map createValidType
                 |> Result.mapError (fun _ -> errorMessage)
 
-
     module FloatValidations =
         let ``validate >= 0`` (x: float) =
             if x >= 0.0 then Ok x
