@@ -347,7 +347,7 @@ module Caris =
                     and! firstName =  patient.FirstName |> Person.FirstName.validate
                     and! sex = patient.Sex |> Sex.validate
 
-                    let dob = Domain.Person.DateOfBirth patient.DateOfBirth
+                    let dob = Person.DateOfBirth patient.DateOfBirth
 
                     return ({
                         MRN = mrn
@@ -376,7 +376,7 @@ module Caris =
                     String.split ','
                     >> List.map IcdCode.validate
                     >> Result.combine
-                    >> Result.map Domain.DiagnosisCodes
+                    >> Result.map DiagnosisCodes
 
             open Utilities.StringValidations.Typed
 
