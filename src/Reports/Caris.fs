@@ -1215,26 +1215,20 @@ module Caris =
             report.Patient.MRN |> Option.map (fun mrn ->
                 let patient = report.Patient
 
-                let dto = ({
-                    CreatedAt = System.DateTime.Now
-                    MRN = mrn
-                    FirstName = patient.FirstName
-                    LastName = patient.LastName
-                    DateOfBirth = patient.DateOfBirth
-                    Sex = patient.Sex.Value
-                } : DTO.Patient)
-
-                dto |> DTO.Patient.buildRow
+                ({ CreatedAt = System.DateTime.Now
+                   MRN = mrn
+                   FirstName = patient.FirstName
+                   LastName = patient.LastName
+                   DateOfBirth = patient.DateOfBirth
+                   Sex = patient.Sex.Value
+                } : DTO.Patient).Row
             )
 
         /// Prepare a row to be created in the "vendors" table for Caris Life Sciences
         let toVendorRow (report: Report) =
-            let dto = ({
-                CreatedAt = System.DateTime.Now
-                Lab = report.Test.Lab
-            } : DTO.Vendor)
-
-            dto |> DTO.Vendor.buildRow
+            ({ CreatedAt = System.DateTime.Now
+               Lab = report.Test.Lab
+            } : DTO.Vendor).Row
 
         /// Prepare a database row in the "reports" table
         let tryReportRow (report: Report) =
@@ -1274,14 +1268,13 @@ module Caris =
         /// Only tumor samplesa are listed in Caris reports.
         let toSampleRow (report: Report) =
             let specimen = report.Specimen
-            let row = context.Public.Samples.Create()
 
-            row.SampleId       <- specimen.SpecimenId.Value
-            row.SampleType     <- specimen.Type.Value
-            row.Category       <- "tumor"
-            row.BiopsySite     <- specimen.Site.Value |> Some
-
-            row
+            ({ CreatedAt  = System.DateTime.Now
+               SampleId   = specimen.SpecimenId.Value
+               SampleType = specimen.Type.Value
+               Category   = "tumor"
+               BiopsySite = specimen.Site.Value |> Some
+            } : DTO.Sample).Row
 
         /// The parent sample and report must exist in the datbase.
         let toSampleReportRow (report: Report) =
@@ -1302,10 +1295,13 @@ module Caris =
 
             geneNames @ fusionGenes
             |> List.map (fun geneName ->
-                let row = context.Public.Genes.Create()
-                row.Name <- geneName.Value
-                row
+                ({ CreatedAt = System.DateTime.Now
+                   Name = geneName
+                   EntrezId = None
+                   HgncId = None
+                } : DTO.Gene)
             )
+            |> List.map DTO.Gene.buildRow
 
         /// Convert a report's genomic alterations that have a 'molecular consequence' to 'Variant' database rows.
         /// Each genomic alteration with a "molecular consequence" will also have an hgvs coding change and protein change.
