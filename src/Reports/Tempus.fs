@@ -147,9 +147,6 @@ module Tempus =
                     | ``FFPE Slides (Unstained)`` -> "FFPE Slides (Unstained)"
                     | Saliva -> "Saliva"
 
-            type BlockId =
-                internal | BlockId of string
-                member this.Value = this |> fun (BlockId blockId) -> blockId
 
             type TumorPercentage =
                 internal |  TumorPercentage of uint
@@ -168,7 +165,6 @@ module Tempus =
             type Dates =
                 { CollectionDate: Sample.CollectionDate
                   ReceivedDate:   Sample.ReceivedDate }
-
 
         /// the tumor sample that will be present in the `specimens` section of the report
         type CancerousSample =
