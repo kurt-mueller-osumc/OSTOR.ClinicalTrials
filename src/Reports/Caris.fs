@@ -220,7 +220,7 @@ module Caris =
               ResultGroup: GenomicAlteration.ResultGroup
               GenomicSource: GenomicAlteration.Source option
               MolecularConsequence: GenomicAlteration.MolecularConsequence option
-              Interpretation: GenomicAlteration.GeneInterpretation
+              Interpretation: GenomicAlteration.GeneInterpretation option
               AlleleFrequency: GenomicAlteration.AlleleFrequency option
               HGVS: HGVS option
               TranscriptAlterationDetails: GenomicAlteration.TranscriptAlterationDetails option }
@@ -580,10 +580,14 @@ module Caris =
 
         module Gene =
             module Interpretation =
+                open Utilities
                 open Utilities.StringValidations.Typed
 
                 /// Validate that a gene interpretation is not blank
                 let validate = validateNotBlank GenomicAlteration.GeneInterpretation "Gene interpretation can't be blank"
+
+                /// Validate a genomic alteration's interpretation, if it exists
+                let validateOptional = Optional.validateWith validate
 
         module Nucleotide =
             open System.Text.RegularExpressions
@@ -614,7 +618,7 @@ module Caris =
         type GenomicAlteration =
             { GeneName: string
               GenomicSource: string option
-              Interpretation: string
+              Interpretation: string option
               ResultGroup: ResultGroup
               MolecularConsequence: string option
               TranscriptAlterationDetails: TranscriptAlterationDetails option
@@ -778,7 +782,7 @@ module Caris =
                 validation {
                     let! geneName = genomicAlteration.GeneName |> Gene.Name.validate
                     and! resultGroup = genomicAlteration.ResultGroup |> ResultGroup.validate
-                    and! interpretation = genomicAlteration.Interpretation |> Gene.Interpretation.validate
+                    and! interpretation = genomicAlteration.Interpretation |> Gene.Interpretation.validateOptional
                     and! molecularConsequence = genomicAlteration.MolecularConsequence |> MolecularConsequence.validateOptional
                     and! alleleFrequency = genomicAlteration.AlleleFrequency |> AlleleFrequency.validateOptional
                     and! transcriptAlterationDetails = genomicAlteration.TranscriptAlterationDetails |> TranscriptAlterationDetails.validateOptional
@@ -1042,8 +1046,8 @@ module Caris =
                        HgvsProteinChange = ga.HgvsProteinChanges |> Seq.tryHead
                        Chromosome = ga.Chromosomes |> Seq.tryHead
                        Exon = ga.Exons |> Seq.tryHead
-                       Source = ga.GenomicSources |> Seq.tryHead
-                       Interpretation = ga.Interpretations |> Seq.head
+                       GenomicSource = ga.GenomicSources |> Seq.tryHead
+                       Interpretation = ga.Interpretations |> Seq.tryHead
                        AlleleFrequency = ga.AlleleFrequencyInformations |> Seq.tryHead |> Option.map (fun afi -> afi.AlleleFrequency)
                        MolecularConsequence = ga.MolecularConsequences |> Seq.tryHead
                        TranscriptAlterationDetails = ga.AlterationDetails
@@ -1066,7 +1070,7 @@ module Caris =
                       ResultGroup = { Group = ga.ResultGroup; Result = ga.Result }
                       Interpretation = ga.Interpretation
                       AlleleFrequency = ga.AlleleFrequency
-                      GenomicSource = ga.Source
+                      GenomicSource = ga.GenomicSource
                       MolecularConsequence = ga.MolecularConsequence
                       HGVS = { CodingChange = ga.HgvsCodingChange; ProteinChange = ga.HgvsProteinChange }
                       TranscriptAlterationDetails = ga.TranscriptAlterationDetails |> Option.map (fun tad ->
