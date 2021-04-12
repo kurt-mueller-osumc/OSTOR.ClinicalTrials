@@ -1206,36 +1206,35 @@ module Caris =
 
 
     module DTO =
+        open Core
         open Database
         open Domain
 
         /// Convert report's patient information to a patient database row.
         let tryPatientRow (report: Report) =
-            report.Patient.TryMrnValue |> Option.map (fun mrnValue ->
+            report.Patient.MRN |> Option.map (fun mrn ->
                 let patient = report.Patient
-                let row = context.Public.Patients.Create()
 
-                row.Mrn         <- mrnValue
-                row.FirstName   <- patient.FirstName.Value
-                row.LastName    <- patient.LastName.Value
-                row.DateOfBirth <- patient.DateOfBirth.Value
+                let dto = ({
+                    CreatedAt = System.DateTime.Now
+                    MRN = mrn
+                    FirstName = patient.FirstName
+                    LastName = patient.LastName
+                    DateOfBirth = patient.DateOfBirth
+                    Sex = patient.Sex.Value
+                } : DTO.Patient)
 
-                row
+                dto |> DTO.Patient.buildRow
             )
 
         /// Prepare a row to be created in the "vendors" table for Caris Life Sciences
-        let toVendorRow =
-            let row = context.Public.Vendors.Create()
+        let toVendorRow (report: Report) =
+            let dto = ({
+                CreatedAt = System.DateTime.Now
+                Lab = report.Test.Lab
+            } : DTO.Vendor)
 
-            // source: https://npiprofile.com/npi/1013973866
-            row.Name <- "Caris Life Sciences"
-            row.CliaNumber <- "03D1019490"
-            row.StreetAddress <- "4610 SOUTH 44TH PLACE"
-            row.City <- "Phoenix"
-            row.State <- "Arizona"
-            row.ZipCode <- "85040"
-
-            row
+            dto |> DTO.Vendor.buildRow
 
         /// Prepare a database row in the "reports" table
         let tryReportRow (report: Report) =
