@@ -66,12 +66,14 @@ module Caris =
 
             type Type =
                 internal
+                | ``Peripheral Blood Plasma``
                 | ``Tissue Biopsy Formalin Vial``
                 | ``Tissue Biopsy Paraffin Blocks``
                 | ``Tissue Biopsy Slide Unstained``
 
                 member this.Value =
                     match this with
+                    | ``Peripheral Blood Plasma`` -> "Peripheral Blood Plasma"
                     | ``Tissue Biopsy Formalin Vial`` -> "Tissue Biopsy Formalin Vial"
                     | ``Tissue Biopsy Paraffin Blocks`` -> "Tissue Biopsy Paraffin Blocks"
                     | ``Tissue Biopsy Slide Unstained`` -> "Tissue Biopsy Slide Unstained"
@@ -480,7 +482,7 @@ module Caris =
                 ///    validate "TN21-123456-A" = Ok (AccessionId "TN21-123456-A")
                 ///    validate "invalidId" = Error "Invalid accession id: invalidId"
                 let validate input =
-                    if Regex("^TN\d{2}-\d{6}-[A-Z]{1}$").Match(input).Success then
+                    if Regex("^TN\d{2}-\d{6}-[A-Z]{1}\d*$").Match(input).Success then
                         Ok <| AccessionId input
                     else
                         Error $"Invalid accession id: {input}"
@@ -491,6 +493,7 @@ module Caris =
                 /// Validate that a sample type's tissue biopsy is from a vial, blocks, or a slide.
                 let validate input =
                     match input with
+                    | "Peripheral Blood Plasma" -> Ok ``Peripheral Blood Plasma``
                     | "Tissue Biopsy Formalin Vial" -> Ok ``Tissue Biopsy Formalin Vial``
                     | "Tissue Biopsy Paraffin Blocks" -> Ok ``Tissue Biopsy Paraffin Blocks``
                     | "Tissue Biopsy Slide Unstained" -> Ok ``Tissue Biopsy Slide Unstained``
