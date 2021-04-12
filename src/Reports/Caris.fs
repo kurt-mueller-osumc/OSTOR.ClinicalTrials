@@ -909,7 +909,6 @@ module Caris =
                 | _ -> Error $"Invalid tumor mutation burden: {tumorMutationBurden}"
 
             open Utilities
-
             /// Validate an optional Tumor Mutation Burden. If no input exists, it's valid.
             /// If an input exists, run validation checks on it.
             let validateOptional = Optional.validateWith validate
@@ -976,7 +975,10 @@ module Caris =
                         TumorMutationBurden = tmb
                         MicrosatelliteInstability = msi
                     } : Domain.Report)
-                }
+                } |> Result.mapError (fun errors ->
+                    ({ ReportId = report.Test.ReportId
+                       Errors = errors } : Report.ValidationError))
+
 
 
     module Xml =
