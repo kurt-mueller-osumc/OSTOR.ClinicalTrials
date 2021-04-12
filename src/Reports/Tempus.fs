@@ -2004,14 +2004,6 @@ module Tempus =
             relevantFusionRows
             @ fusionRows
 
-        let querySampleReportId (reportId: Report.Identifier) (sampleId: Sample.Identifier) =
-            query {
-                for sampleReport in context.Public.SampleReports do
-                where (sampleReport.ReportId = reportId.Value.ToString() && sampleReport.SampleId = sampleId.Value.ToString())
-                select sampleReport.Id
-                exactlyOne
-            }
-
         let toDatabase (overallReport: OverallReport) =
             overallReport
             |> tryPatientRow

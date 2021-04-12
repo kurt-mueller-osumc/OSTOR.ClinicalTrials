@@ -119,6 +119,11 @@ module Core =
                 internal | NucleotideAlteration of string
                 member this.Value = this |> fun (NucleotideAlteration na) -> na
 
+        module Fusion =
+            type Description =
+                internal | Description of string
+                member this.Value = this |> fun (Description description) -> description
+
     module Input =
         module StreetAddress =
             open Utilities.StringValidations.Typed
