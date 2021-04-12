@@ -1241,7 +1241,6 @@ module Caris =
             report.Patient.TryMrnValue |> Option.map (fun mrnValue ->
                 let row = context.Public.Reports.Create()
                 let test = report.Test
-                let patient = report.Patient
                 let orderingMd = report.OrderingMd
                 let pathologist = report.Pathologist
                 let diagnosis = report.Diagnosis
@@ -1313,8 +1312,6 @@ module Caris =
         ///
         /// Each variant row has a parent sample report and a parent gene. The parent sample report and gene must already exist in the database.
         let toVariantRows (sampleReportId: System.Guid) (report: Report) =
-
-
             report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
                 let row = context.Public.Variants.Create()
