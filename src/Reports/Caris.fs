@@ -265,9 +265,6 @@ module Caris =
 
         module Fusion =
             type Exon = internal Exon of uint
-            type Interpretation =
-                internal | Interpretation of string
-                member this.Value = this |> fun (Interpretation fusionInterpretation) -> fusionInterpretation
             type Result = internal ``Fusion Detected`` | ``Pathogenic Fusion``
 
         /// Fusions are marked as "translocations" in a Caris report
@@ -276,7 +273,7 @@ module Caris =
               Gene2Name: Gene.Name
               Exon1: Fusion.Exon
               Exon2: Fusion.Exon
-              Interpretation: Fusion.Interpretation
+              Interpretation: Fusion.Description
               Result: Fusion.Result }
 
             member this.GeneNames = [this.Gene1Name; this.Gene2Name]
@@ -864,10 +861,9 @@ module Caris =
 
             module Interpretation =
                 open Utilities.StringValidations.Typed
-                open type Fusion.Interpretation
 
                 /// Validate that a fusion interpreation is not blank
-                let validate = validateNotBlank Interpretation "Fusion interpretation can't be blank"
+                let validate = validateNotBlank Fusion.Description "Fusion interpretation can't be blank"
 
             module Result =
                 open type Fusion.Result
