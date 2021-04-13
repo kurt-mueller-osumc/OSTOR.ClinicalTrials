@@ -244,6 +244,15 @@ module Core =
                 let validate =
                     validateNotBlank Name "Gene name can't be blank"
 
+        module Fusion =
+            module Description =
+                open Utilities.StringValidations.Typed
+
+                /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
+                let validate =
+                    validateNotBlank Fusion.Description "Fusion description can't be blank"
+
+
         module Report =
             type ValidationError =
                 { ReportId: string
