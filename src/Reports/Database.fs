@@ -64,10 +64,14 @@ module Database =
 
                 row.CreatedAt <- now
                 row.UpdatedAt <- now
+                // patient identifiers
                 row.Mrn <- this.MRN.Value
+                // patient info
                 row.FirstName <- this.FirstName.Value
                 row.LastName <- this.LastName.Value
                 row.DateOfBirth <- this.DateOfBirth.Value
+                // patient demographics
+                row.Sex <- this.Sex
 
                 row
 
