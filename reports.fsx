@@ -1,5 +1,6 @@
 #r "nuget: Thoth.Json.Net"
 #r "nuget: FSharp.Data"
+#r "nuget: SQLProvider"
 #r "nuget: FsToolkit.ErrorHandling"
 
 #r "src/Reports/bin/Debug/net5.0/Reports.dll"
@@ -14,26 +15,26 @@ open Utilities
 
 (* Tempus Reports *)
 
-let tempusReportJsonsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "Tempus"|])
+// let tempusReportJsonsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "Tempus"|])
 
-let tempusJsonResults =
-    DirectoryInfo(tempusReportJsonsPath).EnumerateFileSystemInfos("*.json")
-    |> Seq.map (fun filePath ->
-        let jsonText = File.ReadAllText(filePath.FullName)
-        Tempus.Json.deserializeWithError filePath.Name jsonText
-    ) |> Seq.toList
+// let tempusJsonResults =
+//     DirectoryInfo(tempusReportJsonsPath).EnumerateFileSystemInfos("*.json")
+//     |> Seq.map (fun filePath ->
+//         let jsonText = File.ReadAllText(filePath.FullName)
+//         Tempus.Json.deserializeWithError filePath.Name jsonText
+//     ) |> Seq.toList
 
-let (tempusJsons, tempusJsonErrors) = Result.partition tempusJsonResults
+// let (tempusJsons, tempusJsonErrors) = Result.partition tempusJsonResults
 
 
-let (tempusReports, tempusErrors) =
-    tempusJsons
-    |> Seq.map (fun json ->
-        printfn $"Tempus report id: {json.Report.ReportId}"
-        Tempus.Json.validate json
-    )
-    |> Seq.toList
-    |> Result.partition
+// let (tempusReports, tempusErrors) =
+//     tempusJsons
+//     |> Seq.map (fun json ->
+//         printfn $"Tempus report id: {json.Report.ReportId}"
+//         Tempus.Json.validate json
+//     )
+//     |> Seq.toList
+//     |> Result.partition
 
 
 (* FMI Reports *)
@@ -67,12 +68,27 @@ let (tempusReports, tempusErrors) =
 // let (fmiReports, fmiErrors) = Result.partition fmiResults
 
 
-// // (* Caris Reports *)
+// (* Caris Reports *)
 
-// let carisReportsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "Caris"|])
+let carisReportsPath = Path.Combine([| Environment.CurrentDirectory; "data"; "Caris"|])
 
-// let carisXmls =
-//     DirectoryInfo(carisReportsPath).EnumerateFileSystemInfos("*.xml")
-//     |> Seq.map (fun filePath -> Caris.Report.Xml(filePath.FullName))
-//     |> Seq.toList
+let (carisReports, carisErrors) =
+    DirectoryInfo(carisReportsPath).EnumerateFileSystemInfos("*.xml")
+    |> Seq.map (fun filePath ->
+        printfn $"Caris report: {filePath}"
 
+        Caris.Xml.Report(filePath.FullName).Report
+        |> Caris.Input.Report.validate
+
+    )
+    |> Seq.toList
+    |> Result.partition
+
+
+carisReports
+|> List.sortByDescending (fun carisReport -> carisReport.Test.ReceivedDate)
+|> List.choose Caris.DTO.tryCreate
+|> List.map (fun dto ->
+    printfn $"Insert {dto.Report}"
+    dto.Insert
+)
