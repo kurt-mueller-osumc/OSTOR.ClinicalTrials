@@ -1078,8 +1078,7 @@ module FoundationMedicine =
 
             pmi.MRN
             |> Option.map (fun mrn ->
-                { CreatedAt    = DateTime.Now
-                  MRN          = mrn
+                { MRN          = mrn
                   LastName     = pmi.LastName
                   FirstName    = pmi.FirstName
                   DateOfBirth  = pmi.DateOfBirth.Value // assume that the optional dob exists and get the underlying datetime
@@ -1097,7 +1096,6 @@ module FoundationMedicine =
                 let lab = report.FirstLabOrDefault
 
                 { // meta
-                  CreatedAt = DateTime.Now
                   ReportId = report.ReportId.Value.ToString()
                   IssuedDate = report.IssuedDate.Value
 
@@ -1126,8 +1124,7 @@ module FoundationMedicine =
             let sample = report.Sample
             let pmi = report.PMI
 
-            { CreatedAt = DateTime.Now
-              SampleId = sample.SampleId.Value
+            { SampleId = sample.SampleId.Value
               SampleType = sample.Format.Value
               BiopsySite = pmi.TrySpecimenSiteValue
               Category = "tumor"
@@ -1136,8 +1133,7 @@ module FoundationMedicine =
         let toSampleReportRow (report: Report) : DTO.SampleReport =
             let sample = report.Sample
 
-            { CreatedAt = DateTime.Now
-              // foreign keys
+            { // foreign keys
               ReportId = report.ReportId.Value
               SampleId = sample.SampleId.Value
 
@@ -1158,8 +1154,7 @@ module FoundationMedicine =
             shortGeneNames
             @ fusionGenes
             |> List.map (fun geneName ->
-                { CreatedAt = DateTime.Now
-                  Name = geneName
+                { Name = geneName
                   EntrezId = None
                   HgncId = None
                 }
@@ -1168,13 +1163,11 @@ module FoundationMedicine =
         open Core
         open type Variant.Category
 
-        let toVariantRows (sampleReportId: Guid) (report: Report) : DTO.Variant list =
+        let toVariantRows (report: Report) : DTO.Variant list =
             report.ShortVariants
             |> List.map (fun shortVariant ->
-                { CreatedAt = DateTime.Now
-                  // foreign keys
+                { // foreign keys
                   GeneName = shortVariant.GeneName
-                  SampleReportId = sampleReportId
                   // identifier
                   Name = shortVariant.ProteinEffect.Value
                   Category = Somatic
@@ -1196,40 +1189,30 @@ module FoundationMedicine =
                 }
             )
 
-        let toFusionRows (sampleReportId: Guid) (report: Report) =
+        let toFusionRows  (report: Report) : DTO.Fusion seq =
             report.Fusions |> Seq.map (fun fusion ->
-                let row = context.Public.Fusions.Create()
+                { Gene1Name = fusion.TargetedGene
+                  Gene2Name = fusion.OtherGene
 
-                row.SampleReportId <- sampleReportId
-                row.FirstGeneName <- fusion.TargetedGene.Value
-                row.SecondGeneName <- fusion.OtherGene.Value
-
-                row.Description <- fusion.Description.Value |> Some
-                row.FusionType <- fusion.Type.Value
-
-                row
+                  Description = fusion.Description |> Some
+                  Type = fusion.Type.Value
+                }
             )
 
         open Utilities
 
-        let tryDatabaseRows (report: Report) =
+        let tryCreate (report: Report) : DTO option =
             report |> tryPatientRow |> Option.map (fun patientRow ->
-                /// insert patient, vendor, genes, and sample into database
-                report |> toVendorRow |> ignore
-                report |> toGeneRows |> ignore
-                report |> toSampleRow |> ignore
-
-                context.SubmitUpdates()
-
-                /// insert report into database
-                report |> tryReportRow |> Optional.value |> ignore
-
-                context.SubmitUpdates()
-
-                /// insert sample report, variants, and fusions into database
-                let sampleReportId = querySampleReportId report.ReportId.Value report.Sample.SampleId.Value
-                report |> toVariantRows sampleReportId |> ignore
-                report |> toFusionRows sampleReportId |> ignore
-
-                context.SubmitUpdates()
+                { Vendor = report |> toVendorRow
+                  Patient = patientRow
+                  Genes = report |> toGeneRows
+                  CancerousSample = {
+                      Sample = report |> toSampleRow
+                      SampleReport = report |> toSampleReportRow
+                  }
+                  NormalSample = None
+                  Report = report |> tryReportRow |> Optional.value
+                  Variants = report |> toVariantRows
+                  Fusions = report |> toFusionRows |> Seq.toList
+                }
             )
