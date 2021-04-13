@@ -1766,79 +1766,81 @@ module Tempus =
 
 
         module InheritedRelevantVariant =
-            let toVariantRows (sampleReportId: System.Guid) (variants: InheritedRelevantVariants) =
+            open type Variant.Category
+
+            let toRows (sampleReportId: Guid) (variants: InheritedRelevantVariants) : DTO.Variant list =
                 variants.Values |> List.map (fun variant ->
-                    let row = context.Public.Variants.Create()
-
-                    row.SampleReportId <- sampleReportId
-                    row.GeneName <- variant.Gene.Name.Value
-                    row.Name <- variant.HGVS.MutationEffect
-
-                    row.Category <- "germline"
-                    row.Assessment <- variant.ClinicalSignificance.Value |> Some
-                    row.Description <- variant.Description.Value |> Some
-
-                    row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
-                    row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
-                    row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
-
-                    row.AllelicFraction <- variant.AllelicFraction.Value |> Some
-
-                    row
+                    { CreatedAt = DateTime.Now
+                      // foreign keys
+                      SampleReportId = sampleReportId
+                      GeneName = variant.Gene.Name
+                      // identifier
+                      Name = variant.HGVS.MutationEffect
+                      Category = Germline
+                      // opinions
+                      Type = None
+                      Assessment = variant.ClinicalSignificance.Value |> Some
+                      // info
+                      Description = variant.Description.Value |> Some
+                      AllelicFraction = variant.AllelicFraction.Value |> Some
+                      // HGVS
+                      Transcript = None
+                      HgvsProteinAbbreviatedChange = variant.HGVS.TryAbbreviatedProteinChangeValue
+                      HgvsProteinFullChange = variant.HGVS.TryFullProteinChangeValue
+                      HgvsCodingChange = variant.HGVS.CodingChange.Value |> Some
+                      NucleotideAlteration = None
+                    }
                 )
 
         module InheritedVUS =
-            let toVariantRows (sampleReportId: System.Guid) (vus: InheritedVUS) =
+            open type Variant.Category
+
+            let toRows (sampleReportId: Guid) (vus: InheritedVUS) : DTO.Variant list =
                 vus.Values |> List.map (fun variant ->
-                    let row = context.Public.Variants.Create()
-
-                    row.SampleReportId <- sampleReportId
-                    row.GeneName <- variant.Gene.Name.Value
-                    row.Name <- variant.HGVS.MutationEffect
-
-                    row.Category <- "germline"
-                    row.Assessment <- variant.ClinicalSignificance.Value |> Some
-                    row.Description <- variant.Description.Value |> Some
-
-                    row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
-                    row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
-                    row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
-
-                    row.AllelicFraction <- variant.AllelicFraction.Value |> Some
-
-                    row
+                    { CreatedAt = DateTime.Now
+                      // foreign keys
+                      GeneName = variant.Gene.Name
+                      SampleReportId = sampleReportId
+                      // identifier
+                      Name = variant.HGVS.MutationEffect
+                      Category = Germline
+                      // opinions
+                      Type = None
+                      Assessment = variant.ClinicalSignificance.Value |> Some
+                      //info
+                      Description = variant.Description.Value |> Some
+                      AllelicFraction = variant.AllelicFraction.Value |> Some
+                      // HGVS
+                      HgvsProteinAbbreviatedChange = variant.HGVS.TryAbbreviatedProteinChangeValue
+                      HgvsProteinFullChange = variant.HGVS.TryFullProteinChangeValue
+                      HgvsCodingChange = variant.HGVS.CodingChange.Value |> Some
+                      Transcript = None
+                      NucleotideAlteration = None
+                    }
                 )
 
         /// Build a row to be inserted into the `patients` database table if the Tempus report's patient has an MRN.
-        let tryPatientRow (overallReport: OverallReport) =
-            let row = context.Public.Patients.Create()
+        let tryPatientRow (overallReport: OverallReport) : DTO.Patient option =
             let patient = overallReport.Patient
 
-            patient.TryMrnValue
-            |> Option.map (fun mrnValue ->
-
-                row.Mrn          <- mrnValue
-                row.LastName     <- patient.LastName.Value
-                row.FirstName    <- patient.FirstName.Value
-                row.DateOfBirth  <- patient.DateOfBirth.Value
-                row.Sex          <- patient.Sex.Value
-
-                row
+            patient.MRN
+            |> Option.map (fun mrn ->
+                { CreatedAt   = DateTime.Now
+                  MRN         = mrn
+                  LastName    = patient.LastName
+                  FirstName   = patient.FirstName
+                  DateOfBirth = patient.DateOfBirth
+                  Sex         = patient.Sex.Value
+                }
             )
 
         /// Build a row to be inserted into the `vendors` database table.
-        let toVendorRow (overallReport: OverallReport) =
-            let row = context.Public.Vendors.Create()
+        let toVendorRow (overallReport: OverallReport) : DTO.Vendor =
             let lab = overallReport.Lab
 
-            row.Name          <- lab.Name.Value
-            row.CliaNumber    <- lab.CliaNumber.Value
-            row.StreetAddress <- lab.Address.Street.Value
-            row.City          <- lab.Address.City.Value
-            row.State         <- lab.Address.State.Value
-            row.ZipCode       <- lab.Address.Zip.Value
-
-            row
+            { CreatedAt = DateTime.Now
+              Lab = lab
+            }
 
         /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
         let tryReportRow (overallReport: OverallReport) =
