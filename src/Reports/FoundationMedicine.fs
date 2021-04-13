@@ -111,9 +111,6 @@ module FoundationMedicine =
         and VariantName = internal VariantName of string
 
         module Fusion =
-            type Description =
-                internal | Description of string
-                member this.Value = this |> fun (Description description) -> description
             type Type =
                 internal | Type of string
                 member this.Value = this |> fun (Type fusionType) -> fusionType
@@ -566,16 +563,6 @@ module FoundationMedicine =
                 /// Validate that a gene name is not blank
                 let validate = validateNotBlank Gene.Name $"Targeted fusion gene can't be blank"
 
-            module Description =
-                open type Fusion.Description
-
-                /// Validate that a fusion description contains 'fusion'
-                let validate (input: string) =
-                    if input.Contains("fusion") then
-                        Ok (Description input)
-                    else
-                        Error $"Invalid fusion description: {input}"
-
             module FusionType =
                 open type Fusion.Type
 
@@ -589,7 +576,7 @@ module FoundationMedicine =
                 validation {
                     let! targetedGene = fusion.TargetedGene |> TargetedGene.validate
                     and! otherGene = fusion.OtherGene |> OtherGene.validate
-                    and! description = fusion.Description |> Description.validate
+                    and! description = fusion.Description |> Input.Fusion.Description.validate
                     and! fusionType = fusion.Type |> FusionType.validate
 
                     return ({
