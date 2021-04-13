@@ -1843,32 +1843,35 @@ module Tempus =
             }
 
         /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
-        let tryReportRow (overallReport: OverallReport) =
+        let tryReportRow (overallReport: OverallReport) : DTO.Report option =
             let patient = overallReport.Patient
 
-            patient.TryMrnValue
-            |> Option.map (fun mrnValue ->
-                let row = context.Public.Reports.Create()
+            patient.MRN
+            |> Option.map (fun mrn ->
                 let lab = overallReport.Lab
                 let report = overallReport.Report
                 let order = overallReport.Order
                 let results = overallReport.Results
 
-                row.PatientMrn <- mrnValue
-                row.VendorCliaNumber <- lab.CliaNumber.Value
-                row.ReportId <- report.ReportId.Value.ToString()
-                row.OrderingPhysician <- Some order.Physician.Value
-                row.Pathologist <- Some report.SigningPathologist.Value
-                row.IssuedDate <- report.SignoutDate.Value
-
-                row.TumorMutationalBurden <- results.TryTmbScoreValue
-                row.TumorMutationalBurdenPercentile <- results.TryTmbPercentileValue |> Option.map int
-                row.MsiStatus <- results.TryMsiValue
-
-                row.DiagnosisName <- patient.DiagnosisName.Value
-                row.DiagnosisDate <- patient.TryDiagnosisDateValue
-
-                row
+                { CreatedAt = DateTime.Now
+                  ReportId = report.ReportId.Value.ToString()
+                  IssuedDate = report.SignoutDate.Value
+                  // foreign keys
+                  PatientMRN = mrn
+                  VendorCliaNumber = lab.CliaNumber
+                  // diagnosis
+                  DiagnosisName = patient.DiagnosisName
+                  DiagnosisDate = patient.TryDiagnosisDateValue
+                  DiagnosisIcdCodes = []
+                  // ordering physician
+                  OrderingPhysicianName = Some order.Physician.Value
+                  OrderingPhysicianNumber = None
+                  Pathologist = Some report.SigningPathologist.Value
+                  // biomarkers
+                  TumorMutationBurden = results.TryTmbScoreValue
+                  TumorMutationBurdenPercentile = results.TryTmbPercentileValue |> Option.map int
+                  MicrosatelliteInstabilityStatus = results.TryMsiValue
+                }
             )
 
         /// Build a row for the tumor sample to be inserted into the `samples` database table.
