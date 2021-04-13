@@ -215,21 +215,11 @@ module Tempus =
                     match this with
                     | GeneFusion -> "GeneFusion"
 
-            type VariantDescription =
-                internal
-                | ``Chromosomal rearrangement``
-                | ``Deletion (exons 2-7)``
-
-                member this.Value =
-                    match this with
-                    | ``Chromosomal rearrangement`` -> "Chromosomal rearrangement"
-                    | ``Deletion (exons 2-7)`` -> "Deletion (exons 2-7)"
-
         type Fusion =
             { ``5' Gene``: Gene
               ``3' Gene``: Gene
               FusionType: Fusion.Type option
-              VariantDescription: Fusion.VariantDescription }
+              Description: Fusion.Description }
 
             member this.Genes = [this.``5' Gene``; this.``3' Gene``]
             member this.TryTypeValue = this.FusionType |> Option.map (fun fusionType -> fusionType.Value)
@@ -710,27 +700,19 @@ module Tempus =
                 /// Validate an optional fusion type if it exists.
                 let validateOptional = Optional.validateWith validate
 
-            module VariantDescription =
-                /// Validate that a fusion variant description is either "Chromosomal rearrangement" or "Deletion (exons 2-7)"
-                let validate description =
-                    match description with
-                    | "Chromosomal rearrangement" -> Ok Fusion.``Chromosomal rearrangement``
-                    | "Deletion (exons 2-7)" -> Ok Fusion.``Deletion (exons 2-7)``
-                    | _ -> Error $"Invalid fusion variant description: {description}"
-
             /// Validate that a fusion has 2 valid genes and a valid fusion type, if present.
             let validate (fusion: Fusion) : Validation<Domain.Fusion, string> =
                 validation {
                     let! gene5 = fusion.Gene5 |> Gene.validate
                     and! gene3 = fusion.Gene3 |> Gene.validate
                     and! fusionType = fusion.FusionType |> Type.validateOptional
-                    and! variantDescription = fusion.VariantDescription |> VariantDescription.validate
+                    and! variantDescription = fusion.VariantDescription |> Input.Fusion.Description.validate
 
                     return ({ ``5' Gene`` = gene5
                               ``3' Gene`` = gene3
                               FusionType = fusionType
-                              VariantDescription = variantDescription
-                            } : Domain.Fusion)
+                              Description = variantDescription
+                            })
                 }
 
         module Fusions =
@@ -1714,7 +1696,7 @@ module Tempus =
                 )
 
             /// Try to convert a somatic, biologically relevant variant to a row in the `fusions` database table
-            let tryFusionRow (sampleReportId: System.Guid) (variant: Variant) =
+            let tryFusionRow (sampleReportId: System.Guid) (variant: Variant) : DTO.Fusion option =
                 variant.TryRelevantFusion |> Option.map (fun fusion ->
                     let row = context.Public.Fusions.Create()
 
