@@ -1635,14 +1635,13 @@ module Tempus =
             module Mutation =
                 /// Convert a somatic, potentially actionable mutation to rows in the `variants` database table
                 /// Sample report must already exist.
-                let toVariantRows (sampleReportId: Guid) (mutation: Mutation) : DTO.Variant list =
+                let toVariantRows (mutation: Mutation) : DTO.Variant list =
                     mutation.Variants
                     |> List.map (fun variant ->
 
                         { CreatedAt = DateTime.Now
                           // foreign keys
                           GeneName = mutation.Gene.Name
-                          SampleReportId = sampleReportId
                           // identifier
                           Name = variant.HGVS.MutationEffect
                           Category = Somatic
@@ -1664,11 +1663,10 @@ module Tempus =
             module CopyNumberVariant =
                 /// Convert a somatic, potentially actionable copy number variant to a row in the `variants` database table
                 /// Sample report must already exist.
-                let toVariantRow (sampleReportId: Guid) (copyNumberVariant: CopyNumberVariant) : DTO.Variant =
+                let toVariantRow (copyNumberVariant: CopyNumberVariant) : DTO.Variant =
                     { CreatedAt = DateTime.Now
                       // foreign keys
                       GeneName = copyNumberVariant.Gene.Name
-                      SampleReportId = sampleReportId
                       // identifier
                       Name = copyNumberVariant.Gene.Name.Value
                       Category = Somatic
@@ -1691,12 +1689,11 @@ module Tempus =
             open SomaticBiologicallyRelevant
 
             /// Try to convert a somatic, biologically relevant variant to a row in the `variants` database table
-            let tryVariantRow (sampleReportId: Guid) (variant: Variant) : DTO.Variant option =
+            let tryVariantRow (variant: Variant) : DTO.Variant option =
                 variant.TryRelevantGene |> Option.map (fun relevantGene ->
                     { CreatedAt = DateTime.Now
                       // foreign keys
-                      GeneName       = relevantGene.Name
-                      SampleReportId = sampleReportId
+                      GeneName = relevantGene.Name
                       // identifier
                       Name = variant.TryHgvsMutationEffect |> Option.defaultValue relevantGene.Name.Value
                       Category   = Somatic
@@ -1716,10 +1713,9 @@ module Tempus =
                 )
 
             /// Try to convert a somatic, biologically relevant variant to a row in the `fusions` database table
-            let tryFusionRow (sampleReportId: Guid) (variant: Variant) : DTO.Fusion option =
+            let tryFusionRow  (variant: Variant) : DTO.Fusion option =
                 variant.TryRelevantFusion |> Option.map (fun fusion ->
                     { CreatedAt = DateTime.Now
-                      SampleReportId = sampleReportId
                       Gene1Name = fusion.``3' Gene``.Name
                       Gene2Name = fusion.``5' Gene``.Name
                       Type      = variant.Type.Value
@@ -1731,11 +1727,10 @@ module Tempus =
             open type Variant.Category
 
             /// convert a somatic variant of unknown significance to a row in the `variants` database table
-            let toVariantRow (sampleReportId: Guid) (vus: SomaticVUS) : DTO.Variant =
+            let toVariantRow (vus: SomaticVUS) : DTO.Variant =
                 { CreatedAt = DateTime.Now
                   // foreign keys
                   GeneName = vus.Gene.Name
-                  SampleReportId = sampleReportId
                   // identifier
                   Name = vus.Hgvs.MutationEffect
                   Category = Somatic
@@ -1754,11 +1749,10 @@ module Tempus =
                 }
 
         module Fusion =
-            let toRow (sampleReportId: Guid) (fusion: Fusion) : DTO.Fusion =
+            let toRow (fusion: Fusion) : DTO.Fusion =
                 { CreatedAt = DateTime.Now
                   Gene1Name = fusion.``5' Gene``.Name
                   Gene2Name = fusion.``3' Gene``.Name
-                  SampleReportId = sampleReportId
 
                   Type = fusion.TryTypeValue |> Option.defaultValue ""
                   Description = fusion.Description |> Some
@@ -1768,11 +1762,10 @@ module Tempus =
         module InheritedRelevantVariant =
             open type Variant.Category
 
-            let toRows (sampleReportId: Guid) (variants: InheritedRelevantVariants) : DTO.Variant list =
+            let toRows (variants: InheritedRelevantVariants) : DTO.Variant list =
                 variants.Values |> List.map (fun variant ->
                     { CreatedAt = DateTime.Now
                       // foreign keys
-                      SampleReportId = sampleReportId
                       GeneName = variant.Gene.Name
                       // identifier
                       Name = variant.HGVS.MutationEffect
@@ -1795,12 +1788,11 @@ module Tempus =
         module InheritedVUS =
             open type Variant.Category
 
-            let toRows (sampleReportId: Guid) (vus: InheritedVUS) : DTO.Variant list =
+            let toRows (vus: InheritedVUS) : DTO.Variant list =
                 vus.Values |> List.map (fun variant ->
                     { CreatedAt = DateTime.Now
                       // foreign keys
                       GeneName = variant.Gene.Name
-                      SampleReportId = sampleReportId
                       // identifier
                       Name = variant.HGVS.MutationEffect
                       Category = Germline
@@ -1959,32 +1951,32 @@ module Tempus =
             )
 
         /// Build variant rows to be inserted into the `variants` database table. This function assumes that an existing sample report exists in the dtabase.
-        let toVariantRows (sampleReportId: System.Guid) (overallReport: OverallReport) =
+        let toVariantRows (overallReport: OverallReport) : DTO.Variant list =
             let results = overallReport.Results
 
             let somaticActionableMutationRows =
                 results.``Somatic Potentially Actionable Mutations``
-                |> List.collect (SomaticPotentiallyActionable.Mutation.toVariantRows sampleReportId)
+                |> List.collect SomaticPotentiallyActionable.Mutation.toVariantRows
 
             let somaticActionableCopyNumberRows =
                 results.``Somatic Potentially Actionable Copy Number Variants``
-                |> List.map (SomaticPotentiallyActionable.CopyNumberVariant.toVariantRows sampleReportId)
+                |> List.map SomaticPotentiallyActionable.CopyNumberVariant.toVariantRow
 
             let somaticRelevantRows =
                 results.``Somatic Biologically Relevant Variants``
-                |> List.choose (SomaticBiologicallyRelevantVariant.tryVariantRow sampleReportId)
+                |> List.choose SomaticBiologicallyRelevantVariant.tryVariantRow
 
             let somaticVusRows =
                 results.``Somatic Variants of Unknown Significance``
-                |> List.map (SomaticVUS.toVariantRow sampleReportId)
+                |> List.map SomaticVUS.toVariantRow
 
             let inheritedRelevantVariantRows =
                 results.``Inherited Relevant Variants``
-                |> InheritedRelevantVariant.toVariantRows sampleReportId
+                |> InheritedRelevantVariant.toRows
 
             let inheritedVusRows =
                 results.``Inherited Variants of Unknown Significance``
-                |> InheritedVUS.toVariantRows sampleReportId
+                |> InheritedVUS.toRows
 
             somaticActionableMutationRows
             @ somaticActionableCopyNumberRows
@@ -1994,46 +1986,46 @@ module Tempus =
             @ inheritedVusRows
 
 
-        let toFusionRows (sampleReportId: System.Guid) (overallReport: OverallReport) =
+        let toFusionRows (overallReport: OverallReport) =
             let results = overallReport.Results
 
             let relevantFusionRows =
                 results.``Somatic Biologically Relevant Variants``
-                |> List.choose (SomaticBiologicallyRelevantVariant.tryFusionRow sampleReportId)
+                |> List.choose SomaticBiologicallyRelevantVariant.tryFusionRow
 
             let fusionRows =
                 results.Fusions
-                |> List.map (Fusion.toRow sampleReportId)
+                |> List.map Fusion.toRow
 
             relevantFusionRows
             @ fusionRows
 
-        let toDatabase (overallReport: OverallReport) =
+        open Utilities
+
+        let create (overallReport: OverallReport) : DTO option =
             overallReport
             |> tryPatientRow
             |> Option.map (fun patientRow ->
-                /// create parent objects
-                overallReport |> toVendorRow |> ignore
+                let normalSampleDTOs =
+                    (overallReport |> tryNormalSampleRow,
+                     overallReport |> tryNormalSampleReportRow)
+                     ||> Option.map2 (fun sample sampleReport ->
+                        ({ Sample = sample
+                           SampleReport = sampleReport
+                        })
+                )
 
-                context.SubmitUpdates()
-
-                overallReport |> tryReportRow |> ignore
-                overallReport |> toGeneRows |> ignore
-                overallReport |> toCancerousSampleRows |> ignore
-                overallReport |> tryNormalSampleRow |> ignore
-
-                context.SubmitUpdates()
-
-                overallReport |> toCancerousSampleReportRow |> ignore
-                overallReport |> tryNormalSampleReportRow |> ignore
-
-                context.SubmitUpdates()
-
-                let sampleReportId = querySampleReportId overallReport.Report.ReportId.Value overallReport.CancerousSample.SampleId.Value
-
-                overallReport |> toVariantRows sampleReportId |> ignore
-                overallReport |> toFusionRows sampleReportId |> ignore
-
-                context.SubmitUpdates()
+                { Vendor = overallReport |> toVendorRow
+                  Patient = patientRow
+                  Genes = overallReport |> toGeneRows
+                  CancerousSample = {
+                      Sample = overallReport |> toCancerousSampleRow
+                      SampleReport = overallReport |> toCancerousSampleReportRow
+                  }
+                  NormalSample = normalSampleDTOs
+                  Report = overallReport |> tryReportRow |> Optional.value
+                  Variants = overallReport |> toVariantRows
+                  Fusions = overallReport |> toFusionRows
+                }
             )
 
