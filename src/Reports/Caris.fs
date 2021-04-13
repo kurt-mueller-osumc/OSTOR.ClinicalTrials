@@ -1351,14 +1351,6 @@ module Caris =
                 }
             )
 
-        // Find the existing sample report based on this report's report id and sample id
-        let querySampleReportId (reportId: ReportId) (specimenId: Specimen.Identifier) =
-            query {
-                for sampleReport in context.Public.SampleReports do
-                where (sampleReport.ReportId = reportId.Value && sampleReport.SampleId = specimenId.Value)
-                select sampleReport.Id
-                exactlyOne
-            }
 
         open Utilities
 
@@ -1379,7 +1371,7 @@ module Caris =
 
                 context.SubmitUpdates()
 
-                let sampleReportId = querySampleReportId report.Test.ReportId report.Specimen.SpecimenId
+                let sampleReportId = querySampleReportId report.Test.ReportId.Value report.Specimen.SpecimenId.Value
 
                 report |> toFusionRows sampleReportId |> ignore
                 report |> toVariantRows sampleReportId |> ignore
