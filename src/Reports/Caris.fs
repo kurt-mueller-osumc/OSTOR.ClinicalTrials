@@ -1223,8 +1223,7 @@ module Caris =
             report.Patient.MRN |> Option.map (fun mrn ->
                 let patient = report.Patient
 
-                { CreatedAt = DateTime.Now
-                  MRN = mrn
+                { MRN = mrn
                   FirstName = patient.FirstName
                   LastName = patient.LastName
                   DateOfBirth = patient.DateOfBirth
@@ -1247,7 +1246,6 @@ module Caris =
                 let diagnosis = report.Diagnosis
 
                 { // meta
-                  CreatedAt = DateTime.Now
                   ReportId   = test.ReportId.Value
                   IssuedDate = test.ReceivedDate.Value
 
@@ -1278,8 +1276,7 @@ module Caris =
         let toSampleRow (report: Report) : DTO.Sample =
             let specimen = report.Specimen
 
-            { CreatedAt  = DateTime.Now
-              SampleId   = specimen.SpecimenId.Value
+            { SampleId   = specimen.SpecimenId.Value
               SampleType = specimen.Type.Value
               Category   = "tumor"
               BiopsySite = specimen.Site.Value |> Some
@@ -1290,8 +1287,7 @@ module Caris =
             let specimen = report.Specimen
             let test = report.Test
 
-            { CreatedAt = DateTime.Now
-              SampleId = specimen.SpecimenId.Value
+            { SampleId = specimen.SpecimenId.Value
               ReportId = test.ReportId.Value
               CollectionDate = specimen.Dates.CollectionDate |> Some
               ReceivedDate = specimen.Dates.ReceivedDate
@@ -1306,72 +1302,70 @@ module Caris =
 
             geneNames @ fusionGenes
             |> List.map (fun geneName ->
-                { CreatedAt = DateTime.Now
-                  Name = geneName
+                { Name = geneName
                   EntrezId = None
                   HgncId = None
                 }
             )
 
+        open type Variant.Category
+
         /// Convert a report's genomic alterations that have a 'molecular consequence' to 'Variant' database rows.
         /// Each genomic alteration with a "molecular consequence" will also have an hgvs coding change and protein change.
         ///
         /// Each variant row has a parent sample report and a parent gene. The parent sample report and gene must already exist in the database.
-        let toVariantRows (sampleReportId: Guid) (report: Report) =
+        let toVariantRows (report: Report) : DTO.Variant seq =
             report.GenomicAlterationsWithMolecularConsequence
             |> Seq.map (fun ga ->
-                let row = context.Public.Variants.Create()
-
-                // Associate the variant to the gene by its name
-                row.GeneName       <- ga.GeneName.Value
-                row.SampleReportId <- sampleReportId
-                row.Name           <- ga.TryHgvsProteinChangeValue |> Option.defaultValue ""
-
-                row.AllelicFraction <- ga.TryAlleleFrequencyValue |> Option.map float
-                row.Category <- ga.SourceValue // is 'somatic'
-                row.Type <- ga.MolecularConsequenceValue |> Some
-
-                row.HgvsC <- ga.TryHgvsCodingChangeValue
-                row.HgvsProtein <- ga.TryHgvsProteinChangeValue
-                row.Transcript <- ga.TryTranscriptIdValue
-
-                row)
+                { GeneName = ga.GeneName
+                  // identifier
+                  Name     = ga.TryHgvsProteinChangeValue |> Option.defaultValue ""
+                  Category = Somatic
+                  // opinions
+                  Type = None
+                  Assessment = ga.MolecularConsequenceValue |> Some
+                  // info
+                  Description = None
+                  AllelicFraction = ga.TryAlleleFrequencyValue |> Option.map float
+                  // HGVS
+                  HgvsCodingChange = ga.TryHgvsCodingChangeValue
+                  HgvsProteinAbbreviatedChange = ga.TryHgvsProteinChangeValue
+                  HgvsProteinFullChange = None
+                  Transcript = ga.TryTranscriptIdValue
+                  NucleotideAlteration = None
+                }
+            )
 
         /// Assumes that fusion genes already exist in the database
-        let toFusionRows (sampleReportId: Guid) (report: Report) : DTO.Fusion seq =
+        let toFusionRows (report: Report) : DTO.Fusion seq =
             report.Fusions
             |> Seq.map (fun fusion ->
-                { CreatedAt = DateTime.Now
-                  Gene1Name = fusion.Gene1Name
+                { Gene1Name = fusion.Gene1Name
                   Gene2Name = fusion.Gene2Name
-                  SampleReportId = sampleReportId
                   Description = fusion.Interpretation |> Some
                   Type = "mutation"
                 }
             )
 
-
         open Utilities
 
-        let tryInsertRows (report: Report) =
-            report.Patient.TryMrnValue |> Option.map (fun _ ->
-                toVendorRow |> ignore
-                report |> tryPatientRow |> Optional.value |> ignore
-                report |> toGeneRows |> ignore
-                report |> toSampleRow |> ignore
+        let tryCreate (report: Report) : DTO option =
+            report
+            |> tryPatientRow
+            |> Option.map (fun patientRow ->
+                report |> toFusionRows |> ignore
+                report |> toVariantRows |> ignore
 
-                context.SubmitUpdates()
-
-                report |> tryReportRow  |> Optional.value |> ignore
-
-                context.SubmitUpdates()
-
-                report |> toSampleReportRow |> ignore
-
-                context.SubmitUpdates()
-
-                let sampleReportId = querySampleReportId report.Test.ReportId.Value report.Specimen.SpecimenId.Value
-
-                report |> toFusionRows sampleReportId |> ignore
-                report |> toVariantRows sampleReportId |> ignore
+                { Vendor = report |> toVendorRow
+                  Patient = patientRow
+                  Genes = report |> toGeneRows
+                  CancerousSample = {
+                      Sample = report |> toSampleRow
+                      SampleReport = report |> toSampleReportRow
+                  }
+                  NormalSample = None
+                  Report = report |> tryReportRow |> Optional.value
+                  Variants = report |> toVariantRows |> Seq.toList
+                  Fusions = report |> toFusionRows |> Seq.toList
+                }
             )
