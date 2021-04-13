@@ -1728,32 +1728,34 @@ module Tempus =
                 )
 
         module SomaticVUS =
+            open type Variant.Category
+
             /// convert a somatic variant of unknown significance to a row in the `variants` database table
-            let toVariantRow (sampleReportId: System.Guid) (vus: SomaticVUS) =
-                let row = context.Public.Variants.Create()
-
-                row.GeneName <- vus.Gene.Name.Value
-                row.SampleReportId <- sampleReportId
-                row.Name <- vus.Hgvs.MutationEffect
-
-                row.Category <- "somatic"
-                row.Assessment <- "unknown significance" |> Some
-                row.Type <- vus.Type.Value |> Some
-                row.Description <- vus.Description.Value |> Some
-
-                row.NucleotideAlteration <- vus.NucleotideAlteration.Value |> Some
-                row.HgvsProtein <- vus.Hgvs.TryAbbreviatedProteinChangeValue
-                row.HgvsProteinFull <- vus.Hgvs.TryFullProteinChangeValue
-                row.HgvsC <- vus.Hgvs.CodingChange.Value |> Some
-                row.Transcript <- vus.Hgvs.ReferenceSequence.Value |> Some
-
-                row.AllelicFraction <- vus.AllelicFraction.Value |> Some
-
-                row
+            let toVariantRow (sampleReportId: Guid) (vus: SomaticVUS) : DTO.Variant =
+                { CreatedAt = DateTime.Now
+                  // foreign keys
+                  GeneName = vus.Gene.Name
+                  SampleReportId = sampleReportId
+                  // identifier
+                  Name = vus.Hgvs.MutationEffect
+                  Category = Somatic
+                  // opinions
+                  Type = vus.Type.Value |> Some
+                  Assessment = "unknown significance" |> Some
+                  // info
+                  Description = vus.Description.Value |> Some
+                  AllelicFraction = vus.AllelicFraction.Value |> Some
+                  // HGVS
+                  NucleotideAlteration = vus.NucleotideAlteration.Value |> Some
+                  HgvsProteinAbbreviatedChange = vus.Hgvs.TryAbbreviatedProteinChangeValue
+                  HgvsProteinFullChange = vus.Hgvs.TryFullProteinChangeValue
+                  HgvsCodingChange = vus.Hgvs.CodingChange.Value |> Some
+                  Transcript = vus.Hgvs.ReferenceSequence.Value |> Some
+                }
 
         module Fusion =
-            let toRow (sampleReportId: System.Guid) (fusion: Fusion) : DTO.Fusion =
-                { CreatedAt = System.DateTime.Now
+            let toRow (sampleReportId: Guid) (fusion: Fusion) : DTO.Fusion =
+                { CreatedAt = DateTime.Now
                   Gene1Name = fusion.``5' Gene``.Name
                   Gene2Name = fusion.``3' Gene``.Name
                   SampleReportId = sampleReportId
