@@ -1220,100 +1220,99 @@ module Caris =
         open Domain
 
         /// Convert report's patient information to a patient database row.
-        let tryPatientRow (report: Report) =
+        let tryPatientRow (report: Report) : DTO.Patient option =
             report.Patient.MRN |> Option.map (fun mrn ->
                 let patient = report.Patient
 
-                ({ CreatedAt = DateTime.Now
-                   MRN = mrn
-                   FirstName = patient.FirstName
-                   LastName = patient.LastName
-                   DateOfBirth = patient.DateOfBirth
-                   Sex = patient.Sex.Value
-                } : DTO.Patient).Row
+                { CreatedAt = DateTime.Now
+                  MRN = mrn
+                  FirstName = patient.FirstName
+                  LastName = patient.LastName
+                  DateOfBirth = patient.DateOfBirth
+                  Sex = patient.Sex.Value
+                }
             )
 
         /// Prepare a row to be created in the "vendors" table for Caris Life Sciences
-        let toVendorRow (report: Report) =
-            ({ CreatedAt = DateTime.Now
-               Lab = report.Test.Lab
-            } : DTO.Vendor).Row
+        let toVendorRow (report: Report) : DTO.Vendor =
+            { CreatedAt = DateTime.Now
+              Lab = report.Test.Lab
+            }
 
         /// Prepare a database row in the "reports" table
-        let tryReportRow (report: Report) =
+        let tryReportRow (report: Report) : DTO.Report option =
             report.Patient.MRN |> Option.map (fun mrn ->
                 let test = report.Test
                 let orderingMd = report.OrderingMd
                 let pathologist = report.Pathologist
                 let diagnosis = report.Diagnosis
 
-                ({ // meta
-                   CreatedAt = DateTime.Now
-                   ReportId   = test.ReportId.Value
-                   IssuedDate = test.ReceivedDate.Value
+                { // meta
+                  CreatedAt = DateTime.Now
+                  ReportId   = test.ReportId.Value
+                  IssuedDate = test.ReceivedDate.Value
 
-                   // foreign keys
-                   PatientMRN = mrn
-                   VendorCliaNumber = test.Lab.CliaNumber
+                  // foreign keys
+                  PatientMRN = mrn
+                  VendorCliaNumber = test.Lab.CliaNumber
 
-                   // diagnosis - caris doesn't report diagnosis dates
-                   DiagnosisName     = diagnosis.DiagnosisName
-                   DiagnosisIcdCodes = diagnosis.DiagnosisCodes.Values
-                   DiagnosisDate = None
+                  // diagnosis - caris doesn't report diagnosis dates
+                  DiagnosisName     = diagnosis.DiagnosisName
+                  DiagnosisIcdCodes = diagnosis.DiagnosisCodes.Values
+                  DiagnosisDate = None
 
-                   // ordering physician
-                   OrderingPhysicianName   = orderingMd.Name.Value |> Some
-                   OrderingPhysicianNumber = orderingMd.NationalProviderId |> Some
-                   Pathologist = pathologist.TryOrganizationValue
+                  // ordering physician
+                  OrderingPhysicianName   = orderingMd.Name.Value |> Some
+                  OrderingPhysicianNumber = orderingMd.NationalProviderId |> Some
+                  Pathologist = pathologist.TryOrganizationValue
 
-                   // biomarkers
-                   TumorMutationBurden = report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
-                   TumorMutationBurdenPercentile = None
-                   MicrosatelliteInstabilityStatus = report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
-                } : DTO.Report).Row
+                  // biomarkers
+                  TumorMutationBurden = report.TumorMutationBurden |> Option.bind (fun tmb -> tmb.TryValue) |> Option.map float
+                  TumorMutationBurdenPercentile = None
+                  MicrosatelliteInstabilityStatus = report.MicrosatelliteInstability |> Option.map (fun msi -> msi.Value)
+                }
             )
 
         /// Each report lists a sample that may be referred to across reports. Therefore, samples are given their own table and listings of a sample in a report are givne their own table.
         ///
         /// Only tumor samplesa are listed in Caris reports.
-        let toSampleRow (report: Report) =
+        let toSampleRow (report: Report) : DTO.Sample =
             let specimen = report.Specimen
 
-            ({ CreatedAt  = DateTime.Now
-               SampleId   = specimen.SpecimenId.Value
-               SampleType = specimen.Type.Value
-               Category   = "tumor"
-               BiopsySite = specimen.Site.Value |> Some
-            } : DTO.Sample).Row
+            { CreatedAt  = DateTime.Now
+              SampleId   = specimen.SpecimenId.Value
+              SampleType = specimen.Type.Value
+              Category   = "tumor"
+              BiopsySite = specimen.Site.Value |> Some
+            }
 
         /// The parent sample and report must exist in the datbase.
-        let toSampleReportRow (report: Report) =
+        let toSampleReportRow (report: Report) : DTO.SampleReport =
             let specimen = report.Specimen
             let test = report.Test
 
-            ({ CreatedAt = DateTime.Now
-               SampleId = specimen.SpecimenId.Value
-               ReportId = test.ReportId.Value
-               CollectionDate = specimen.Dates.CollectionDate |> Some
-               ReceivedDate = specimen.Dates.ReceivedDate
-               BlockId = None
-               TumorPercentage = None
-            } : DTO.SampleReport).Row
+            { CreatedAt = DateTime.Now
+              SampleId = specimen.SpecimenId.Value
+              ReportId = test.ReportId.Value
+              CollectionDate = specimen.Dates.CollectionDate |> Some
+              ReceivedDate = specimen.Dates.ReceivedDate
+              BlockId = None
+              TumorPercentage = None
+            }
 
         /// Convert all genomic alterations with molecular consequences to 'gene' database rows
-        let toGeneRows (report: Report) =
+        let toGeneRows (report: Report) : DTO.Gene list =
             let geneNames   = report.GenomicAlterationsWithMolecularConsequence |> Seq.toList |> List.map (fun ga -> ga.GeneName)
             let fusionGenes = report.Fusions |> Seq.toList |> List.collect (fun fusion -> fusion.GeneNames)
 
             geneNames @ fusionGenes
             |> List.map (fun geneName ->
-                ({ CreatedAt = DateTime.Now
-                   Name = geneName
-                   EntrezId = None
-                   HgncId = None
-                } : DTO.Gene)
+                { CreatedAt = DateTime.Now
+                  Name = geneName
+                  EntrezId = None
+                  HgncId = None
+                }
             )
-            |> List.map DTO.Gene.buildRow
 
         /// Convert a report's genomic alterations that have a 'molecular consequence' to 'Variant' database rows.
         /// Each genomic alteration with a "molecular consequence" will also have an hgvs coding change and protein change.
@@ -1340,18 +1339,16 @@ module Caris =
                 row)
 
         /// Assumes that fusion genes already exist in the database
-        let toFusionRows (sampleReportId: Guid) (report: Report) =
+        let toFusionRows (sampleReportId: Guid) (report: Report) : DTO.Fusion seq =
             report.Fusions
             |> Seq.map (fun fusion ->
-                let row = context.Public.Fusions.Create()
-
-                row.SampleReportId <- sampleReportId
-                row.FirstGeneName  <- fusion.Gene1Name.Value
-                row.SecondGeneName <- fusion.Gene2Name.Value
-                row.Description    <- fusion.Interpretation.Value |> Some
-                row.FusionType <- "mutation"
-
-                row
+                { CreatedAt = DateTime.Now
+                  Gene1Name = fusion.Gene1Name
+                  Gene2Name = fusion.Gene2Name
+                  SampleReportId = sampleReportId
+                  Description = fusion.Interpretation |> Some
+                  Type = "mutation"
+                }
             )
 
         // Find the existing sample report based on this report's report id and sample id
