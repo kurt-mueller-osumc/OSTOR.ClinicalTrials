@@ -1639,8 +1639,7 @@ module Tempus =
                     mutation.Variants
                     |> List.map (fun variant ->
 
-                        { CreatedAt = DateTime.Now
-                          // foreign keys
+                        { // foreign keys
                           GeneName = mutation.Gene.Name
                           // identifier
                           Name = variant.HGVS.MutationEffect
@@ -1664,8 +1663,7 @@ module Tempus =
                 /// Convert a somatic, potentially actionable copy number variant to a row in the `variants` database table
                 /// Sample report must already exist.
                 let toVariantRow (copyNumberVariant: CopyNumberVariant) : DTO.Variant =
-                    { CreatedAt = DateTime.Now
-                      // foreign keys
+                    { // foreign keys
                       GeneName = copyNumberVariant.Gene.Name
                       // identifier
                       Name = copyNumberVariant.Gene.Name.Value
@@ -1691,8 +1689,7 @@ module Tempus =
             /// Try to convert a somatic, biologically relevant variant to a row in the `variants` database table
             let tryVariantRow (variant: Variant) : DTO.Variant option =
                 variant.TryRelevantGene |> Option.map (fun relevantGene ->
-                    { CreatedAt = DateTime.Now
-                      // foreign keys
+                    { // foreign keys
                       GeneName = relevantGene.Name
                       // identifier
                       Name = variant.TryHgvsMutationEffect |> Option.defaultValue relevantGene.Name.Value
@@ -1715,8 +1712,7 @@ module Tempus =
             /// Try to convert a somatic, biologically relevant variant to a row in the `fusions` database table
             let tryFusionRow  (variant: Variant) : DTO.Fusion option =
                 variant.TryRelevantFusion |> Option.map (fun fusion ->
-                    { CreatedAt = DateTime.Now
-                      Gene1Name = fusion.``3' Gene``.Name
+                    { Gene1Name = fusion.``3' Gene``.Name
                       Gene2Name = fusion.``5' Gene``.Name
                       Type      = variant.Type.Value
                       Description = None
@@ -1728,8 +1724,7 @@ module Tempus =
 
             /// convert a somatic variant of unknown significance to a row in the `variants` database table
             let toVariantRow (vus: SomaticVUS) : DTO.Variant =
-                { CreatedAt = DateTime.Now
-                  // foreign keys
+                { // foreign keys
                   GeneName = vus.Gene.Name
                   // identifier
                   Name = vus.Hgvs.MutationEffect
@@ -1750,8 +1745,7 @@ module Tempus =
 
         module Fusion =
             let toRow (fusion: Fusion) : DTO.Fusion =
-                { CreatedAt = DateTime.Now
-                  Gene1Name = fusion.``5' Gene``.Name
+                { Gene1Name = fusion.``5' Gene``.Name
                   Gene2Name = fusion.``3' Gene``.Name
 
                   Type = fusion.TryTypeValue |> Option.defaultValue ""
@@ -1764,8 +1758,7 @@ module Tempus =
 
             let toRows (variants: InheritedRelevantVariants) : DTO.Variant list =
                 variants.Values |> List.map (fun variant ->
-                    { CreatedAt = DateTime.Now
-                      // foreign keys
+                    { // foreign keys
                       GeneName = variant.Gene.Name
                       // identifier
                       Name = variant.HGVS.MutationEffect
@@ -1790,8 +1783,7 @@ module Tempus =
 
             let toRows (vus: InheritedVUS) : DTO.Variant list =
                 vus.Values |> List.map (fun variant ->
-                    { CreatedAt = DateTime.Now
-                      // foreign keys
+                    { // foreign keys
                       GeneName = variant.Gene.Name
                       // identifier
                       Name = variant.HGVS.MutationEffect
@@ -1817,8 +1809,7 @@ module Tempus =
 
             patient.MRN
             |> Option.map (fun mrn ->
-                { CreatedAt   = DateTime.Now
-                  MRN         = mrn
+                { MRN         = mrn
                   LastName    = patient.LastName
                   FirstName   = patient.FirstName
                   DateOfBirth = patient.DateOfBirth
@@ -1845,8 +1836,7 @@ module Tempus =
                 let order = overallReport.Order
                 let results = overallReport.Results
 
-                { CreatedAt = DateTime.Now
-                  ReportId = report.ReportId.Value.ToString()
+                { ReportId = report.ReportId.Value.ToString()
                   IssuedDate = report.SignoutDate.Value
                   // foreign keys
                   PatientMRN = mrn
@@ -1870,8 +1860,7 @@ module Tempus =
         let toCancerousSampleRow (overallReport: OverallReport) : DTO.Sample =
             let cancerousSample = overallReport.CancerousSample
 
-            { CreatedAt  = DateTime.Now
-              SampleId   = cancerousSample.SampleId.Value.ToString()
+            { SampleId   = cancerousSample.SampleId.Value.ToString()
               Category   = cancerousSample.Category.Value
               BiopsySite = cancerousSample.Site.Value |> Some
               SampleType = cancerousSample.Type.Value
@@ -1881,8 +1870,7 @@ module Tempus =
         let tryNormalSampleRow (overallReport: OverallReport) : DTO.Sample option =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
-                { CreatedAt  = DateTime.Now
-                  Category   = "normal"
+                { Category   = "normal"
                   SampleId   = normalSample.SampleId.Value.ToString()
                   BiopsySite = normalSample.Site.Value |> Some
                   SampleType = normalSample.Type.Value
@@ -1894,8 +1882,7 @@ module Tempus =
             let report = overallReport.Report
             let cancerousSample = overallReport.CancerousSample
 
-            { CreatedAt = DateTime.Now
-              SampleId = cancerousSample.SampleId.Value.ToString()
+            { SampleId = cancerousSample.SampleId.Value.ToString()
               ReportId = report.ReportId.Value.ToString()
               BlockId  = cancerousSample.BlockId
 
@@ -1912,8 +1899,7 @@ module Tempus =
             |> Option.map (fun normalSample ->
                 let report = overallReport.Report
 
-                { CreatedAt = DateTime.Now
-                  // foreign keys
+                { // foreign keys
                   SampleId = normalSample.SampleId.Value.ToString()
                   ReportId = report.ReportId.Value.ToString()
                   // identifier
@@ -1943,8 +1929,7 @@ module Tempus =
             @ inheritedRelevantGenes
             @ inheritedVusGenes
             |> List.map (fun gene ->
-                { CreatedAt = System.DateTime.Now
-                  Name = gene.Name
+                { Name = gene.Name
                   HgncId = Some gene.HgncId.Value
                   EntrezId = None
                 }
@@ -2002,18 +1987,18 @@ module Tempus =
 
         open Utilities
 
-        let create (overallReport: OverallReport) : DTO option =
+        /// Create a DTO to be inserted into the databased based on information found in this report
+        let tryCreate (overallReport: OverallReport) : DTO option =
             overallReport
             |> tryPatientRow
             |> Option.map (fun patientRow ->
                 let normalSampleDTOs =
                     (overallReport |> tryNormalSampleRow,
-                     overallReport |> tryNormalSampleReportRow)
-                     ||> Option.map2 (fun sample sampleReport ->
+                     overallReport |> tryNormalSampleReportRow
+                    ) ||> Option.map2 (fun sample sampleReport ->
                         ({ Sample = sample
                            SampleReport = sampleReport
-                        })
-                )
+                        }))
 
                 { Vendor = overallReport |> toVendorRow
                   Patient = patientRow
