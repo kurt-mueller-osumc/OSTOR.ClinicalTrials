@@ -1624,54 +1624,67 @@ module Tempus =
             }
 
     module DTO =
+        open Core
         open Database
+        open System
 
         module SomaticPotentiallyActionable =
             open SomaticPotentiallyActionable
+            open type Variant.Category
 
             module Mutation =
                 /// Convert a somatic, potentially actionable mutation to rows in the `variants` database table
                 /// Sample report must already exist.
-                let toVariantRows (sampleReportId: System.Guid) (mutation: Mutation) =
+                let toVariantRows (sampleReportId: Guid) (mutation: Mutation) : DTO.Variant list =
                     mutation.Variants
                     |> List.map (fun variant ->
-                        let row = context.Public.Variants.Create()
 
-                        row.GeneName <- mutation.Gene.Name.Value
-                        row.SampleReportId <- sampleReportId
-                        row.Name <- variant.HGVS.MutationEffect
-
-                        row.Category <- "somatic"
-                        row.Description <- variant.Description.Value |> Some
-                        row.Assessment <- "potentially actionable" |> Some
-
-                        row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
-                        row.HgvsProtein <- variant.HGVS.TryAbbreviatedProteinChangeValue
-                        row.HgvsProteinFull <- variant.HGVS.TryFullProteinChangeValue
-                        row.HgvsC <- variant.HGVS.CodingChange.Value |> Some
-                        row.Transcript <- variant.HGVS.ReferenceSequence.Value |> Some
-
-                        row.AllelicFraction <- variant.TryAllelicFractionValue
-
-                        row
+                        { CreatedAt = DateTime.Now
+                          // foreign keys
+                          GeneName = mutation.Gene.Name
+                          SampleReportId = sampleReportId
+                          // identifier
+                          Name = variant.HGVS.MutationEffect
+                          Category = Somatic
+                          // opinion
+                          Type = None
+                          Assessment = "potentially actionable" |> Some
+                          // info
+                          Description = variant.Description.Value |> Some
+                          AllelicFraction = variant.TryAllelicFractionValue
+                          // HGVS
+                          NucleotideAlteration = variant.TryNucleotideAlterationValue
+                          HgvsProteinAbbreviatedChange = variant.HGVS.TryAbbreviatedProteinChangeValue
+                          HgvsProteinFullChange = variant.HGVS.TryFullProteinChangeValue
+                          HgvsCodingChange = variant.HGVS.CodingChange.Value |> Some
+                          Transcript = variant.HGVS.ReferenceSequence.Value |> Some
+                        }
                     )
 
             module CopyNumberVariant =
                 /// Convert a somatic, potentially actionable copy number variant to a row in the `variants` database table
                 /// Sample report must already exist.
-                let toVariantRows (sampleReportId: System.Guid) (copyNumberVariant: CopyNumberVariant) =
-                    let row = context.Public.Variants.Create()
-
-                    row.GeneName <- copyNumberVariant.Gene.Name.Value
-                    row.SampleReportId <- sampleReportId
-                    row.Name <- copyNumberVariant.Gene.Name.Value
-
-                    row.Category <- "somatic"
-                    row.Description <- copyNumberVariant.Description.Value |> Some
-                    row.Assessment <- "potentially actionable" |> Some
-                    row.Type <- copyNumberVariant.Type.Value |> Some
-
-                    row
+                let toVariantRow (sampleReportId: Guid) (copyNumberVariant: CopyNumberVariant) : DTO.Variant =
+                    { CreatedAt = DateTime.Now
+                      // foreign keys
+                      GeneName = copyNumberVariant.Gene.Name
+                      SampleReportId = sampleReportId
+                      // identifier
+                      Name = copyNumberVariant.Gene.Name.Value
+                      Category = Somatic
+                      // opinion
+                      Type = copyNumberVariant.Type.Value |> Some
+                      Assessment = "potentially actionable" |> Some
+                      // info
+                      Description = copyNumberVariant.Description.Value |> Some
+                      AllelicFraction = None
+                      // HGVS
+                      Transcript = None
+                      HgvsCodingChange = None
+                      HgvsProteinFullChange = None
+                      HgvsProteinAbbreviatedChange = None
+                      NucleotideAlteration = None
+                    }
 
         module SomaticBiologicallyRelevantVariant =
             open SomaticBiologicallyRelevant
