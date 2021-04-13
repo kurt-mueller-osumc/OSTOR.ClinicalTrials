@@ -52,8 +52,7 @@ module Database =
 
         /// A dto representing a row in the `patients` table
         type Patient =
-            { CreatedAt: DateTime
-              MRN: Patient.MRN
+            { MRN: Patient.MRN
               FirstName: Person.FirstName
               LastName: Person.LastName
               DateOfBirth: Person.DateOfBirth
@@ -61,9 +60,10 @@ module Database =
 
             member this.Row =
                 let row = context.Public.Patients.Create()
+                let now = DateTime.Now
 
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
                 row.Mrn <- this.MRN.Value
                 row.FirstName <- this.FirstName.Value
                 row.LastName <- this.LastName.Value
@@ -77,17 +77,17 @@ module Database =
 
         /// A dto representing a row in the `genes` table
         type Gene =
-            { CreatedAt: DateTime
-              Name: Gene.Name
+            { Name: Gene.Name
               EntrezId: int option
               HgncId: string option }
 
             /// Build a row to be inserted into `genes` table
             member this.Row =
                 let row = context.Public.Genes.Create()
+                let now = DateTime.Now
 
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
 
                 row.Name <- this.Name.Value
                 row.EntrezId <- this.EntrezId
@@ -100,8 +100,7 @@ module Database =
 
         /// A dto representing a row in the `samples` table
         type Sample =
-            { CreatedAt: DateTime
-              SampleId: string
+            { SampleId: string
               SampleType: string
               Category: string
               BiopsySite: string option }
@@ -109,9 +108,10 @@ module Database =
             /// Build a row to be inserted into `samples` table
             member this.Row =
                 let row = context.Public.Samples.Create()
+                let now = DateTime.Now
 
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
 
                 row.SampleId <- this.SampleId
                 row.SampleType <- this.SampleType
@@ -125,7 +125,6 @@ module Database =
 
         type Report =
             { // meta
-              CreatedAt: DateTime
               ReportId: string
               IssuedDate: DateTime
               // foreign keys
@@ -147,10 +146,11 @@ module Database =
 
             member this.Row =
                 let row = context.Public.Reports.Create()
+                let now = DateTime.Now
 
                 // meta
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
                 row.ReportId <- this.ReportId
                 row.IssuedDate <- this.IssuedDate
 
@@ -176,8 +176,7 @@ module Database =
                 row
 
         type SampleReport =
-            { CreatedAt: DateTime
-              // foreign keys
+            { // foreign keys
               SampleId: string
               ReportId: string
               // identifier
@@ -189,9 +188,10 @@ module Database =
 
             member this.Row =
                 let row = context.Public.SampleReports.Create()
+                let now = DateTime.Now
 
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
 
                 row.SampleId <- this.SampleId
                 row.ReportId <- this.ReportId
@@ -205,8 +205,7 @@ module Database =
                 row
 
         type Variant =
-            { CreatedAt: DateTime
-              // foreign keys
+            { // foreign keys
               GeneName: Gene.Name
               // identifier
               Name: string
@@ -227,9 +226,10 @@ module Database =
 
             member this.ToRow (sampleReportId: Guid) =
                 let row = context.Public.Variants.Create()
+                let now = DateTime.Now
 
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
 
                 // foreign keys
                 row.GeneName <- this.GeneName.Value
@@ -261,8 +261,7 @@ module Database =
 
 
         type Fusion =
-            { CreatedAt: DateTime
-              // foreign keys
+            { // foreign keys
               Gene1Name: Gene.Name
               Gene2Name: Gene.Name
               // info
@@ -272,9 +271,10 @@ module Database =
 
             member this.ToRow (sampleReportId: Guid) =
                 let row = context.Public.Fusions.Create()
+                let now = DateTime.Now
 
-                row.CreatedAt <- this.CreatedAt
-                row.UpdatedAt <- this.CreatedAt
+                row.CreatedAt <- now
+                row.UpdatedAt <- now
 
                 row.FirstGeneName <- this.Gene1Name.Value
                 row.SecondGeneName <- this.Gene2Name.Value
