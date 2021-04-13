@@ -1698,14 +1698,13 @@ module Tempus =
             /// Try to convert a somatic, biologically relevant variant to a row in the `fusions` database table
             let tryFusionRow (sampleReportId: System.Guid) (variant: Variant) : DTO.Fusion option =
                 variant.TryRelevantFusion |> Option.map (fun fusion ->
-                    let row = context.Public.Fusions.Create()
-
-                    row.SampleReportId <- sampleReportId
-                    row.FirstGeneName  <- fusion.``3' Gene``.Name.Value
-                    row.SecondGeneName <- fusion.``5' Gene``.Name.Value
-                    row.FusionType     <- variant.Type.Value
-
-                    row
+                    { CreatedAt = System.DateTime.Now
+                      SampleReportId = sampleReportId
+                      Gene1Name = fusion.``3' Gene``.Name
+                      Gene2Name = fusion.``5' Gene``.Name
+                      Type      = variant.Type.Value
+                      Description = None
+                    }
                 )
 
         module SomaticVUS =
@@ -1733,17 +1732,16 @@ module Tempus =
                 row
 
         module Fusion =
-            let toFusionRow (sampleReportId: System.Guid) (fusion: Fusion) =
-                let row = context.Public.Fusions.Create()
+            let toRow (sampleReportId: System.Guid) (fusion: Fusion) : DTO.Fusion =
+                { CreatedAt = System.DateTime.Now
+                  Gene1Name = fusion.``5' Gene``.Name
+                  Gene2Name = fusion.``3' Gene``.Name
+                  SampleReportId = sampleReportId
 
-                row.FirstGeneName <- fusion.``5' Gene``.Name.Value
-                row.SecondGeneName <- fusion.``3' Gene``.Name.Value
-                row.SampleReportId <- sampleReportId
+                  Type = fusion.TryTypeValue |> Option.defaultValue ""
+                  Description = fusion.Description |> Some
+                }
 
-                row.FusionType <- fusion.TryTypeValue |> Option.defaultValue ""
-                row.Description <- fusion.VariantDescription.Value |> Some
-
-                row
 
         module InheritedRelevantVariant =
             let toVariantRows (sampleReportId: System.Guid) (variants: InheritedRelevantVariants) =
@@ -1910,7 +1908,7 @@ module Tempus =
                 row
             )
 
-        let toGeneRows (overallReport: OverallReport) =
+        let toGeneRows (overallReport: OverallReport) : DTO.Gene list =
             let results = overallReport.Results
             let somaticPotentiallyActionableGenes = results.``Somatic Potentially Actionable Mutations`` |> List.map (fun mutation -> mutation.Gene)
             let somaticPotentiallyActionableCopyNumberGenes = results.``Somatic Potentially Actionable Copy Number Variants`` |> List.map (fun variant -> variant.Gene)
@@ -1928,12 +1926,11 @@ module Tempus =
             @ inheritedRelevantGenes
             @ inheritedVusGenes
             |> List.map (fun gene ->
-                let row = context.Public.Genes.Create()
-
-                row.Name <- gene.Name.Value
-                row.HgncId <- Some gene.HgncId.Value
-
-                row
+                { CreatedAt = System.DateTime.Now
+                  Name = gene.Name
+                  HgncId = Some gene.HgncId.Value
+                  EntrezId = None
+                }
             )
 
         /// Build variant rows to be inserted into the `variants` database table. This function assumes that an existing sample report exists in the dtabase.
@@ -1981,7 +1978,7 @@ module Tempus =
 
             let fusionRows =
                 results.Fusions
-                |> List.map (Fusion.toFusionRow sampleReportId)
+                |> List.map (Fusion.toRow sampleReportId)
 
             relevantFusionRows
             @ fusionRows
@@ -2007,7 +2004,7 @@ module Tempus =
 
                 context.SubmitUpdates()
 
-                let sampleReportId = querySampleReportId overallReport.Report.ReportId overallReport.CancerousSample.SampleId
+                let sampleReportId = querySampleReportId overallReport.Report.ReportId.Value overallReport.CancerousSample.SampleId.Value
 
                 overallReport |> toVariantRows sampleReportId |> ignore
                 overallReport |> toFusionRows sampleReportId |> ignore
