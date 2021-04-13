@@ -1687,31 +1687,38 @@ module Tempus =
                     }
 
         module SomaticBiologicallyRelevantVariant =
+            open type Variant.Category
             open SomaticBiologicallyRelevant
 
             /// Try to convert a somatic, biologically relevant variant to a row in the `variants` database table
-            let tryVariantRow (sampleReportId: System.Guid) (variant: Variant) =
+            let tryVariantRow (sampleReportId: Guid) (variant: Variant) : DTO.Variant option =
                 variant.TryRelevantGene |> Option.map (fun relevantGene ->
-                    let row = context.Public.Variants.Create()
-
-                    row.GeneName       <- relevantGene.Name.Value
-                    row.SampleReportId <- sampleReportId
-                    row.Name <- variant.TryHgvsMutationEffect |> Option.defaultValue relevantGene.Name.Value
-
-                    row.Category   <- "somatic"
-                    row.Assessment <- "biologically relevant"    |> Some
-                    row.Type       <- variant.Type.Value |> Some
-                    row.NucleotideAlteration <- variant.TryNucleotideAlterationValue
-
-                    row.AllelicFraction <- variant.TryAllelicFractionValue
-
-                    row
+                    { CreatedAt = DateTime.Now
+                      // foreign keys
+                      GeneName       = relevantGene.Name
+                      SampleReportId = sampleReportId
+                      // identifier
+                      Name = variant.TryHgvsMutationEffect |> Option.defaultValue relevantGene.Name.Value
+                      Category   = Somatic
+                      // opinions
+                      Type       = variant.Type.Value |> Some
+                      Assessment = "biologically relevant"    |> Some
+                      // info
+                      Description = None
+                      AllelicFraction = variant.TryAllelicFractionValue
+                      // HGVS
+                      Transcript = None
+                      HgvsCodingChange = None
+                      HgvsProteinFullChange = None
+                      HgvsProteinAbbreviatedChange = None
+                      NucleotideAlteration = variant.TryNucleotideAlterationValue
+                    }
                 )
 
             /// Try to convert a somatic, biologically relevant variant to a row in the `fusions` database table
-            let tryFusionRow (sampleReportId: System.Guid) (variant: Variant) : DTO.Fusion option =
+            let tryFusionRow (sampleReportId: Guid) (variant: Variant) : DTO.Fusion option =
                 variant.TryRelevantFusion |> Option.map (fun fusion ->
-                    { CreatedAt = System.DateTime.Now
+                    { CreatedAt = DateTime.Now
                       SampleReportId = sampleReportId
                       Gene1Name = fusion.``3' Gene``.Name
                       Gene2Name = fusion.``5' Gene``.Name
