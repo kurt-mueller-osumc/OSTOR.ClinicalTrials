@@ -96,7 +96,7 @@ module Database =
                 row
 
         module Gene =
-            let buildRow (dto: Gene) = dto.Row
+            let toRow (dto: Gene) = dto.Row
 
         /// A dto representing a row in the `samples` table
         type Sample =
@@ -121,7 +121,7 @@ module Database =
                 row
 
         module Sample =
-            let buildRow (dto: Sample) = dto.Row
+            let toRow (dto: Sample) = dto.Row
 
         type Report =
             { // meta
@@ -208,7 +208,6 @@ module Database =
             { CreatedAt: DateTime
               // foreign keys
               GeneName: Gene.Name
-              SampleReportId: Guid
               // identifier
               Name: string
               Category: Variant.Category
@@ -218,7 +217,6 @@ module Database =
               // info
               Description: string option
               AllelicFraction: float option
-
               // HGVS
               Transcript: string option
               HgvsCodingChange: string option
@@ -227,7 +225,7 @@ module Database =
               NucleotideAlteration: string option
             }
 
-            member this.Row =
+            member this.ToRow (sampleReportId: Guid) =
                 let row = context.Public.Variants.Create()
 
                 row.CreatedAt <- this.CreatedAt
@@ -235,7 +233,7 @@ module Database =
 
                 // foreign keys
                 row.GeneName <- this.GeneName.Value
-                row.SampleReportId <- this.SampleReportId
+                row.SampleReportId <- sampleReportId
 
                 // identifier
                 row.Name <- this.Name
@@ -258,19 +256,21 @@ module Database =
 
                 row
 
+        module Variant =
+            let toRow sampleReportId (variant: Variant) = variant.ToRow sampleReportId
+
 
         type Fusion =
             { CreatedAt: DateTime
               // foreign keys
               Gene1Name: Gene.Name
               Gene2Name: Gene.Name
-              SampleReportId: Guid
               // info
               Description: Fusion.Description option
               Type: string
             }
 
-            member this.Row =
+            member this.ToRow (sampleReportId: Guid) =
                 let row = context.Public.Fusions.Create()
 
                 row.CreatedAt <- this.CreatedAt
@@ -278,8 +278,63 @@ module Database =
 
                 row.FirstGeneName <- this.Gene1Name.Value
                 row.SecondGeneName <- this.Gene2Name.Value
-                row.SampleReportId <- this.SampleReportId
+                row.SampleReportId <- sampleReportId
                 row.Description <- this.Description |> Option.map (fun description -> description.Value)
                 row.FusionType <- this.Type
 
                 row
+
+        module Fusion =
+            let toRow sampleReportId (fusion: Fusion) = fusion.ToRow sampleReportId
+
+    type DTO =
+        { // top level entities
+          Vendor: DTO.Vendor
+          Patient: DTO.Patient
+          Genes: DTO.Gene list
+
+          // middle
+          Report: DTO.Report
+          NormalSample: SampleDTOs option
+          CancerousSample: SampleDTOs
+
+          // leafs
+          Variants: DTO.Variant list
+          Fusions: DTO.Fusion list
+        }
+
+        member this.Insert =
+            // insert top level entieties
+            this.Vendor.Row  |> ignore
+            this.Patient.Row |> ignore
+            this.Genes |> List.map DTO.Gene.toRow |> ignore
+
+            context.SubmitUpdates()
+
+            this.Report.Row |> ignore
+
+            this.NormalSample |> Option.map (fun dtos ->
+                (dtos.Sample.Row, dtos.SampleReport.Row)
+            ) |> ignore
+
+            this.CancerousSample.Sample.Row |> ignore
+            this.CancerousSample.SampleReport.Row |> ignore
+
+            context.SubmitUpdates()
+
+            let sampleReportId = querySampleReportId this.CancerousSample.SampleReport.ReportId this.CancerousSample.SampleReport.SampleId
+
+            this.Variants
+            |> List.map (DTO.Variant.toRow sampleReportId)
+            |> ignore
+
+            this.Fusions
+            |> List.map (DTO.Fusion.toRow sampleReportId)
+            |> ignore
+
+            context.SubmitUpdates()
+
+    and SampleDTOs =
+        { Sample: DTO.Sample
+          SampleReport: DTO.SampleReport }
+
