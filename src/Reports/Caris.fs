@@ -56,7 +56,6 @@ module Caris =
             member this.TryOrganizationValue =
                 this.Organization |> Option.map (fun org -> org.Value)
 
-
         module Specimen =
             type Identifier =
                 internal | Identifier of string
