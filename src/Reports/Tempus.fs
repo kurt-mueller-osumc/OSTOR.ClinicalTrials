@@ -1875,64 +1875,62 @@ module Tempus =
             )
 
         /// Build a row for the tumor sample to be inserted into the `samples` database table.
-        let toCancerousSampleRows (overallReport: OverallReport) =
-            let row = context.Public.Samples.Create()
+        let toCancerousSampleRow (overallReport: OverallReport) : DTO.Sample =
             let cancerousSample = overallReport.CancerousSample
 
-            row.SampleId   <- cancerousSample.SampleId.Value.ToString()
-            row.Category   <- cancerousSample.Category.Value
-            row.BiopsySite <- cancerousSample.Site.Value |> Some
-            row.SampleType <- cancerousSample.Type.Value
-
-            row
+            { CreatedAt  = DateTime.Now
+              SampleId   = cancerousSample.SampleId.Value.ToString()
+              Category   = cancerousSample.Category.Value
+              BiopsySite = cancerousSample.Site.Value |> Some
+              SampleType = cancerousSample.Type.Value
+            }
 
         /// Build a row for the normal sample, if it exists, to be inserted into the `samples` database table.
-        let tryNormalSampleRow (overallReport: OverallReport) =
+        let tryNormalSampleRow (overallReport: OverallReport) : DTO.Sample option =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
-                let row = context.Public.Samples.Create()
-
-                row.Category   <- "normal"
-                row.SampleId   <- normalSample.SampleId.Value.ToString()
-                row.BiopsySite <- normalSample.Site.Value |> Some
-                row.SampleType <- normalSample.Type.Value
-
-                row
+                { CreatedAt  = DateTime.Now
+                  Category   = "normal"
+                  SampleId   = normalSample.SampleId.Value.ToString()
+                  BiopsySite = normalSample.Site.Value |> Some
+                  SampleType = normalSample.Type.Value
+                }
             )
 
         /// Build a row for the tumor sample to be inserted into the `sample_reports` database table
-        let toCancerousSampleReportRow (overallReport: OverallReport) =
+        let toCancerousSampleReportRow (overallReport: OverallReport) : DTO.SampleReport =
             let report = overallReport.Report
             let cancerousSample = overallReport.CancerousSample
-            let row = context.Public.SampleReports.Create()
 
-            row.SampleId <- cancerousSample.SampleId.Value.ToString()
-            row.ReportId <- report.ReportId.Value.ToString()
-            row.BlockId  <- cancerousSample.TryBlockIdValue
+            { CreatedAt = DateTime.Now
+              SampleId = cancerousSample.SampleId.Value.ToString()
+              ReportId = report.ReportId.Value.ToString()
+              BlockId  = cancerousSample.BlockId
 
-            row.CollectionDate <- cancerousSample.Dates.CollectionDate.Value |> Some
-            row.ReceiptDate    <- cancerousSample.Dates.ReceivedDate.Value
+              CollectionDate = cancerousSample.Dates.CollectionDate |> Some
+              ReceivedDate   = cancerousSample.Dates.ReceivedDate
 
-            row.TumorPercentage <- cancerousSample.TryTumorPercentageValue |> Option.map int
+              TumorPercentage = cancerousSample.TryTumorPercentageValue |> Option.map int
+            }
 
-            row
 
         /// Build a row for the normal sample, if it exists, to be insterested into the `sample_reports` database table
-        let tryNormalSampleReportRow (overallReport: OverallReport) =
+        let tryNormalSampleReportRow (overallReport: OverallReport) : DTO.SampleReport option =
             overallReport.NormalSample
             |> Option.map (fun normalSample ->
-
                 let report = overallReport.Report
-                let row = context.Public.SampleReports.Create()
 
-                row.SampleId <- normalSample.SampleId.Value.ToString()
-                row.ReportId <- report.ReportId.Value.ToString()
-                row.BlockId  <- normalSample.TryBlockIdValue
-
-                row.CollectionDate <- normalSample.Dates.CollectionDate.Value |> Some
-                row.ReceiptDate    <- normalSample.Dates.ReceivedDate.Value
-
-                row
+                { CreatedAt = DateTime.Now
+                  // foreign keys
+                  SampleId = normalSample.SampleId.Value.ToString()
+                  ReportId = report.ReportId.Value.ToString()
+                  // identifier
+                  BlockId  = normalSample.BlockId
+                  // dates
+                  CollectionDate  = normalSample.Dates.CollectionDate |> Some
+                  ReceivedDate    = normalSample.Dates.ReceivedDate
+                  TumorPercentage = None
+                }
             )
 
         let toGeneRows (overallReport: OverallReport) : DTO.Gene list =
