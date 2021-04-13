@@ -75,6 +75,8 @@ module Database =
                 // patient demographics
                 row.Sex <- this.Sex
 
+                row.OnConflict <- Common.OnConflict.DoNothing
+
                 row
 
         module Patient =
@@ -98,6 +100,8 @@ module Database =
                 row.Name <- this.Name.Value
                 row.EntrezId <- this.EntrezId
                 row.HgncId <- this.HgncId
+
+                row.OnConflict <- Common.OnConflict.DoNothing
 
                 row
 
@@ -123,6 +127,8 @@ module Database =
                 row.SampleType <- this.SampleType
                 row.Category <- this.Category
                 row.BiopsySite <- this.BiopsySite
+
+                row.OnConflict <- Common.OnConflict.DoNothing
 
                 row
 
@@ -179,6 +185,8 @@ module Database =
                 row.TumorMutationalBurdenPercentile <- this.TumorMutationBurdenPercentile
                 row.MsiStatus <- this.MicrosatelliteInstabilityStatus
 
+                row.OnConflict <- Common.OnConflict.DoNothing
+
                 row
 
         type SampleReport =
@@ -207,6 +215,8 @@ module Database =
                 row.ReceiptDate <- this.ReceivedDate.Value
 
                 row.TumorPercentage <- this.TumorPercentage
+
+                row.OnConflict <- Common.OnConflict.DoNothing
 
                 row
 
@@ -260,6 +270,8 @@ module Database =
                 row.HgvsProtein <- this.HgvsProteinAbbreviatedChange
                 row.NucleotideAlteration <- this.NucleotideAlteration
 
+                row.OnConflict <- Common.OnConflict.DoNothing
+
                 row
 
         module Variant =
@@ -287,6 +299,8 @@ module Database =
                 row.SampleReportId <- sampleReportId
                 row.Description <- this.Description |> Option.map (fun description -> description.Value)
                 row.FusionType <- this.Type
+
+                row.OnConflict <- Common.OnConflict.DoNothing
 
                 row
 
