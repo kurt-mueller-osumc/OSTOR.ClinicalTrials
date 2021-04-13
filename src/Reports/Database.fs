@@ -44,6 +44,8 @@ module Database =
                 row.State <- lab.Address.State.Value
                 row.ZipCode <- lab.Address.Zip.Value
 
+                row.OnConflict <- Common.OnConflict.DoNothing
+
                 row
 
         module Vendor =
