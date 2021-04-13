@@ -257,3 +257,29 @@ module Database =
                 row.NucleotideAlteration <- this.NucleotideAlteration
 
                 row
+
+
+        type Fusion =
+            { CreatedAt: DateTime
+              // foreign keys
+              Gene1Name: Gene.Name
+              Gene2Name: Gene.Name
+              SampleReportId: Guid
+              // info
+              Description: Fusion.Description option
+              Type: string
+            }
+
+            member this.Row =
+                let row = context.Public.Fusions.Create()
+
+                row.CreatedAt <- this.CreatedAt
+                row.UpdatedAt <- this.CreatedAt
+
+                row.FirstGeneName <- this.Gene1Name.Value
+                row.SecondGeneName <- this.Gene2Name.Value
+                row.SampleReportId <- this.SampleReportId
+                row.Description <- this.Description |> Option.map (fun description -> description.Value)
+                row.FusionType <- this.Type
+
+                row
