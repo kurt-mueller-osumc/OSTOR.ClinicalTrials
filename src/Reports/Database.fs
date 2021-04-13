@@ -317,6 +317,8 @@ module Database =
 
             this.Report.Row |> ignore
 
+            context.SubmitUpdates()
+
             this.NormalSample |> Option.map (fun dtos ->
                 (dtos.Sample.Row, dtos.SampleReport.Row)
             ) |> ignore
