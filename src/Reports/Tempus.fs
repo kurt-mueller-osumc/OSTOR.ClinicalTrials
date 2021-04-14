@@ -894,12 +894,12 @@ module Tempus =
             module Dates =
                 /// Validate that sample's collection date happens before its received date
                 let validate dates : Result<Sample.Dates, string> =
-                    if dates.CollectionDate < dates.ReceivedDate then
+                    if dates.CollectionDate <= dates.ReceivedDate then
                         Ok ({ CollectionDate = CollectionDate dates.CollectionDate
                               ReceivedDate   = ReceivedDate dates.ReceivedDate
                             })
                     else
-                        Error $"Collection date, {dates.CollectionDate}, doesn't occur before received date, {dates.ReceivedDate}"
+                        Error $"Collection date, {dates.CollectionDate}, must occur before or on received date, {dates.ReceivedDate}"
 
 
         module CancerousSample =
