@@ -357,11 +357,11 @@ module FoundationMedicine =
                         Ok { CollectionDate = None
                              ReceivedDate = Sample.ReceivedDate receivedDate }
                     | Some collectionDate, receivedDate ->
-                        if collectionDate < receivedDate then
+                        if collectionDate <= receivedDate then
                             Ok { CollectionDate = Some <| Sample.CollectionDate collectionDate
                                  ReceivedDate = Sample.ReceivedDate receivedDate }
                         else
-                            Error "Collection date must occur before received date"
+                            Error "Collection date must occur on or before received date"
 
 
             open type Sample.ReceivedDate
