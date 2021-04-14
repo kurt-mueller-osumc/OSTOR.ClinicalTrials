@@ -1818,7 +1818,7 @@ module Tempus =
                 { MRN         = mrn
                   LastName    = patient.LastName
                   FirstName   = patient.FirstName
-                  DateOfBirth = patient.DateOfBirth
+                  DateOfBirth = patient.DateOfBirth |> Some
                   Sex         = patient.Sex.Value
                 }
             )

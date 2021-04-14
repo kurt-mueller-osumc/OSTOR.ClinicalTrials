@@ -1223,7 +1223,7 @@ module Caris =
                 { MRN = mrn
                   FirstName = patient.FirstName
                   LastName = patient.LastName
-                  DateOfBirth = patient.DateOfBirth
+                  DateOfBirth = patient.DateOfBirth |> Some
                   Sex = patient.Sex.Value
                 }
             )

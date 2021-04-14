@@ -57,7 +57,7 @@ module Database =
             { MRN: Patient.MRN
               FirstName: Person.FirstName
               LastName: Person.LastName
-              DateOfBirth: Person.DateOfBirth
+              DateOfBirth: Person.DateOfBirth option
               Sex: string }
 
             member this.Row =
@@ -71,7 +71,7 @@ module Database =
                 // patient info
                 row.FirstName <- this.FirstName.Value
                 row.LastName <- this.LastName.Value
-                row.DateOfBirth <- this.DateOfBirth.Value
+                row.DateOfBirth <- this.DateOfBirth |> Option.map (fun dob -> dob.Value)
                 // patient demographics
                 row.Sex <- this.Sex
 

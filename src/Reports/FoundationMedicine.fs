@@ -1081,11 +1081,10 @@ module FoundationMedicine =
                 { MRN          = mrn
                   LastName     = pmi.LastName
                   FirstName    = pmi.FirstName
-                  DateOfBirth  = pmi.DateOfBirth.Value // assume that the optional dob exists and get the underlying datetime
+                  DateOfBirth  = pmi.DateOfBirth
                   Sex          = pmi.Gender.Value
                 }
             )
-
 
         /// Build a row to be inserted in the `reports` database table, if the associated patient has an MRN.
         let tryReportRow (report: Report) : DTO.Report option =
@@ -1202,7 +1201,9 @@ module FoundationMedicine =
         open Utilities
 
         let tryCreate (report: Report) : DTO option =
-            report |> tryPatientRow |> Option.map (fun patientRow ->
+            report
+            |> tryPatientRow
+            |> Option.map (fun patientRow ->
                 { Vendor = report |> toVendorRow
                   Patient = patientRow
                   Genes = report |> toGeneRows
