@@ -527,11 +527,11 @@ module Caris =
 
             module Dates =
                 let validate (input: SpecimenDates) : Result<Specimen.Dates, string> =
-                    if input.CollectionDate < input.ReceivedDate then
+                    if input.CollectionDate <= input.ReceivedDate then
                         Ok <| { CollectionDate = Sample.CollectionDate input.CollectionDate
                                 ReceivedDate   = Sample.ReceivedDate   input.ReceivedDate }
                     else
-                        Error "Sample collection date must occur before received date"
+                        Error "Sample collection date must occur on or before received date"
 
             open FsToolkit.ErrorHandling
 
@@ -542,9 +542,6 @@ module Caris =
                     and! specimenType = Type.validate sample.Type
                     and! specimenSite = Site.validate sample.Site
                     and! sampleDates = Dates.validate sample.Dates
-
-                    // let collectionDate = CollectionDate sample.CollectionDate
-                    // let receivedDate = ReceivedDate sample.ReceivedDate
 
                     return ({
                         SpecimenId = specimenId
