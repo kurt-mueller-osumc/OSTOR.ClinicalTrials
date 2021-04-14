@@ -1601,8 +1601,10 @@ module Tempus =
             deserialize
             >> Result.mapError (fun errMsg -> { FileName = fileName; Error = errMsg })
 
+        open Core.Input
+
         /// Validate an overall report
-        let validate (overallReport: OverallReport) : Validation<Domain.OverallReport, string> =
+        let validate (overallReport: OverallReport) : Result<Domain.OverallReport, Report.ValidationError> =
             validation {
                 let! lab     = overallReport.Lab     |> Lab.validate
                 and! report  = overallReport.Report  |> Report.validate
@@ -1621,7 +1623,11 @@ module Tempus =
                     NormalSample = normalSample
                     Results = results
                 })
-            }
+            } |> Result.mapError (fun errors ->
+                { ReportId = overallReport.Report.ReportId.ToString()
+                  Errors = errors
+                }
+            )
 
     module DTO =
         open Core
