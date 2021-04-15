@@ -417,7 +417,7 @@ module Tempus =
                 internal | ``Variant of Unknown Significance``
                 member this.Value =
                     match this with
-                    | ``Variant of Unknown Significance`` -> "variant of unknown signficance"
+                    | ``Variant of Unknown Significance`` -> "variant of unknown significance"
 
         type InheritedRelevantVariants = InheritedVariants<InheritedRelevantVariants.ClinicalSignificance>
         type InheritedVUS = InheritedVariants<InheritedVUS.ClinicalSignificance>
@@ -1352,7 +1352,7 @@ module Tempus =
                     { NoteJson = "note"   |> flip get.Required.Field Decoder.Optional.string
                       Values   = "values" |> flip get.Required.Field (Decode.list InheritedVariantValue.Decoder) }
                 )
-        /// generic logic inherited variant sections: `results.inheritedRelevantVariants`, `results.inheritedVariantsOfUnknownSignficance`
+        /// generic logic inherited variant sections: `results.inheritedRelevantVariants`, `results.inheritedVariantsOfUnknownSignificance`
         module InheritedVariants =
             open StringValidations.Typed
 
@@ -1444,7 +1444,7 @@ module Tempus =
             module ClinicalSignificance =
                 open type InheritedRelevantVariants.ClinicalSignificance
 
-                /// Validate that an inherited relevant variant's clinical signficance is either "Likely Pathogenic", "Pathogenic", "Risk Allele", or "VUS Favoring Pathogenic"
+                /// Validate that an inherited relevant variant's clinical significance is either "Likely Pathogenic", "Pathogenic", "Risk Allele", or "VUS Favoring Pathogenic"
                 let validate input =
                     match input with
                     | "Likely Pathogenic" -> Ok ``Likely Pathogenic``
@@ -1457,12 +1457,12 @@ module Tempus =
             let validate (variant: InheritedVariants) : Validation<Domain.InheritedRelevantVariants,string> =
                 variant |> InheritedVariants.validate ClinicalSignificance.validate
 
-        /// logic for `results.InheritedVariantsOfUnknownSignficance` section
+        /// logic for `results.InheritedVariantsOfUnknownSignificance` section
         module InheritedVUS =
             module ClinicalSignificance =
                 open type InheritedVUS.ClinicalSignificance
 
-                /// Validate that a VUS clinical signficance is "Variant of Unknown Significance"
+                /// Validate that a VUS clinical significance is "Variant of Unknown Significance"
                 let validate input =
                     match input with
                     | "Variant of Unknown Significance" -> Ok ``Variant of Unknown Significance``
